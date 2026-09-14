@@ -23,6 +23,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - **Admin Listas tab** — manage lookup lists (expense categories, income types, etc.) without editing code constants.
 - Badge redesign (3×2in, left-aligned text, larger QR) with QR code linking to per-registration check-in URL.
 - **Maintenance mode** — `MAINTENANCE_MODE` flag in `src/constants/index.js`; while on, only admin PINs can log in (non-admin logins blocked, cached non-admin sessions kicked to `/login` via `AuthGate`), and all public routes (`/events/register`, `/events/lookup`, `/events/checkin`, `/events/selfcheckin/:eventId`, `/songs/:date`) show a bilingual maintenance notice instead of their normal content. Login screen shows the same notice as a banner above the PIN form. Added ahead of upcoming structural changes; flip the flag back to `false` to reopen.
+- `MAINTENANCE_ALLOWED_USER_IDS` — small allowlist of non-admin `app_users.id`s permitted to log in while maintenance mode is on, for staff who need access without lifting the lockdown for everyone (currently: Nairon Pimentel, pastor).
 
 ### Changed
 - **Renamed project** from `events-app` to `mcc-newark-hub` for consistency with the app's own branding: GitHub repo (`MCC-Newark-Hub/mcc-newark-hub`, auto-redirected from the old name), package name (already `mcc-newark-hub`), Supabase project display name, docs (README, CONTRIBUTING, mkdocs.yml, docs/dev/*), and CHANGELOG title. `mcc-newark-hub.vercel.app` added as a new Vercel domain (production, no redirect) alongside the existing `mcc-newark-events.vercel.app`, which stays live indefinitely so already-printed badge QR codes and shared links keep working unchanged.
@@ -32,6 +33,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Waitlist filter and member category sync on class move (CIA report work).
 - Middle dot rendering as literal `·` in ClerkView stats.
 - In-app Help modal and login screen tutorial link pointed at the old GitHub Pages docs URL (`.../events-app/`), which started 404ing the moment the repo was renamed — updated both to `.../mcc-newark-hub/`.
+- Balanço's "Arrecadado" total excluded paid registrations that were later cancelled, undercounting real revenue (cancellation doesn't refund a payment already collected) — `paid` in `TreasurerView.jsx`'s `BalanceTab` no longer filters out cancelled rows.
 
 ### In progress
 - Password reset flow for internal users

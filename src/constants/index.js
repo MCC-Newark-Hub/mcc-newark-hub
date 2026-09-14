@@ -5,6 +5,13 @@
 // Set back to false to reopen the app.
 export const MAINTENANCE_MODE = true;
 
+// app_users.id of non-admin users allowed to log in during maintenance, in
+// addition to admins. Keep this list short and remove entries once they're
+// no longer needed.
+export const MAINTENANCE_ALLOWED_USER_IDS = [
+  4, // Nairon Pimentel (pastor)
+];
+
 // ── Categories, Roles, Teams, Churches ────────────────────────────────────────
 
 export const CATEGORIES = ["0-3", "Criança", "Intermediário", "Adolescente", "Jovem", "Adulto"];

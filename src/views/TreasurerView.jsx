@@ -20,7 +20,9 @@ function fmtCur(n) { return "$" + Number(n || 0).toFixed(2); }
 // ── Balance tab ───────────────────────────────────────────────────────────────
 function BalanceTab({ eventRegs, expenses, extras }) {
   const active  = eventRegs.filter((r) => !r.cancelled && !r.waitlisted);
-  const paid    = active.filter((r) => r.paid && !r.exempt);
+  // Money already collected stays counted even if the person later cancelled —
+  // cancellation doesn't refund the payment, so it shouldn't drop out of Arrecadado.
+  const paid    = eventRegs.filter((r) => !r.waitlisted && r.paid && !r.exempt);
   const pending = active.filter((r) => !r.paid && !r.exempt && r.fee > 0);
   const exempt  = active.filter((r) => r.exempt);
 
