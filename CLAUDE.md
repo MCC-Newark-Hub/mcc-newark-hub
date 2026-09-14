@@ -16,6 +16,10 @@ npm run preview      # Preview production build locally
 
 Path alias: `@/` maps to `./src/` (configured in `vite.config.js`).
 
+## Changelog
+
+Every change (feature, fix, refactor) must be added to `CHANGELOG.md` under `[Unreleased]` in the same commit/session that makes it — not deferred. Use the categories already defined at the bottom of that file (Added/Changed/Fixed/Removed/Security/Database).
+
 ## Architecture
 
 ### Router

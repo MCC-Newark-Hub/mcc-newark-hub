@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { INIT_USERS } from "@/dev/seeds";
+import { MAINTENANCE_MODE } from "@/constants";
 
 export function useAuth(dbUsers) {
   const [user, setUser] = useState(null);
@@ -27,6 +28,7 @@ export function useAuth(dbUsers) {
         teamLeads: u.team_leads || u.teamLeads || [],
         showFinancials: u.show_financials !== false,
       };
+      if (MAINTENANCE_MODE && !mapped.sysRoles.includes("admin")) return null;
       setUser(mapped);
       return mapped;
     }

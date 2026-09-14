@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { STRINGS } from "@/i18n/strings";
+import { MAINTENANCE_MODE } from "@/constants";
 import ICMLogo from "@/components/ICMLogo";
 import PinLogin from "@/components/PinLogin";
+import MaintenanceNotice from "@/components/MaintenanceNotice";
 
 export default function HubLoginScreen({ login, lang, setLang }) {
   const t = STRINGS[lang] || STRINGS.pt;
+  const pt = lang !== "en";
   const navigate = useNavigate();
   const location = useLocation();
   const [pin, setPin] = useState("");
@@ -18,6 +21,9 @@ export default function HubLoginScreen({ login, lang, setLang }) {
       // Legacy mcc_view values map to /events
       const dest = from && !STAFF_VIEWS.includes(from) ? from : "/";
       navigate(dest, { replace: true });
+    } else if (MAINTENANCE_MODE) {
+      setErr(pt ? "PIN incorreto ou acesso restrito durante a manutenção." : "Incorrect PIN or access restricted during maintenance.");
+      setPin("");
     } else {
       setErr(t.wrongPin || "PIN incorreto.");
       setPin("");
@@ -47,6 +53,7 @@ export default function HubLoginScreen({ login, lang, setLang }) {
         <p style={{ color: "rgba(255,255,255,.7)", fontSize: 14, marginBottom: 28 }}>
           {lang === "en" ? "Church Portal" : "Portal da Igreja"}
         </p>
+        {MAINTENANCE_MODE && <MaintenanceNotice lang={lang} variant="banner" />}
         <PinLogin
           pin={pin}
           setPin={setPin}

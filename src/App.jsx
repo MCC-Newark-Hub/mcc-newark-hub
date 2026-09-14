@@ -141,7 +141,7 @@ export default function App() {
               } />
 
               {/* Public: event flows (no PIN required) */}
-              <Route element={<PublicLayout />}>
+              <Route element={<PublicLayout lang={lang} />}>
                 <Route path="/events/register" element={
                   <PublicPortal
                     event={appData.event}

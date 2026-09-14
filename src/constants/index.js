@@ -1,3 +1,10 @@
+// ── Maintenance Mode ────────────────────────────────────────────────────────
+// While true: only admin PINs can log in (non-admin logins and cached non-admin
+// sessions are blocked), and all public routes (register, lookup, check-in,
+// songs) show a maintenance notice instead of their normal content.
+// Set back to false to reopen the app.
+export const MAINTENANCE_MODE = true;
+
 // ── Categories, Roles, Teams, Churches ────────────────────────────────────────
 
 export const CATEGORIES = ["0-3", "Criança", "Intermediário", "Adolescente", "Jovem", "Adulto"];
