@@ -12,8 +12,8 @@
 ## 1. Clone and install
 
 ```bash
-git clone https://github.com/mcc-newark-hub/events-app.git
-cd events-app
+git clone https://github.com/mcc-newark-hub/mcc-newark-hub.git
+cd mcc-newark-hub
 npm install
 ```
 
@@ -22,7 +22,7 @@ npm install
 ## 2. Create a Supabase project
 
 1. Log in to [supabase.com](https://supabase.com/)
-2. Click **New project** — name it `events-app-local` (or similar)
+2. Click **New project** — name it `mcc-newark-hub-local` (or similar)
 3. Wait for provisioning (~1 minute)
 4. Go to **Settings → API** and copy:
    - **Project URL** → `VITE_SUPABASE_URL`

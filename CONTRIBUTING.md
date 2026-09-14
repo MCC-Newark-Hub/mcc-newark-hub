@@ -1,4 +1,4 @@
-# Contributing to events-app
+# Contributing to mcc-newark-hub
 
 This is a private project maintained for Igreja Cristã Maranata, Newark, NJ. If you're reading this, you've been added as a collaborator — welcome.
 

@@ -1,10 +1,10 @@
 site_name: ICM Newark — Sistema de Inscrições
 site_description: Guia de usuário e documentação do sistema de inscrições da Igreja Cristã Maranata Newark
 site_author: ICM Newark
-site_url: https://mcc-newark-hub.github.io/events-app/
+site_url: https://mcc-newark-hub.github.io/mcc-newark-hub/
 
-repo_name: events-app
-repo_url: https://github.com/mcc-newark-hub/events-app
+repo_name: mcc-newark-hub
+repo_url: https://github.com/mcc-newark-hub/mcc-newark-hub
 
 theme:
   name: material
@@ -76,5 +76,5 @@ nav:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/mcc-newark-hub/events-app
+      link: https://github.com/mcc-newark-hub/mcc-newark-hub
 

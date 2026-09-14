@@ -201,7 +201,7 @@ Migrations in `migrations/001–010`.
 ## Vercel Dev/Staging Setup (manual steps — not yet done)
 
 To avoid testing against production data:
-1. Create a second Supabase project (e.g. "events-app-staging")
+1. Create a second Supabase project (e.g. "mcc-newark-hub-staging")
 2. Run all migrations from `migrations/` on the staging project
 3. In Vercel Dashboard → Project → Settings → Environment Variables:
    - Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_KEY` for the **Preview** environment pointing to the staging Supabase project

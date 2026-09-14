@@ -189,7 +189,7 @@ function LoginScreen({ login, lang, setLang, event, activeCount, waitlistedCount
               <Lock size={18} /> {t.teamAccess}
             </button>
             <a
-              href="https://mcc-newark-hub.github.io/events-app/tutorials/first-login/"
+              href="https://mcc-newark-hub.github.io/mcc-newark-hub/tutorials/first-login/"
               target="_blank"
               rel="noopener noreferrer"
               style={{

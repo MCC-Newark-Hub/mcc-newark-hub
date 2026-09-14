@@ -4,7 +4,7 @@
 
 | Environment | Branch | URL | Supabase project |
 |---|---|---|---|
-| Production | `master` | `events-app.vercel.app` (or custom domain) | Production project |
+| Production | `main` | `mcc-newark-hub.vercel.app` (`mcc-newark-events.vercel.app` also stays live for existing links) | Production project |
 | Preview | any feature branch | auto-generated Vercel URL | Staging project (recommended) |
 
 ---
@@ -36,7 +36,7 @@ For a true staging setup, configure the **Preview** environment to point to a se
 
 This prevents feature-branch preview URLs from hitting the production database.
 
-1. Create a second Supabase project (e.g. `events-app-staging`)
+1. Create a second Supabase project (e.g. `mcc-newark-hub-staging`)
 2. Run the base schema SQL from [setup-local.md](setup-local.md#4-create-the-base-schema)
 3. Run all migrations in order
 4. Seed with enough test data to develop against

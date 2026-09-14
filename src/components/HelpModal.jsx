@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 
-const DOCS_BASE = "https://mcc-newark-hub.github.io/events-app";
+const DOCS_BASE = "https://mcc-newark-hub.github.io/mcc-newark-hub";
 
 function docsUrl(lang, path) {
   const base = lang === "en" ? `${DOCS_BASE}/en/` : `${DOCS_BASE}/`;

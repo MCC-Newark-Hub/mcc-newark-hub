@@ -127,4 +127,4 @@ Also: always verify UPDATE/DELETE actually changed rows by chaining `.select()` 
 
 ### Deployment
 
-Vercel auto-deploys on push to `main` (team: `mcc-newark-dev-s-projects`, project: `newark-events-app`). The `dist/` folder is gitignored — Vercel builds from source. Live at `mcc-newark-events.vercel.app`.
+Vercel auto-deploys on push to `main` (team: `mcc-newark-dev-s-projects`, project: `newark-events-app`). The `dist/` folder is gitignored — Vercel builds from source. Live at `mcc-newark-hub.vercel.app` (new primary domain) — `mcc-newark-events.vercel.app` stays attached and unredirected so existing printed badge QR codes and shared links keep working.
