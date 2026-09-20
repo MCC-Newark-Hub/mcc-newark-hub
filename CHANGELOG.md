@@ -10,7 +10,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- **`/24h-prayers` landing page** — when more than one prayer list is active, `/24h-prayers` shows a card per list (name, title, dates, scope, slots taken with progress bar, status badge) linking to `/24h-prayers/<list>`; with a single active list it still opens that board directly. Boards opened by link show "← Todas as listas" when other lists exist. Replaces the list tabs.
+- **`/24h-prayers` landing page** — `/24h-prayers` shows a card per active list (name, title, dates, scope, slots taken with progress bar, status badge) linking to `/24h-prayers/<list>`, even when only one list is active. Boards opened by link show "← Todas as listas". Replaces the list tabs.
 - All texts of the public prayer page (board, landing, church picker) now live in `src/i18n/strings.js` (PT + EN, `prayer*` keys, `fill()` helper for `{placeholders}`) instead of inline `pt ? … : …` ternaries, as the project convention asks.
 - **Tesouraria module** — new `treasurer` sys_role with dedicated TreasurerView. Tabs: Balanço (financial summary), Inscrições (read-only payment status), Despesas (expense tracking), Outras Entradas (donations, collections). Accessible read-only by Pastor; full edit by Treasurer and Admin.
 - `treasury_expenses` and `treasury_collections` Supabase tables (RLS disabled).

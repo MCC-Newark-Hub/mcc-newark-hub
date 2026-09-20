@@ -103,7 +103,7 @@ function PrayerBoard({ lang, setLang }) {
       }
       // The landing page shows how full each list is.
       let c = {};
-      if (!idParam && visible.length > 1) {
+      if (!idParam && visible.length > 0) {
         const res = await Promise.all(
           visible.map((p) => sb.from("schedule_oracao").select("id", { count: "exact", head: true }).eq("period_id", p.id))
         );
@@ -127,7 +127,7 @@ function PrayerBoard({ lang, setLang }) {
     };
   }, [idParam, tick]);
 
-  // One list (or a list opened by its link) shows its board; several lists at /24h-prayers show cards.
+  // /24h-prayers shows a card per active list; a list opened by its link shows its board.
   const churchesReady = churches.some((c) => c.id);
   const allowedFor = (p) => {
     if (!p) return null;
@@ -137,7 +137,7 @@ function PrayerBoard({ lang, setLang }) {
     }
     return resolveScopeChurches(p, memberships, churches);
   };
-  const landing = loaded && !idParam && periods.length > 1;
+  const landing = loaded && !idParam && periods.length > 0;
   const period = landing ? null : periods[0] || null;
   const periodId = period?.id || null;
 
@@ -387,7 +387,7 @@ function PrayerBoard({ lang, setLang }) {
           </div>
         )}
 
-        {idParam && listCount > 1 && (
+        {idParam && listCount > 0 && (
           <p style={{ textAlign: "center", marginBottom: 12 }}>
             <Link to="/24h-prayers" style={{ fontSize: 13, fontWeight: 700, color: "#8B0000", textDecoration: "none" }}>{tt.prayerAllLists}</Link>
           </p>
