@@ -7,7 +7,7 @@ import ChurchLabel from "@/components/ChurchLabel";
 import InlineMarkdown from "@/components/InlineMarkdown";
 import { useAppDataContext } from "@/context/AppDataContext";
 import { sb } from "@/lib/supabase";
-import { SLOT_COUNT, HALVES, HALF_SIZE, slotTime, slotRange, splitName, todayLocal, periodText, pickByParam, formatPeriodRange, formatCircular, pickActivePeriods } from "@/lib/prayerSlots";
+import { SLOT_COUNT, HALVES, HALF_SIZE, groupBySlot, slotCapacity, slotStats, slotTime, slotRange, splitName, todayLocal, periodText, pickByParam, formatPeriodRange, formatCircular, pickActivePeriods } from "@/lib/prayerSlots";
 import { resolveScopeChurches, scopeLabel, joinList } from "@/lib/churchGroups";
 import { STRINGS, fill } from "@/i18n/strings";
 import PrayerLanding from "@/components/PrayerLanding";
@@ -105,10 +105,11 @@ function PrayerBoard({ lang, setLang }) {
       let c = {};
       if (!idParam && visible.length > 0) {
         const res = await Promise.all(
-          visible.map((p) => sb.from("schedule_oracao").select("id", { count: "exact", head: true }).eq("period_id", p.id))
+          visible.map((p) => sb.from("schedule_oracao").select("slot_index").eq("period_id", p.id))
         );
         if (cancelled) return;
-        c = Object.fromEntries(visible.map((p, i) => [p.id, res[i].error ? null : res[i].count ?? 0]));
+        // Slots with at least one person (a slot can hold several).
+        c = Object.fromEntries(visible.map((p, i) => [p.id, res[i].error ? null : new Set((res[i].data || []).map((r) => r.slot_index)).size]));
       }
       setLoadError(false);
       setListCount(all.length);
@@ -148,7 +149,8 @@ function PrayerBoard({ lang, setLang }) {
       const { data, error: e2 } = await sb
         .from("schedule_oracao")
         .select("id,slot_index,member_name,church")
-        .eq("period_id", periodId);
+        .eq("period_id", periodId)
+        .order("created_at");
       if (cancelled) return;
       if (e2) {
         console.error("schedule_oracao load error:", e2);
@@ -179,10 +181,14 @@ function PrayerBoard({ lang, setLang }) {
     : church;
   const boardReady = slotsFor === periodId;
 
-  const bySlot = useMemo(() => new Map(slots.map((s) => [s.slot_index, s])), [slots]);
-  // A slot someone else grabbed while it was selected drops out of the selection.
-  const validSelected = selected.filter((i) => !bySlot.has(i));
-  const filled = boardReady ? slots.length : 0;
+  const bySlot = useMemo(() => groupBySlot(slots), [slots]);
+  const capacity = slotCapacity(period);
+  const isFull = (i) => (bySlot.get(i)?.length || 0) >= capacity;
+  // A slot that filled up while it was selected drops out of the selection.
+  const validSelected = selected.filter((i) => !isFull(i));
+  const occupiedSelected = validSelected.filter((i) => bySlot.has(i));
+  const stats = slotStats(boardReady ? slots : [], capacity);
+  const filled = stats.covered;
   const pct = Math.round((filled / SLOT_COUNT) * 100);
 
   const toggle = (i) => {
@@ -222,7 +228,9 @@ function PrayerBoard({ lang, setLang }) {
           .select("slot_index")
           .eq("period_id", period.id)
           .in("slot_index", attempted);
-        const ranges = (nowTaken || []).map((r) => slotRange(r.slot_index)).join(", ");
+        const perSlot = new Map();
+        (nowTaken || []).forEach((r) => perSlot.set(r.slot_index, (perSlot.get(r.slot_index) || 0) + 1));
+        const ranges = [...perSlot].filter(([, n]) => n >= capacity).map(([i]) => slotRange(i)).join(", ");
         setNotice({
           type: "error",
           text: fill(tt.prayerBookFailed, { ranges: ranges || tt.prayerThatSlot }),
@@ -265,57 +273,84 @@ function PrayerBoard({ lang, setLang }) {
     setNotice({ type: "ok", text: tt.prayerSlotRemoved });
   };
 
-  const takenMessage = (s) => fill(tt.prayerSlotTaken, { range: slotRange(s.slot_index) });
+  const fullMessage = (i) => fill(tt.prayerSlotTaken, { range: slotRange(i) });
 
   const renderRow = (i) => {
-    const s = bySlot.get(i);
+    const people = bySlot.get(i) || [];
     const range = slotRange(i);
+    const full = people.length >= capacity;
+    const isSel = validSelected.includes(i);
     const base = {
       display: "flex", alignItems: "center", gap: 10, width: "100%", boxSizing: "border-box",
       borderRadius: 8, padding: "9px 12px", minHeight: 42, textAlign: "left",
       fontFamily: "'Montserrat',sans-serif", fontSize: 13, background: "#fff", color: "#111827",
     };
     const rangeStyle = { fontWeight: 600, fontVariantNumeric: "tabular-nums", minWidth: 96 };
+    const chip = capacity > 1 && (
+      <span style={{ fontSize: 10.5, fontWeight: 800, padding: "2px 8px", borderRadius: 99, background: full ? "#f3f4f6" : "#fef3c7", color: full ? "#4b5563" : "#92400e", flexShrink: 0 }}>
+        {full ? `${people.length}/${capacity} · ${tt.prayerFullChip}` : `${people.length}/${capacity}`}
+      </span>
+    );
 
-    if (s) {
-      const isMine = mine.includes(s.id);
+    if (people.length > 0) {
+      const anyMine = people.some((p) => mine.includes(p.id));
       return (
         <div
           key={i}
-          onClick={() => !isMine && setNotice({ type: "error", text: takenMessage(s) })}
-          style={{ ...base, border: `1.5px solid ${isMine ? "#2d8a4e" : "#e5e7eb"}`, cursor: isMine ? "default" : "not-allowed" }}
+          role={full ? undefined : "button"}
+          tabIndex={full ? undefined : 0}
+          aria-pressed={full ? undefined : isSel}
+          onClick={() => (full ? !anyMine && setNotice({ type: "error", text: fullMessage(i) }) : toggle(i))}
+          onKeyDown={(e) => { if (!full && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); toggle(i); } }}
+          style={{
+            ...base, alignItems: "flex-start",
+            border: `1.5px solid ${isSel ? "#8B0000" : anyMine ? "#2d8a4e" : "#e5e7eb"}`,
+            background: isSel ? "#fef2f2" : "#fff",
+            cursor: full ? (anyMine ? "default" : "not-allowed") : "pointer",
+          }}
         >
-          <CircleCheck size={18} color="#2d8a4e" aria-label={tt.prayerTaken} style={{ flexShrink: 0 }} />
-          <span style={rangeStyle}>{range}</span>
-          <span style={{ flex: 1, minWidth: 0 }} title={s.member_name}>
-            <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-              <span style={{ fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>
-                {splitName(s.member_name).first}
-              </span>
-              {isMine && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#2d8a4e", flexShrink: 0 }}>{tt.prayerYou}</span>}
-              <ChurchLabel church={s.church} />
-            </span>
-            {splitName(s.member_name).rest && (
-              <span style={{ display: "block", fontSize: 11.5, fontWeight: 500, color: "#6b7280", textTransform: "uppercase", lineHeight: 1.3, overflowWrap: "anywhere" }}>
-                {splitName(s.member_name).rest}
-              </span>
-            )}
+          {full || !isSel
+            ? <CircleCheck size={18} color={full ? "#2d8a4e" : "#d97706"} aria-label={full ? tt.prayerLegendFull : tt.prayerLegendSomeone} style={{ flexShrink: 0, marginTop: 1 }} />
+            : <CircleDot size={18} color="#8B0000" style={{ flexShrink: 0, marginTop: 1 }} />}
+          <span style={{ ...rangeStyle, marginTop: 1 }}>{range}</span>
+          <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+            {people.map((s) => {
+              const isMine = mine.includes(s.id);
+              return (
+                <span key={s.id} style={{ display: "flex", alignItems: "flex-start", gap: 4, minWidth: 0 }} title={s.member_name}>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                      <span style={{ fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>
+                        {splitName(s.member_name).first}
+                      </span>
+                      {isMine && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#2d8a4e", flexShrink: 0 }}>{tt.prayerYou}</span>}
+                      <ChurchLabel church={s.church} />
+                    </span>
+                    {splitName(s.member_name).rest && (
+                      <span style={{ display: "block", fontSize: 11.5, fontWeight: 500, color: "#6b7280", textTransform: "uppercase", lineHeight: 1.3, overflowWrap: "anywhere" }}>
+                        {splitName(s.member_name).rest}
+                      </span>
+                    )}
+                  </span>
+                  {isMine && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); removeMine(s); }}
+                      aria-label={tt.prayerRemoveMySlot}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "#dc2626", padding: 0, display: "flex" }}
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </span>
+              );
+            })}
           </span>
-          {isMine && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); removeMine(s); }}
-              aria-label={tt.prayerRemoveMySlot}
-              style={{ background: "none", border: "none", cursor: "pointer", color: "#dc2626", padding: 0, display: "flex" }}
-            >
-              <X size={16} />
-            </button>
-          )}
+          {chip}
         </div>
       );
     }
 
-    const isSel = validSelected.includes(i);
     return (
       <button
         key={i}
@@ -331,7 +366,8 @@ function PrayerBoard({ lang, setLang }) {
       >
         {isSel ? <CircleDot size={18} style={{ flexShrink: 0 }} /> : <Circle size={18} color="#9ca3af" style={{ flexShrink: 0 }} />}
         <span style={rangeStyle}>{range}</span>
-        <span style={{ flex: 1, fontWeight: 700 }}>{isSel ? (tt.prayerSelected) : (tt.prayerFree)}</span>
+        <span style={{ flex: 1, fontWeight: 700 }}>{isSel ? tt.prayerSelected2 : tt.prayerFree2}</span>
+        {chip}
       </button>
     );
   };
@@ -402,8 +438,13 @@ function PrayerBoard({ lang, setLang }) {
         <div style={{ textAlign: "center", marginBottom: 12 }}>
           <div style={{ fontSize: 15, fontWeight: 800, color: "#03223f", marginBottom: 4 }}>{tt.prayerTimeSlots}</div>
           <p style={{ color: "#6b7280", fontSize: 13, lineHeight: 1.5 }}>
-            {tt.prayerHowTo}
+            {capacity > 1 ? fill(tt.prayerHowToMany, { n: capacity }) : tt.prayerHowTo}
           </p>
+          {capacity > 1 && (
+            <p style={{ color: "#92400e", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, fontSize: 12.5, lineHeight: 1.5, padding: "8px 12px", marginTop: 8 }}>
+              {tt.prayerCapacityNote}
+            </p>
+          )}
         </div>
 
         <div ref={fieldsRef} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
@@ -440,13 +481,14 @@ function PrayerBoard({ lang, setLang }) {
 
         <div style={{ display: "flex", justifyContent: "center", gap: 14, flexWrap: "wrap", marginBottom: 14 }}>
           {legend(<Circle size={16} color="#9ca3af" />, tt.prayerFree2)}
-          {legend(<CircleCheck size={16} color="#2d8a4e" />, tt.prayerTaken)}
+          {capacity > 1 && legend(<CircleCheck size={16} color="#d97706" />, tt.prayerLegendSomeone)}
+          {legend(<CircleCheck size={16} color="#2d8a4e" />, capacity > 1 ? tt.prayerLegendFull : tt.prayerTaken)}
           {legend(<CircleDot size={16} color="#8B0000" />, tt.prayerSelected2)}
         </div>
 
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#6b7280", marginBottom: 4 }}>
-            <span>{fill(tt.prayerSlotsOfTotal, { n: filled, total: SLOT_COUNT })}</span>
+            <span>{fill(capacity > 1 ? tt.prayerCoveredOfTotal : tt.prayerSlotsOfTotal, { n: filled, total: SLOT_COUNT })}{capacity > 1 && ` · ${stats.people === 1 ? tt.prayerPeopleOne : fill(tt.prayerPeopleMany, { n: stats.people })}`}</span>
             <span style={{ fontWeight: 700 }}>{pct}%</span>
           </div>
           <div style={{ height: 8, background: "#e5e7eb", borderRadius: 99, overflow: "hidden" }}>
@@ -515,6 +557,12 @@ function PrayerBoard({ lang, setLang }) {
 
       {validSelected.length > 0 && (
         <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "#fff", borderTop: "1px solid #e5e7eb", padding: "12px 16px", boxShadow: "0 -4px 20px rgba(0,0,0,.12)", zIndex: 50 }}>
+          {occupiedSelected.length > 0 && (
+            <div role="status" style={{ maxWidth: 820, margin: "0 auto 10px", background: "#fffbeb", border: "1px solid #fde68a", color: "#92400e", borderRadius: 8, padding: "8px 12px", fontSize: 12.5, lineHeight: 1.45 }}>
+              {tt.prayerHasSomeoneWarning}
+              <span style={{ display: "block", fontWeight: 700, marginTop: 2 }}>{occupiedSelected.map(slotRange).join(", ")}</span>
+            </div>
+          )}
           <div style={{ maxWidth: 820, margin: "0 auto", display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: "#03223f" }}>

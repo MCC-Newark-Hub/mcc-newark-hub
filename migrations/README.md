@@ -22,6 +22,7 @@ Run these files **in order** using the Supabase SQL editor or `psql`. Each migra
 | `016_audit_log.sql` | Creates `audit_log` table (actor, action, entity, details, timestamp) — every mutation in useAppData.js writes here, feeding the Admin audit log page. |
 | `022_schedule_oracao.sql` | Creates `prayer_periods` ("Período de Orações Ininterruptas": `oracao24h-NNN` id, title, optional circular number, start/end date, `reasons text[]`, `is_active`) and `schedule_oracao` (one person per slot, unique per period + slot index), RLS disabled; seeds the first period (inactive). Used by the admin Oração 24h tab and the public `/24h-prayers` board; both fail without it. |
 | `023_church_groups.sql` | Creates `church_groups` (polos / áreas / regiões) and `church_group_members`, seeds the three polos, and adds list name, English title/intentions and scope (`scope_kind`, `scope_group_ids`, `scope_churches`) to `prayer_periods`. Additive and idempotent. |
+| `024_prayer_slot_capacity.sql` | Adds `prayer_periods.slot_capacity` (people per slot, 1-20, default 1), drops the one-person-per-slot unique constraint on `schedule_oracao`, adds a unique index so the same person can't be twice in a slot, and a `BEFORE INSERT` trigger that enforces the capacity (locks the period row; a full slot raises 23505). Apply **before** deploying the code that uses it. |
 
 ## How to run
 

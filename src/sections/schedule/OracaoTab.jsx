@@ -10,7 +10,7 @@ import ChurchLabel from "@/components/ChurchLabel";
 import PrayerImportModal from "@/components/PrayerImportModal";
 import { STRINGS } from "@/i18n/strings";
 import {
-  SLOT_COUNT, HALVES, HALF_SIZE, slotTime, slotRange, splitName,
+  SLOT_COUNT, HALVES, HALF_SIZE, groupBySlot, slotCapacity, slotStats, slotTime, slotRange, splitName,
   todayLocal, formatDate, formatPeriodRange, formatCircular, parseReasons, periodSlug, pickPeriod, buildShareText, nextPeriodId,
 } from "@/lib/prayerSlots";
 
@@ -98,9 +98,12 @@ export default function OracaoTab({ lang }) {
     return () => { cancelled = true; clearInterval(t); };
   }, [periodId, tick, pt]);
 
-  const slotRow = (i) => slots.find((s) => s.slot_index === i);
+  const capacity = slotCapacity(period);
+  const bySlot = groupBySlot(slots);
+  const slotPeople = (i) => bySlot.get(i) || [];
   const memberResults = query.length > 1 ? members.filter((m) => norm(m.name).includes(norm(query))).slice(0, 5) : [];
-  const filled = slots.length;
+  const stats = slotStats(slots, capacity);
+  const filled = stats.covered;
   const pct = Math.round((filled / SLOT_COUNT) * 100);
 
   // The permanent link always shows whichever period is active.
@@ -118,7 +121,7 @@ export default function OracaoTab({ lang }) {
   };
 
   // ── Period (period) management ────────────────────────────────────────────
-  const blankForm = { title: "", circular: "", start_date: today, end_date: today, reasonsText: "", title_en: "", reasonsEnText: "", list_name: "", scope_kind: "all", scope_group_ids: [], scope_churches: [] };
+  const blankForm = { title: "", circular: "", start_date: today, end_date: today, reasonsText: "", title_en: "", reasonsEnText: "", list_name: "", scope_kind: "all", scope_group_ids: [], scope_churches: [], slot_capacity: "1" };
   const openNew = () => { setFormError(""); setForm({ ...blankForm }); };
   // Another list of the same circular: same title, dates and intentions, new name and scope.
   const openDuplicate = () => {
@@ -126,6 +129,7 @@ export default function OracaoTab({ lang }) {
     setForm({
       ...blankForm, title: period.title, circular: period.circular || "", start_date: period.start_date, end_date: period.end_date,
       reasonsText: (period.reasons || []).join("\n"), title_en: period.title_en || "", reasonsEnText: (period.reasons_en || []).join("\n"),
+      slot_capacity: String(slotCapacity(period)),
     });
   };
   const openEdit = () => {
@@ -135,6 +139,7 @@ export default function OracaoTab({ lang }) {
       reasonsText: (period.reasons || []).join("\n"), title_en: period.title_en || "", reasonsEnText: (period.reasons_en || []).join("\n"),
       list_name: period.list_name || "", scope_kind: period.scope_kind || "all",
       scope_group_ids: period.scope_group_ids || [], scope_churches: period.scope_churches || [],
+      slot_capacity: String(slotCapacity(period)),
     });
   };
 
@@ -146,6 +151,8 @@ export default function OracaoTab({ lang }) {
     if (form.end_date < form.start_date) { setFormError(pt ? "A data de fim deve ser igual ou depois da data de início." : "The end date must be on or after the start date."); return; }
     if (form.scope_kind === "groups" && form.scope_group_ids.length === 0) { setFormError(pt ? "Escolha ao menos um polo, área ou região." : "Choose at least one hub, area or region."); return; }
     if (form.scope_kind === "churches" && form.scope_churches.length === 0) { setFormError(pt ? "Escolha ao menos uma igreja." : "Choose at least one church."); return; }
+    const cap = Number(form.slot_capacity);
+    if (!Number.isInteger(cap) || cap < 1 || cap > 20) { setFormError(pt ? "Pessoas por horário deve ser um número de 1 a 20." : "People per slot must be a number from 1 to 20."); return; }
     setSaving(true);
     setFormError("");
     const payload = { title, circular: form.circular.trim() || null, start_date: form.start_date, end_date: form.end_date, reasons: parseReasons(form.reasonsText) };
@@ -159,6 +166,8 @@ export default function OracaoTab({ lang }) {
       payload.scope_group_ids = form.scope_kind === "groups" ? form.scope_group_ids : [];
       payload.scope_churches = form.scope_kind === "churches" ? form.scope_churches : [];
     }
+    // slot_capacity comes from migration 024: same rule, only sent when it matters.
+    if (cap !== 1 || (form.id && period && "slot_capacity" in period)) payload.slot_capacity = cap;
     const { data, error: err } = form.id
       ? await sb.from("prayer_periods").update(payload).eq("id", form.id).select().single()
       : await sb.from("prayer_periods").insert({ ...payload, id: nextPeriodId(periods), is_active: false }).select().single();
@@ -184,7 +193,21 @@ export default function OracaoTab({ lang }) {
     setShowImport(true);
   };
 
-  // Copies names + churches from another period into this one. Slots already taken here are kept.
+  // Inserts rows; if a batch is refused because a slot filled up meanwhile, falls back to one by one.
+  const insertRowsTolerant = async (rows) => {
+    const { data, error: err } = await sb.from("schedule_oracao").insert(rows).select("id");
+    if (!err) return { count: (data || []).length };
+    if (err.code !== "23505") return { error: err };
+    let count = 0;
+    for (const r of rows) {
+      const one = await sb.from("schedule_oracao").insert(r).select("id");
+      if (!one.error) count += 1;
+      else if (one.error.code !== "23505") return { error: one.error };
+    }
+    return { count };
+  };
+
+  // Copies names + churches from another period into this one. Full slots are kept as they are.
   const runImport = async (e) => {
     e.preventDefault();
     if (!importFrom) return;
@@ -200,20 +223,26 @@ export default function OracaoTab({ lang }) {
       setError(pt ? "Não foi possível ler o período selecionado." : "Could not read the selected period.");
       return;
     }
-    const rows = (src || []).filter((r) => !slotRow(r.slot_index)).map((r) => ({ ...r, period_id: period.id }));
+    // Keep within this list's capacity: count what is already in each slot as rows are added.
+    const room = new Map();
+    const rows = [];
+    for (const r of src || []) {
+      const used = (bySlot.get(r.slot_index)?.length || 0) + (room.get(r.slot_index) || 0);
+      const dup = slotPeople(r.slot_index).some((p) => norm(p.member_name) === norm(r.member_name) && norm(p.church) === norm(r.church));
+      if (used >= capacity || dup) continue;
+      room.set(r.slot_index, (room.get(r.slot_index) || 0) + 1);
+      rows.push({ ...r, period_id: period.id });
+    }
     let imported = 0;
     if (rows.length > 0) {
-      const { data, error: e2 } = await sb
-        .from("schedule_oracao")
-        .upsert(rows, { onConflict: "period_id,slot_index", ignoreDuplicates: true })
-        .select("id");
-      if (e2) {
-        console.error("schedule_oracao import write error:", e2);
+      const res = await insertRowsTolerant(rows);
+      if (res.error) {
+        console.error("schedule_oracao import write error:", res.error);
         setImporting(false);
         setError(pt ? "Não foi possível importar os nomes. Tente novamente." : "Could not import the names. Try again.");
         return;
       }
-      imported = (data || []).length;
+      imported = res.count;
     }
     const skipped = (src || []).length - imported;
     setImporting(false);
@@ -258,10 +287,7 @@ export default function OracaoTab({ lang }) {
   };
 
   // ── Slot assignment ─────────────────────────────────────────────────────────
-  const takenMessage = (i) =>
-    pt
-      ? `O horário ${slotRange(i)} já está ocupado. Remova o nome atual (✕) ou escolha outro horário.`
-      : `The ${slotRange(i)} slot is already taken. Remove the current name (✕) or choose another slot.`;
+  const fullMessage = (i) => STRINGS[pt ? "pt" : "en"].prayerSlotFullAdmin.replace("{range}", slotRange(i)).replace("{n}", slotPeople(i).length).replace("{cap}", capacity);
 
   const assignSlot = async (memberId, memberName) => {
     if (activeSlot === null || !memberName) return;
@@ -280,7 +306,7 @@ export default function OracaoTab({ lang }) {
     if (err?.code === "23505") {
       setActiveSlot(null);
       setTick((t) => t + 1);
-      setError(takenMessage(activeSlot));
+      setError(fullMessage(activeSlot));
       return;
     }
     if (err || !data) {
@@ -288,18 +314,16 @@ export default function OracaoTab({ lang }) {
       setError(pt ? "Não foi possível salvar este horário. Tente novamente." : "Could not save this slot. Try again.");
       return;
     }
-    setSlots((prev) => [...prev.filter((s) => s.slot_index !== activeSlot), data]);
+    setSlots((prev) => [...prev, data]);
     setActiveSlot(null);
     setQuery("");
     setManualName("");
     setChurch("");
   };
 
-  const clearSlot = async (i) => {
-    const row = slotRow(i);
-    if (!row) return;
+  const clearSlot = async (row) => {
     setError("");
-    setSlots((prev) => prev.filter((s) => s.slot_index !== i));
+    setSlots((prev) => prev.filter((s) => s.id !== row.id));
     const { error: err } = await sb.from("schedule_oracao").delete().eq("id", row.id);
     if (err) {
       console.error("schedule_oracao delete error:", err);
@@ -323,8 +347,8 @@ export default function OracaoTab({ lang }) {
         </h3>
         <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 16 }}>
           {pt
-            ? "Crie o período (normalmente vem por circular) e ative para ele aparecer na página pública, sem senha, onde os membros escolhem seus horários. São 96 horários de 15 minutos, uma pessoa por horário, sempre o mesmo horário durante o período."
-            : "Create the period (usually announced by a circular) and activate it to show it on the public page, no password, where members pick their slots. 96 fifteen-minute slots, one person per slot, the same slot every day of the period."}
+            ? "Crie o período (normalmente vem por circular) e ative para ele aparecer na página pública, sem senha, onde os membros escolhem seus horários. São 96 horários de 15 minutos; cada lista define quantas pessoas cabem em cada horário (padrão 1), sempre o mesmo horário durante o período."
+            : "Create the period (usually announced by a circular) and activate it to show it on the public page, no password, where members pick their slots. 96 fifteen-minute slots; each list sets how many people fit in a slot (default 1), the same slot every day of the period."}
         </p>
 
         <div style={{ display: "flex", alignItems: "flex-end", gap: 10, flexWrap: "wrap" }}>
@@ -405,7 +429,9 @@ export default function OracaoTab({ lang }) {
             </button>
             <div style={{ flex: 1, minWidth: 200 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
-                <span>{pt ? `${filled} de ${SLOT_COUNT} horários ocupados` : `${filled} of ${SLOT_COUNT} slots taken`}</span>
+                <span>{capacity > 1
+                  ? `${STRINGS[pt ? "pt" : "en"].prayerCoveredOfTotal.replace("{n}", filled).replace("{total}", SLOT_COUNT)} · ${stats.people}/${SLOT_COUNT * capacity}`
+                  : (pt ? `${filled} de ${SLOT_COUNT} horários ocupados` : `${filled} of ${SLOT_COUNT} slots taken`)}</span>
                 <span style={{ fontWeight: 700, color: pct === 100 ? "#2d8a4e" : "var(--muted)" }}>{pct}%</span>
               </div>
               <div style={{ height: 8, background: "var(--border)", borderRadius: 99, overflow: "hidden" }}>
@@ -415,7 +441,8 @@ export default function OracaoTab({ lang }) {
           </div>
           <div style={{ display: "flex", gap: 14, marginBottom: 12 }}>
             {legend(<Circle size={16} color="#9ca3af" />, pt ? "Livre" : "Free")}
-            {legend(<CircleCheck size={16} color="#2d8a4e" />, pt ? "Ocupado" : "Taken")}
+            {capacity > 1 && legend(<CircleCheck size={16} color="#d97706" />, STRINGS[pt ? "pt" : "en"].prayerLegendSomeone)}
+            {legend(<CircleCheck size={16} color="#2d8a4e" />, capacity > 1 ? STRINGS[pt ? "pt" : "en"].prayerLegendFull : (pt ? "Ocupado" : "Taken"))}
           </div>
 
           {loadingSlots ? (
@@ -426,13 +453,14 @@ export default function OracaoTab({ lang }) {
                 <div key={h.start} className="prayer-col">
                   <div style={{ fontSize: 13, fontWeight: 800, color: "var(--text)", padding: "2px 2px 4px" }}>{h.label}</div>
                   {Array.from({ length: HALF_SIZE }, (_, k) => h.start + k).map((i) => {
-                        const row = slotRow(i);
+                        const people = slotPeople(i);
+                        const full = people.length >= capacity;
                         const isActive = activeSlot === i;
                         return (
                           <div
                             key={i}
                             onClick={() => {
-                              if (row) { setError(takenMessage(i)); return; }
+                              if (full) { setError(fullMessage(i)); return; }
                               setError("");
                               setActiveSlot(isActive ? null : i);
                               setQuery("");
@@ -440,20 +468,26 @@ export default function OracaoTab({ lang }) {
                               setChurch("");
                             }}
                             style={{
-                              border: `2px solid ${isActive ? "#8B0000" : row ? "#b7e1cd" : "var(--border)"}`,
+                              border: `2px solid ${isActive ? "#8B0000" : full ? "#b7e1cd" : people.length ? "#fcd9a0" : "var(--border)"}`,
                               background: "var(--card)",
                               borderRadius: 10,
                               padding: "9px 12px",
-                              cursor: row ? "not-allowed" : "pointer",
+                              cursor: full ? "not-allowed" : "pointer",
                               transition: "border-color .15s",
                             }}
                           >
                             <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, marginBottom: 2, fontVariantNumeric: "tabular-nums" }}>
-                              {row ? <CircleCheck size={14} color="#2d8a4e" /> : <Circle size={14} color="#9ca3af" />}
+                              {people.length ? <CircleCheck size={14} color={full ? "#2d8a4e" : "#d97706"} /> : <Circle size={14} color="#9ca3af" />}
                               {slotRange(i)}
+                              {capacity > 1 && (
+                                <span style={{ marginLeft: "auto", fontSize: 10.5, fontWeight: 800, padding: "1px 7px", borderRadius: 99, background: full ? "#dcfce7" : "#fef3c7", color: full ? "#166534" : "#92400e" }}>
+                                  {people.length}/{capacity}
+                                </span>
+                              )}
                             </div>
-                            {row ? (
-                              <div style={{ display: "flex", alignItems: "flex-start", gap: 4 }} title={row.member_name}>
+                            {people.length === 0 && <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)" }}>{pt ? "LIVRE" : "FREE"}</div>}
+                            {people.map((row) => (
+                              <div key={row.id} style={{ display: "flex", alignItems: "flex-start", gap: 4, marginTop: 2 }} title={row.member_name}>
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                   <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
                                     <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>
@@ -468,16 +502,14 @@ export default function OracaoTab({ lang }) {
                                   )}
                                 </div>
                                 <button
-                                  onClick={(e) => { e.stopPropagation(); clearSlot(i); }}
+                                  onClick={(e) => { e.stopPropagation(); clearSlot(row); }}
                                   aria-label={pt ? "Remover" : "Remove"}
                                   style={{ background: "none", border: "none", cursor: "pointer", color: "#dc2626", padding: 0, lineHeight: 1, marginTop: 1 }}
                                 >
                                   <X size={12} />
                                 </button>
                               </div>
-                            ) : (
-                              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)" }}>{pt ? "LIVRE" : "FREE"}</div>
-                            )}
+                            ))}
                           </div>
                         );
                   })}
@@ -570,6 +602,16 @@ export default function OracaoTab({ lang }) {
                 />
               </div>
             )}
+            <label style={labelStyle}>{STRINGS[pt ? "pt" : "en"].prayerFieldCapacity}</label>
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={form.slot_capacity}
+              onChange={(e) => setForm({ ...form, slot_capacity: e.target.value })}
+              style={{ ...inputStyle, marginBottom: 4 }}
+            />
+            <p style={{ fontSize: 11.5, color: "var(--muted)", lineHeight: 1.4, marginBottom: 12 }}>{STRINGS[pt ? "pt" : "en"].prayerFieldCapacityHint}</p>
             <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
               <div style={{ flex: 1 }}>
                 <label style={labelStyle}>{pt ? "De 00:00 de (início)" : "From 12 AM on (start)"}</label>

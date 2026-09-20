@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { sb } from "@/lib/supabase";
 import { STRINGS, fill } from "@/i18n/strings";
-import { slotTime } from "@/lib/prayerSlots";
+import { slotTime, slotCapacity, groupBySlot } from "@/lib/prayerSlots";
 import { resolveScopeChurches, periodTabLabel } from "@/lib/churchGroups";
 import { readImportRows, validateImportRows } from "@/lib/prayerImport";
 
@@ -32,12 +32,13 @@ export default function PrayerImportModal({ period, slots, churches, groups, lan
 
   const allowed = useMemo(() => resolveScopeChurches(period, memberships, churches), [period, memberships, churches]);
   const directory = useMemo(() => churches.map((c) => c.display).filter(Boolean), [churches]);
-  const taken = useMemo(() => new Map(slots.map((s) => [s.slot_index, s.member_name])), [slots]);
+  const existing = useMemo(() => groupBySlot(slots), [slots]);
+  const capacity = slotCapacity(period);
   const choices = allowed || directory.filter((d) => !/^outra/i.test(d));
 
   const rows = useMemo(
-    () => (rawRows ? validateImportRows(rawRows, { allowed, taken, defaultChurch, directory }) : []),
-    [rawRows, allowed, taken, defaultChurch, directory]
+    () => (rawRows ? validateImportRows(rawRows, { allowed, existing, capacity, defaultChurch, directory }) : []),
+    [rawRows, allowed, existing, capacity, defaultChurch, directory]
   );
   const counts = { ok: 0, warn: 0, error: 0 };
   rows.forEach((r) => { counts[r.status] += 1; });
@@ -75,17 +76,24 @@ export default function PrayerImportModal({ period, slots, churches, groups, lan
       member_name: r.name,
       church: r.church,
     }));
-    const { data, error: err } = await sb
-      .from("schedule_oracao")
-      .upsert(payload, { onConflict: "period_id,slot_index", ignoreDuplicates: true })
-      .select("id");
-    setSaving(false);
-    if (err) {
-      console.error("prayer import write error:", err);
+    // A slot may have filled up since the file was checked: the database refuses those rows, so retry one by one.
+    let n = 0;
+    const batch = await sb.from("schedule_oracao").insert(payload).select("id");
+    if (!batch.error) {
+      n = (batch.data || []).length;
+    } else if (batch.error.code === "23505") {
+      for (const row of payload) {
+        const one = await sb.from("schedule_oracao").insert(row).select("id");
+        if (!one.error) n += 1;
+        else if (one.error.code !== "23505") { console.error("prayer import write error:", one.error); setSaving(false); setError(tt.prayerImportFail); return; }
+      }
+    } else {
+      console.error("prayer import write error:", batch.error);
+      setSaving(false);
       setError(tt.prayerImportFail);
       return;
     }
-    const n = (data || []).length;
+    setSaving(false);
     onDone(fill(tt.prayerImportDone, { n, skipped: rows.length - n }));
   };
 

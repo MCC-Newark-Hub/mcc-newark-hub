@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { SLOT_COUNT, slotTime, slotRange, todayLocal, formatDate, formatPeriodRange, formatCircular, parseReasons, pickPeriod, buildShareText, nextPeriodId, splitChurches, churchCity, churchBadge, pickActivePeriods, splitName, periodText, parseInlineMarkdown, markdownToWhatsApp, slugify, periodSlug, pickByParam } from "@/lib/prayerSlots";
+import { SLOT_COUNT, slotTime, slotRange, todayLocal, formatDate, formatPeriodRange, formatCircular, parseReasons, pickPeriod, buildShareText, nextPeriodId, splitChurches, churchCity, churchBadge, pickActivePeriods, splitName, periodText, parseInlineMarkdown, markdownToWhatsApp, slugify, periodSlug, pickByParam, slotCapacity, groupBySlot, slotStats } from "@/lib/prayerSlots";
 
 describe("prayerSlots", () => {
   it("has 96 fifteen-minute slots", () => {
@@ -363,5 +363,31 @@ describe("friendly links", () => {
     expect(pickByParam(list, "texas")).toEqual([]);
     expect(pickByParam(list, "")).toEqual([]);
     expect(pickByParam(list, undefined)).toEqual([]);
+  });
+});
+
+describe("slot capacity", () => {
+  it("defaults to 1 and accepts valid integers", () => {
+    expect(slotCapacity({})).toBe(1);
+    expect(slotCapacity(null)).toBe(1);
+    expect(slotCapacity({ slot_capacity: 3 })).toBe(3);
+    expect(slotCapacity({ slot_capacity: 0 })).toBe(1);
+    expect(slotCapacity({ slot_capacity: "x" })).toBe(1);
+  });
+  it("groups people by slot and counts covered / full slots", () => {
+    const slots = [
+      { slot_index: 0, member_name: "Ana" }, { slot_index: 0, member_name: "Bea" },
+      { slot_index: 1, member_name: "Cris" },
+    ];
+    expect([...groupBySlot(slots).keys()]).toEqual([0, 1]);
+    expect(slotStats(slots, 2)).toEqual({ covered: 2, people: 3, full: 1 });
+    expect(slotStats(slots, 1)).toEqual({ covered: 2, people: 3, full: 2 });
+  });
+  it("WhatsApp text lists every person of a slot", () => {
+    const text = buildShareText({ title: "T", start_date: "2026-09-21", end_date: "2026-09-27", reasons: [] }, [
+      { slot_index: 0, member_name: "Ana" }, { slot_index: 0, member_name: "Bea" },
+    ]);
+    expect(text).toContain("00:00-00:15 - ANA / BEA");
+    expect(text).toContain("00:15-00:30 - LIVRE");
   });
 });

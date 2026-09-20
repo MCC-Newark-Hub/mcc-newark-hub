@@ -30,9 +30,16 @@ describe("validateImportRows", () => {
   it("flags scope, taken slots and repeats in the file", () => {
     const out = validateImportRows(
       rows([["00:00", "Ana", "Newark, NJ"], ["00:00", "Bea", "Newark, NJ"], ["00:15", "Cris", "Provo, UT"], ["00:30", "Dani", "newark, nj"], ["00:45", "Eva", "Newark, NJ"], ["00:10", "Fê", "Newark, NJ"]]),
-      { allowed: ["Newark, NJ", "New York, NY"], taken: new Map([[3, "Zé"]]) }
+      { allowed: ["Newark, NJ", "New York, NY"], existing: new Map([[3, [{ member_name: "Zé", church: "Newark, NJ" }]]]) }
     );
-    expect(out.map((r) => `${r.status}:${r.msg || ""}`)).toEqual(["ok:", "error:dupInFile", "error:outOfScope", "ok:", "error:alreadyTaken", "error:badTime"]);
+    expect(out.map((r) => `${r.status}:${r.msg || ""}`)).toEqual(["ok:", "error:slotFull", "error:outOfScope", "ok:", "error:slotFull", "error:badTime"]);
+  });
+  it("accepts several people per slot up to the capacity", () => {
+    const out = validateImportRows(
+      rows([["00:00", "Ana", "Newark, NJ"], ["00:00", "Bea", "Newark, NJ"], ["00:00", "Ana", "Newark, NJ"], ["00:00", "Cris", "Newark, NJ"], ["00:15", "Dani", "Newark, NJ"]]),
+      { capacity: 2, directory: ["Newark, NJ"], existing: new Map([[1, [{ member_name: "Zé", church: "Newark, NJ" }]]]) }
+    );
+    expect(out.map((r) => `${r.status}:${r.msg || ""}`)).toEqual(["ok:", "ok:", "error:samePerson", "error:slotFull", "ok:"]);
   });
   it("uses the default church, canonicalizes names and warns on unknown ones", () => {
     const out = validateImportRows(rows([["01:00", "Ana", ""], ["01:15", "Bea", "toms river, nj"], ["01:30", "Cris", "Lugar Novo"], ["01:45", "Dani / Eva", "Newark, NJ"]]), { defaultChurch: "Newark, NJ", directory: ["Newark, NJ", "Toms River, NJ"] });

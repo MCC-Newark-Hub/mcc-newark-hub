@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { STRINGS, fill } from "@/i18n/strings";
-import { periodText, periodSlug, formatPeriodRange, todayLocal, SLOT_COUNT } from "@/lib/prayerSlots";
+import { periodText, periodSlug, formatPeriodRange, todayLocal, slotCapacity, SLOT_COUNT } from "@/lib/prayerSlots";
 import { periodTabLabel, scopeLabel } from "@/lib/churchGroups";
 
 // /24h-prayers when several lists are active: one card per list, each linking to its own board.
@@ -42,11 +42,11 @@ export default function PrayerLanding({ periods, groups, counts, lang }) {
               <span style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 20, fontWeight: 700, color: "#8B0000", lineHeight: 1.2 }}>{periodTabLabel(p, groups, lang)}</span>
               <span style={{ fontSize: 12.5, fontWeight: 700, color: "#03223f", lineHeight: 1.35 }}>{periodText(p, lang).title}</span>
               <span style={{ fontSize: 12.5, color: "#4b5563" }}>{formatPeriodRange(p, lang)}</span>
-              <span style={{ fontSize: 12, color: "#6b7280" }}>{scope}</span>
+              <span style={{ fontSize: 12, color: "#6b7280" }}>{scope}{slotCapacity(p) > 1 && ` · ${fill(tt.prayerCapacityCard, { n: slotCapacity(p) })}`}</span>
               {taken != null && (
                 <span style={{ marginTop: "auto" }}>
                   <span style={{ display: "block", fontSize: 11.5, color: "#6b7280", marginBottom: 4 }}>
-                    {fill(tt.prayerSlotsTaken, { n: taken, total: SLOT_COUNT })}
+                    {fill(slotCapacity(p) > 1 ? tt.prayerCoveredOfTotal : tt.prayerSlotsTaken, { n: taken, total: SLOT_COUNT })}
                   </span>
                   <span style={{ display: "block", height: 6, background: "#e5e7eb", borderRadius: 99, overflow: "hidden" }}>
                     <span style={{ display: "block", height: "100%", width: `${pct}%`, background: "#2d8a4e" }} />

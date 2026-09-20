@@ -130,6 +130,30 @@ export function parseReasons(text) {
     .filter(Boolean);
 }
 
+// How many people one slot accepts in this list (migration 024); 1 when the column doesn't exist yet.
+export function slotCapacity(period) {
+  const n = Number(period?.slot_capacity);
+  return Number.isInteger(n) && n >= 1 ? n : 1;
+}
+
+// slot index -> the people in it, in the order they were given.
+export function groupBySlot(slots) {
+  const map = new Map();
+  for (const s of slots || []) {
+    if (!map.has(s.slot_index)) map.set(s.slot_index, []);
+    map.get(s.slot_index).push(s);
+  }
+  return map;
+}
+
+// covered = slots with at least one person; people = total names; full = slots at capacity.
+export function slotStats(slots, capacity) {
+  const by = groupBySlot(slots);
+  let full = 0;
+  by.forEach((list) => { if (list.length >= capacity) full += 1; });
+  return { covered: by.size, people: (slots || []).length, full };
+}
+
 // Plain-text board, ready to paste into WhatsApp:
 //   ORAÇÃO ININTERRUPTA DE 24h PELAS ELEIÇÕES E PELA PÁTRIA
 //   Circular Nº 150/26
@@ -143,9 +167,9 @@ export function parseReasons(text) {
 //   00:15-00:30 - LEONARD
 export function buildShareText(period, slots, lang = "pt") {
   const pt = lang !== "en";
-  const nameBySlot = new Map(slots.map((s) => [s.slot_index, s.member_name]));
+  const bySlot = groupBySlot(slots);
   const free = pt ? "LIVRE" : "FREE";
-  const lines = Array.from({ length: SLOT_COUNT }, (_, i) => `${slotRange(i)} - ${(nameBySlot.get(i) || free).toUpperCase()}`);
+  const lines = Array.from({ length: SLOT_COUNT }, (_, i) => `${slotRange(i)} - ${(bySlot.get(i) || []).map((s) => s.member_name).join(" / ").toUpperCase() || free}`);
   const { title, reasons } = periodText(period, lang);
   const circular = formatCircular(period.circular, lang);
   return [

@@ -36,14 +36,15 @@ export function readImportRows(data) {
 
 // Checks each row and marks it ok / warn (importable, look twice) / error (skipped).
 //   allowed:       church names the list accepts (null = any church)
-//   taken:         Map slot_index -> name already saved in the list
+//   existing:      Map slot_index -> people already saved in the list ([{ member_name, church }])
+//   capacity:      how many people one slot accepts (default 1)
 //   defaultChurch: used when a row has no church
 //   directory:     known church names, to flag typos on open lists
 // Messages are keys resolved by the caller; `vars` fills their placeholders.
-export function validateImportRows(rows, { allowed = null, taken = new Map(), defaultChurch = "", directory = [] } = {}) {
+export function validateImportRows(rows, { allowed = null, existing = new Map(), capacity = 1, defaultChurch = "", directory = [] } = {}) {
   const allowedMap = allowed ? new Map(allowed.map((a) => [norm(a), a])) : null;
   const dirMap = new Map(directory.map((d) => [norm(d), d]));
-  const seen = new Map(); // slot -> name of the first row that claimed it
+  const added = new Map(); // slot -> people added so far by earlier rows of this file
   return rows.map((r) => {
     const res = { ...r, status: "ok", msg: null, vars: {} };
     const fail = (msg, vars = {}) => Object.assign(res, { status: "error", msg, vars });
@@ -66,9 +67,11 @@ export function validateImportRows(rows, { allowed = null, taken = new Map(), de
     }
     res.church = church;
 
-    if (taken.has(r.slot)) return fail("alreadyTaken", { name: taken.get(r.slot), range: res.range });
-    if (seen.has(r.slot)) return fail("dupInFile", { name: seen.get(r.slot), range: res.range });
-    seen.set(r.slot, r.name);
+    const inSlot = [...(existing.get(r.slot) || []), ...(added.get(r.slot) || [])];
+    const same = inSlot.some((p) => norm(p.member_name) === norm(r.name) && norm(p.church) === norm(church));
+    if (same) return fail("samePerson", { range: res.range });
+    if (inSlot.length >= capacity) return fail("slotFull", { range: res.range, n: inSlot.length, cap: capacity });
+    added.set(r.slot, [...(added.get(r.slot) || []), { member_name: r.name, church }]);
     if (/\s\/\s/.test(r.name)) warn("severalNames");
     return res;
   });
