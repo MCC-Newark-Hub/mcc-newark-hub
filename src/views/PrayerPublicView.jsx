@@ -2,8 +2,13 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { Circle, CircleCheck, CircleDot, X } from "lucide-react";
 import ICMLogo from "@/components/ICMLogo";
+import PrayerChurchPicker from "@/components/PrayerChurchPicker";
+import ChurchLabel from "@/components/ChurchLabel";
+import InlineMarkdown from "@/components/InlineMarkdown";
+import { useAppDataContext } from "@/context/AppDataContext";
 import { sb } from "@/lib/supabase";
-import { SLOT_COUNT, HALVES, HALF_SIZE, CHURCH_OPTIONS, slotTime, slotRange, todayLocal, formatPeriodRange, formatCircular, pickPeriod } from "@/lib/prayerSlots";
+import { SLOT_COUNT, HALVES, HALF_SIZE, slotTime, slotRange, splitName, todayLocal, periodText, pickByParam, formatPeriodRange, formatCircular, pickActivePeriods } from "@/lib/prayerSlots";
+import { resolveScopeChurches, periodTabLabel, scopeLabel, joinList } from "@/lib/churchGroups";
 
 const MINE_KEY = "mcc_prayer_mine";
 const PROFILE_KEY = "mcc_prayer_profile";
@@ -29,9 +34,15 @@ function writeJSON(key, val) {
 export default function PrayerPublicView({ lang, setLang }) {
   const pt = lang !== "en";
   const { id: idParam } = useParams();
+  const { churches = [] } = useAppDataContext() || {};
 
-  const [period, setPeriod] = useState(null);
+  const [periods, setPeriods] = useState([]); // every active list (one period per list)
+  const [groups, setGroups] = useState([]);
+  const [memberships, setMemberships] = useState([]);
+  const [groupsOk, setGroupsOk] = useState(true);
+  const [selectedId, setSelectedId] = useState(null);
   const [slots, setSlots] = useState([]);
+  const [slotsFor, setSlotsFor] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [tick, setTick] = useState(0); // bump to force a refresh after a write
@@ -49,7 +60,7 @@ export default function PrayerPublicView({ lang, setLang }) {
     const run = async () => {
       const { data: list, error: e1 } = await sb
         .from("prayer_periods")
-        .select("id,title,circular,start_date,end_date,reasons")
+        .select("*")
         .eq("is_active", true)
         .order("start_date", { ascending: false });
       if (cancelled) return;
@@ -59,25 +70,31 @@ export default function PrayerPublicView({ lang, setLang }) {
         setLoaded(true);
         return;
       }
-      const chosen = idParam ? (list || []).find((c) => c.id === idParam) : pickPeriod(list || [], todayLocal());
-      let rows = [];
-      if (chosen) {
-        const { data, error: e2 } = await sb
-          .from("schedule_oracao")
-          .select("id,slot_index,member_name,church")
-          .eq("period_id", chosen.id);
+      const visible = idParam ? pickByParam(list || [], idParam, todayLocal()) : pickActivePeriods(list || [], todayLocal());
+      // Lists scoped to polos/áreas/regiões need the groups and their churches.
+      const groupIds = [...new Set(visible.flatMap((p) => (p.scope_kind === "groups" ? p.scope_group_ids || [] : [])))];
+      let g = [];
+      let m = [];
+      let ok = true;
+      if (groupIds.length) {
+        const [gr, mr] = await Promise.all([
+          sb.from("church_groups").select("id,name,kind").in("id", groupIds),
+          sb.from("church_group_members").select("group_id,church_id").in("group_id", groupIds),
+        ]);
         if (cancelled) return;
-        if (e2) {
-          console.error("schedule_oracao load error:", e2);
-          setLoadError(true);
-          setLoaded(true);
-          return;
+        if (gr.error || mr.error) {
+          console.error("church groups load error:", gr.error || mr.error);
+          ok = false; // can't restrict without them: fall back to the full church list
+        } else {
+          g = gr.data || [];
+          m = mr.data || [];
         }
-        rows = data || [];
       }
       setLoadError(false);
-      setPeriod(chosen || null);
-      setSlots(rows);
+      setPeriods(visible);
+      setGroups(g);
+      setMemberships(m);
+      setGroupsOk(ok);
       setLoaded(true);
     };
     run();
@@ -88,16 +105,70 @@ export default function PrayerPublicView({ lang, setLang }) {
     };
   }, [idParam, tick]);
 
+  // Which list is showing: the one picked on a tab, else the first one that includes the church
+  // remembered on this device, else the first.
+  const churchesReady = churches.some((c) => c.id);
+  const allowedFor = (p) => {
+    if (!p) return null;
+    if (p.scope_kind === "groups") {
+      if (!groupsOk) return null;
+      if (!churchesReady) return undefined; // directory still loading
+    }
+    return resolveScopeChurches(p, memberships, churches);
+  };
+  const period = useMemo(() => {
+    if (periods.length === 0) return null;
+    const picked = periods.find((p) => p.id === selectedId);
+    if (picked) return picked;
+    const mineChurch = church;
+    const byChurch = mineChurch && periods.find((p) => { const a = allowedFor(p); return Array.isArray(a) && a.includes(mineChurch); });
+    return byChurch || periods[0];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periods, selectedId, church, memberships, groupsOk, churchesReady]);
+  const periodId = period?.id || null;
+
+  useEffect(() => {
+    if (!periodId) return undefined;
+    let cancelled = false;
+    const run = async () => {
+      const { data, error: e2 } = await sb
+        .from("schedule_oracao")
+        .select("id,slot_index,member_name,church")
+        .eq("period_id", periodId);
+      if (cancelled) return;
+      if (e2) {
+        console.error("schedule_oracao load error:", e2);
+        setLoadError(true);
+      } else {
+        setLoadError(false);
+        setSlots(data || []);
+      }
+      setSlotsFor(periodId);
+    };
+    run();
+    const t = setInterval(run, POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [periodId, tick]);
+
   useEffect(() => {
     if (!notice) return undefined;
     const t = setTimeout(() => setNotice(null), 7000);
     return () => clearTimeout(t);
   }, [notice]);
 
+  const allowed = allowedFor(period);
+  const churchValue = Array.isArray(allowed)
+    ? (allowed.length === 1 ? allowed[0] : allowed.includes(church) ? church : "")
+    : church;
+  const boardReady = slotsFor === periodId;
+
   const bySlot = useMemo(() => new Map(slots.map((s) => [s.slot_index, s])), [slots]);
   // A slot someone else grabbed while it was selected drops out of the selection.
   const validSelected = selected.filter((i) => !bySlot.has(i));
-  const filled = slots.length;
+  const filled = boardReady ? slots.length : 0;
   const pct = Math.round((filled / SLOT_COUNT) * 100);
 
   const toggle = (i) => {
@@ -109,7 +180,7 @@ export default function PrayerPublicView({ lang, setLang }) {
     const cleanName = name.trim().replace(/\s+/g, " ");
     const missing = cleanName.length < 2
       ? (pt ? "Digite seu nome." : "Enter your name.")
-      : !church
+      : !churchValue
         ? (pt ? "Escolha sua igreja." : "Choose your church.")
         : "";
     if (missing) {
@@ -124,7 +195,7 @@ export default function PrayerPublicView({ lang, setLang }) {
       slot_index: i,
       slot_time: slotTime(i),
       member_name: cleanName,
-      church,
+      church: churchValue,
     }));
     const { data, error } = await sb.from("schedule_oracao").insert(rows).select("id");
     setSaving(false);
@@ -155,7 +226,7 @@ export default function PrayerPublicView({ lang, setLang }) {
     const nextMine = [...mine, ...(data || []).map((r) => r.id)].slice(-200);
     setMine(nextMine);
     writeJSON(MINE_KEY, nextMine);
-    writeJSON(PROFILE_KEY, { name: cleanName, church });
+    writeJSON(PROFILE_KEY, { name: cleanName, church: churchValue });
     setName(cleanName);
     setFormError("");
     setSelected([]);
@@ -209,11 +280,19 @@ export default function PrayerPublicView({ lang, setLang }) {
         >
           <CircleCheck size={18} color="#2d8a4e" aria-label={pt ? "Ocupado" : "Taken"} style={{ flexShrink: 0 }} />
           <span style={rangeStyle}>{range}</span>
-          <span style={{ flex: 1, minWidth: 0 }}>
-            <span style={{ fontWeight: 700, textTransform: "uppercase", display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {s.member_name}{isMine ? (pt ? " (você)" : " (you)") : ""}
+          <span style={{ flex: 1, minWidth: 0 }} title={s.member_name}>
+            <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+              <span style={{ fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>
+                {splitName(s.member_name).first}
+              </span>
+              {isMine && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#2d8a4e", flexShrink: 0 }}>{pt ? "(você)" : "(you)"}</span>}
+              <ChurchLabel church={s.church} />
             </span>
-            {s.church && <span style={{ fontSize: 10, color: "#6b7280" }}>{s.church}</span>}
+            {splitName(s.member_name).rest && (
+              <span style={{ display: "block", fontSize: 11.5, fontWeight: 500, color: "#6b7280", textTransform: "uppercase", lineHeight: 1.3, overflowWrap: "anywhere" }}>
+                {splitName(s.member_name).rest}
+              </span>
+            )}
           </span>
           {isMine && (
             <button
@@ -280,7 +359,7 @@ export default function PrayerPublicView({ lang, setLang }) {
       <>
         <div style={{ textAlign: "center", marginBottom: 16 }}>
           <h1 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 21, fontWeight: 700, color: "#03223f", marginBottom: 6, lineHeight: 1.25 }}>
-            {period.title}
+            {periodText(period, lang).title}
           </h1>
           {period.circular && (
             <p style={{ color: "#4b5563", fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{formatCircular(period.circular, lang)}</p>
@@ -288,15 +367,44 @@ export default function PrayerPublicView({ lang, setLang }) {
           <p style={{ color: "#4b5563", fontSize: 14, fontWeight: 600 }}>{formatPeriodRange(period, lang)}</p>
         </div>
 
-        {(period.reasons || []).length > 0 && (
+        {periodText(period, lang).reasons.length > 0 && (
           <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: "12px 16px", marginBottom: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: "#03223f", marginBottom: 6 }}>
               {pt ? "Motivos de Oração:" : "Prayer intentions:"}
             </div>
             <ul style={{ margin: 0, paddingLeft: 18, color: "#374151", fontSize: 13, lineHeight: 1.6 }}>
-              {period.reasons.map((r, i) => <li key={i}>{r}</li>)}
+              {periodText(period, lang).reasons.map((r, i) => <li key={i}><InlineMarkdown text={r} /></li>)}
             </ul>
           </div>
+        )}
+
+        {periods.length > 1 && (
+          <div role="tablist" aria-label={pt ? "Listas" : "Lists"} style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 12 }}>
+            {periods.map((p) => {
+              const on = p.id === period.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => { setSelectedId(p.id); setSelected([]); setNotice(null); setFormError(""); }}
+                  style={{
+                    padding: "8px 18px", borderRadius: 99, cursor: "pointer", fontFamily: "'Montserrat',sans-serif", fontSize: 14, fontWeight: 700,
+                    border: `1.5px solid ${on ? "#8B0000" : "#e5e7eb"}`, background: on ? "#8B0000" : "#fff", color: on ? "#fff" : "#374151",
+                  }}
+                >
+                  {periodTabLabel(p, groups, lang)}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {Array.isArray(allowed) && allowed.length > 0 && (
+          <p style={{ textAlign: "center", color: "#6b7280", fontSize: 12, marginBottom: 12 }}>
+            {pt ? "Lista para: " : "List for: "}
+            <strong style={{ color: "#374151" }}>{allowed.length <= 6 ? joinList(allowed, lang) : `${scopeLabel(period, groups, lang) || period.list_name || ""} (${allowed.length} ${pt ? "igrejas" : "churches"})`}</strong>
+          </p>
         )}
 
         <div style={{ textAlign: "center", marginBottom: 12 }}>
@@ -321,13 +429,21 @@ export default function PrayerPublicView({ lang, setLang }) {
                 style={inputStyle}
               />
             </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>{pt ? "Igreja" : "Church"}</label>
-              <select value={church} onChange={(e) => { setChurch(e.target.value); setFormError(""); }} style={inputStyle}>
-                <option value="">{pt ? "Selecione…" : "Select…"}</option>
-                {CHURCH_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
+            {allowed === undefined ? (
+              <div style={{ fontSize: 13, color: "#6b7280", alignSelf: "end", paddingBottom: 10 }}>{pt ? "Carregando igrejas…" : "Loading churches…"}</div>
+            ) : (
+            <PrayerChurchPicker
+              key={`${period.id}-${churches.some((c) => "is_hub" in c) ? "directory" : "fallback"}`}
+              restrictTo={Array.isArray(allowed) ? allowed : undefined}
+              value={churchValue}
+              onChange={(v) => { setChurch(v); setFormError(""); }}
+              churches={churches}
+              pt={pt}
+              label={pt ? "Igreja" : "Church"}
+              inputStyle={inputStyle}
+              labelStyle={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}
+            />
+            )}
           </div>
           {formError && <div role="alert" style={{ color: "#991b1b", fontSize: 13, fontWeight: 600, marginTop: 10 }}>{formError}</div>}
         </div>
@@ -354,14 +470,18 @@ export default function PrayerPublicView({ lang, setLang }) {
           </div>
         )}
 
-        <div className="prayer-cols">
-          {HALVES.map((h) => (
-            <div key={h.start} className="prayer-col">
-              <div style={{ fontSize: 13, fontWeight: 800, color: "#03223f", padding: "2px 2px 4px", letterSpacing: 0.3 }}>{h.label}</div>
-              {Array.from({ length: HALF_SIZE }, (_, k) => renderRow(h.start + k))}
-            </div>
-          ))}
-        </div>
+        {boardReady ? (
+          <div className="prayer-cols">
+            {HALVES.map((h) => (
+              <div key={h.start} className="prayer-col">
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#03223f", padding: "2px 2px 4px", letterSpacing: 0.3 }}>{h.label}</div>
+                {Array.from({ length: HALF_SIZE }, (_, k) => renderRow(h.start + k))}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p style={{ textAlign: "center", color: "#6b7280", fontSize: 14, padding: "30px 0" }}>{pt ? "Carregando…" : "Loading…"}</p>
+        )}
       </>
     );
   }

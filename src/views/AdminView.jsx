@@ -16,6 +16,7 @@ import ConfirmDelete from "@/components/ConfirmDelete";
 import BulkBar from "@/components/BulkBar";
 import FamiliesPanel from "@/components/directory/FamiliesPanel";
 import GroupsPanel from "@/components/directory/GroupsPanel";
+import ChurchGroupsPanel from "@/components/directory/ChurchGroupsPanel";
 import RolesMultiSelect from "@/components/directory/RolesMultiSelect";
 import RegistrationsTab from "./admin/RegistrationsTab";
 import TeamsTab from "./admin/TeamsTab";
@@ -1201,6 +1202,7 @@ function makeTh(sk, sd, toggle) {
 function AdminDirectory({ churches, setChurches, members, setMembers, families, setFamilies, gas, setGas, rosters, setRosters, dbTeams, setDbTeams, dbInstruments, setDbInstruments, dbVoiceTypes, setDbVoiceTypes, dbCategories, dbFunctions, dbImmigrationStatuses, events, regs, setRegs, notify, logAudit }) {
   const TABS = [
     { id: "churches",    label: "Igrejas",               count: churches?.length },
+    { id: "church_groups", label: "Polos e Áreas" },
     { id: "members",     label: "Membros",               count: members?.length },
     { id: "families",    label: "Famílias",              count: families?.length },
     { id: "groups",      label: "Grupos de Assistência", count: gas?.length },
@@ -2011,6 +2013,11 @@ function AdminDirectory({ churches, setChurches, members, setMembers, families, 
       {/* ── Families ─────────────────────────────────────────────────────── */}
       {tab === "families" && (
         <FamiliesPanel members={members} families={families} setFamilies={setFamilies} gas={gas} showGroup showChurch notify={notify} logAudit={logAudit} />
+      )}
+
+      {/* ── Polos / Áreas / Regiões ───────────────────────────────────────── */}
+      {tab === "church_groups" && (
+        <ChurchGroupsPanel churches={churches} notify={notify} logAudit={logAudit} />
       )}
 
       {/* ── GA Groups ────────────────────────────────────────────────────── */}

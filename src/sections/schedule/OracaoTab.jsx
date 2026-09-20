@@ -2,9 +2,14 @@ import { useState, useEffect } from "react";
 import { Circle, CircleCheck, X } from "lucide-react";
 import { sb } from "@/lib/supabase";
 import { useAppDataContext } from "@/context/AppDataContext";
+import PrayerChurchPicker from "@/components/PrayerChurchPicker";
+import MultiCheckList from "@/components/MultiCheckList";
+import InlineMarkdown from "@/components/InlineMarkdown";
+import { kindLabel, scopeLabel, periodTabLabel } from "@/lib/churchGroups";
+import ChurchLabel from "@/components/ChurchLabel";
 import {
-  SLOT_COUNT, HALVES, HALF_SIZE, CHURCH_OPTIONS, slotTime, slotRange,
-  todayLocal, formatDate, formatPeriodRange, formatCircular, parseReasons, pickPeriod, buildShareText, nextPeriodId,
+  SLOT_COUNT, HALVES, HALF_SIZE, slotTime, slotRange, splitName,
+  todayLocal, formatDate, formatPeriodRange, formatCircular, parseReasons, periodSlug, pickPeriod, buildShareText, nextPeriodId,
 } from "@/lib/prayerSlots";
 
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -19,10 +24,12 @@ const labelStyle = { fontSize: 12, fontWeight: 600, color: "var(--muted)", displ
 
 export default function OracaoTab({ lang }) {
   const pt = lang !== "en";
-  const { members = [] } = useAppDataContext() || {};
+  const { members = [], churches = [] } = useAppDataContext() || {};
   const today = todayLocal();
 
   const [periods, setPeriods] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [groupsOk, setGroupsOk] = useState(true);
   const [periodsLoaded, setPeriodsLoaded] = useState(false);
   const [periodId, setPeriodId] = useState(null);
   const [slots, setSlots] = useState([]);
@@ -49,8 +56,13 @@ export default function OracaoTab({ lang }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data, error: err } = await sb.from("prayer_periods").select("*").order("start_date", { ascending: false });
+      const [{ data, error: err }, gr] = await Promise.all([
+        sb.from("prayer_periods").select("*").order("start_date", { ascending: false }),
+        sb.from("church_groups").select("id,name,kind").order("kind").order("name"),
+      ]);
       if (cancelled) return;
+      setGroupsOk(!gr.error);
+      setGroups(gr.error ? [] : gr.data || []);
       if (err) {
         console.error("prayer_periods load error:", err);
         setError(pt ? "Não foi possível carregar os períodos de orações." : "Could not load the prayer periods.");
@@ -102,12 +114,23 @@ export default function OracaoTab({ lang }) {
   };
 
   // ── Period (period) management ────────────────────────────────────────────
-  const openNew = () => { setFormError(""); setForm({ title: "", circular: "", start_date: today, end_date: today, reasonsText: "" }); };
+  const blankForm = { title: "", circular: "", start_date: today, end_date: today, reasonsText: "", title_en: "", reasonsEnText: "", list_name: "", scope_kind: "all", scope_group_ids: [], scope_churches: [] };
+  const openNew = () => { setFormError(""); setForm({ ...blankForm }); };
+  // Another list of the same circular: same title, dates and intentions, new name and scope.
+  const openDuplicate = () => {
+    setFormError("");
+    setForm({
+      ...blankForm, title: period.title, circular: period.circular || "", start_date: period.start_date, end_date: period.end_date,
+      reasonsText: (period.reasons || []).join("\n"), title_en: period.title_en || "", reasonsEnText: (period.reasons_en || []).join("\n"),
+    });
+  };
   const openEdit = () => {
     setFormError("");
     setForm({
-      id: period.id, title: period.title, circular: period.circular || "",
-      start_date: period.start_date, end_date: period.end_date, reasonsText: (period.reasons || []).join("\n"),
+      id: period.id, title: period.title, circular: period.circular || "", start_date: period.start_date, end_date: period.end_date,
+      reasonsText: (period.reasons || []).join("\n"), title_en: period.title_en || "", reasonsEnText: (period.reasons_en || []).join("\n"),
+      list_name: period.list_name || "", scope_kind: period.scope_kind || "all",
+      scope_group_ids: period.scope_group_ids || [], scope_churches: period.scope_churches || [],
     });
   };
 
@@ -117,9 +140,21 @@ export default function OracaoTab({ lang }) {
     if (!title) { setFormError(pt ? "Informe o título do período." : "Enter the period title."); return; }
     if (!form.start_date || !form.end_date) { setFormError(pt ? "Informe as datas de início e fim." : "Enter the start and end dates."); return; }
     if (form.end_date < form.start_date) { setFormError(pt ? "A data de fim deve ser igual ou depois da data de início." : "The end date must be on or after the start date."); return; }
+    if (form.scope_kind === "groups" && form.scope_group_ids.length === 0) { setFormError(pt ? "Escolha ao menos um polo, área ou região." : "Choose at least one hub, area or region."); return; }
+    if (form.scope_kind === "churches" && form.scope_churches.length === 0) { setFormError(pt ? "Escolha ao menos uma igreja." : "Choose at least one church."); return; }
     setSaving(true);
     setFormError("");
     const payload = { title, circular: form.circular.trim() || null, start_date: form.start_date, end_date: form.end_date, reasons: parseReasons(form.reasonsText) };
+    // Scope/list columns come from migration 023: only send them when used (or already present),
+    // so saving a plain period keeps working before that migration is applied.
+    if (form.scope_kind !== "all" || form.list_name.trim() || form.title_en.trim() || form.reasonsEnText.trim() || (form.id && period && "scope_kind" in period)) {
+      payload.title_en = form.title_en.trim() || null;
+      payload.reasons_en = parseReasons(form.reasonsEnText);
+      payload.list_name = form.list_name.trim() || null;
+      payload.scope_kind = form.scope_kind;
+      payload.scope_group_ids = form.scope_kind === "groups" ? form.scope_group_ids : [];
+      payload.scope_churches = form.scope_kind === "churches" ? form.scope_churches : [];
+    }
     const { data, error: err } = form.id
       ? await sb.from("prayer_periods").update(payload).eq("id", form.id).select().single()
       : await sb.from("prayer_periods").insert({ ...payload, id: nextPeriodId(periods), is_active: false }).select().single();
@@ -187,32 +222,15 @@ export default function OracaoTab({ lang }) {
     setTick((t) => t + 1);
   };
 
+  // Several lists (one period each) can be active together; the portal shows them as tabs.
   const toggleActive = async () => {
     const activate = !period.is_active;
     setError("");
-    if (activate) {
-      const other = periods.find((c) => c.is_active && c.id !== period.id);
-      if (other) {
-        const msg = pt
-          ? `O período "${other.title}" (${other.id}) está ativo e será desativado. Continuar?`
-          : `The period "${other.title}" (${other.id}) is active and will be deactivated. Continue?`;
-        if (!window.confirm(msg)) return;
-      }
-    }
-    // Activate first, then deactivate the others: if the second step fails there are two active
-    // periods (the portal still shows one) instead of none.
-    const { data, error: e1 } = await sb.from("prayer_periods").update({ is_active: activate }).eq("id", period.id).select("id");
-    if (e1 || !data || data.length === 0) {
-      console.error("prayer_periods toggle error:", e1);
+    const { data, error: err } = await sb.from("prayer_periods").update({ is_active: activate }).eq("id", period.id).select("id");
+    if (err || !data || data.length === 0) {
+      console.error("prayer_periods toggle error:", err);
       setError(pt ? "Não foi possível alterar o status do período." : "Could not change the period status.");
       return;
-    }
-    if (activate) {
-      const { error: e2 } = await sb.from("prayer_periods").update({ is_active: false }).eq("is_active", true).neq("id", period.id);
-      if (e2) {
-        console.error("prayer_periods deactivate error:", e2);
-        setError(pt ? "Período ativado, mas não foi possível desativar o anterior. Desative-o manualmente." : "Period activated, but the previous one could not be deactivated. Deactivate it manually.");
-      }
     }
     setTick((t) => t + 1);
   };
@@ -312,7 +330,7 @@ export default function OracaoTab({ lang }) {
               <select value={periodId || ""} onChange={(e) => setPeriodId(e.target.value)} style={inputStyle}>
                 {periods.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.id} · {c.title} ({formatDate(c.start_date, lang)} - {formatDate(c.end_date, lang)}){c.is_active ? (pt ? " — ATIVA" : " — ACTIVE") : ""}
+                    {c.id} · {periodTabLabel(c, groups, lang) !== c.id ? `${periodTabLabel(c, groups, lang)} · ` : ""}{c.title} ({formatDate(c.start_date, lang)} - {formatDate(c.end_date, lang)}){c.is_active ? (pt ? " — ATIVA" : " — ACTIVE") : ""}
                   </option>
                 ))}
               </select>
@@ -325,6 +343,7 @@ export default function OracaoTab({ lang }) {
             </button>
           )}
           {period && <button className="btn btn-ghost" onClick={openEdit}>{pt ? "Editar" : "Edit"}</button>}
+          {period && <button className="btn btn-ghost" onClick={openDuplicate} title={pt ? "Outra lista da mesma circular, com outro nome e abrangência" : "Another list of the same circular, with its own name and scope"}>{pt ? "Nova lista deste período" : "New list for this period"}</button>}
           {period && <button className="btn btn-ghost" style={{ color: "#dc2626" }} onClick={deletePeriod}>{pt ? "Excluir" : "Delete"}</button>}
           {period && otherPeriods.length > 0 && (
             <button className="btn btn-ghost" onClick={openImport}>{pt ? "Importar do período anterior" : "Import from previous period"}</button>
@@ -358,12 +377,23 @@ export default function OracaoTab({ lang }) {
               : (pt ? "Inativa: ainda não aparece no portal. Clique em \"Ativar no portal\" para publicar." : "Inactive: not on the portal yet. Click \"Activate on portal\" to publish.")}
           </p>
           <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12, lineHeight: 1.6 }}>
-            {[formatCircular(period.circular, lang), formatPeriodRange(period, lang)].filter(Boolean).join(" · ")}
+            {[scopeLabel(period, groups, lang) ? `${pt ? "Abrangência" : "Scope"}: ${scopeLabel(period, groups, lang)}` : (pt ? "Abrangência: todas as igrejas" : "Scope: all churches"), formatCircular(period.circular, lang), formatPeriodRange(period, lang)].filter(Boolean).join(" · ")}
             {(period.reasons || []).length > 0 && ` · ${period.reasons.length} ${pt ? "motivos de oração" : "prayer intentions"}`}
+          </p>
+          <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12, lineHeight: 1.6 }}>
+            {pt ? "Link desta lista: " : "Link for this list: "}
+            <strong style={{ color: "var(--text)", wordBreak: "break-all" }}>{`${publicLink()}/${periodSlug(period)}`}</strong>
+            <br />
+            {pt
+              ? `Sempre mostra a lista ativa com este nome, mesmo quando você criar a próxima circular. O link com todas as listas é ${publicLink()}.`
+              : `It always shows the active list with this name, even after you create the next circular. The link with every list is ${publicLink()}.`}
           </p>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
             <button className="btn btn-ghost" disabled={!period.is_active} onClick={() => copy("link", publicLink())}>
               {copied === "link" ? (pt ? "Link copiado!" : "Link copied!") : (pt ? "Copiar link público" : "Copy public link")}
+            </button>
+            <button className="btn btn-ghost" disabled={!period.is_active} onClick={() => copy("link1", `${publicLink()}/${periodSlug(period)}`)}>
+              {copied === "link1" ? (pt ? "Link copiado!" : "Link copied!") : (pt ? "Copiar link só desta lista" : "Copy link for this list only")}
             </button>
             <button className="btn btn-ghost" onClick={() => copy("list", buildShareText(period, slots, lang))} disabled={loadingSlots}>
               {copied === "list" ? (pt ? "Lista copiada!" : "List copied!") : (pt ? "Copiar lista (WhatsApp)" : "Copy list (WhatsApp)")}
@@ -418,15 +448,24 @@ export default function OracaoTab({ lang }) {
                               {slotRange(i)}
                             </div>
                             {row ? (
-                              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                  {row.member_name}
-                                </span>
-                                {row.church && <span style={{ fontSize: 10, color: "var(--muted)", whiteSpace: "nowrap" }}>· {row.church.split(" ")[0]}</span>}
+                              <div style={{ display: "flex", alignItems: "flex-start", gap: 4 }} title={row.member_name}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+                                    <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>
+                                      {splitName(row.member_name).first}
+                                    </span>
+                                    <ChurchLabel church={row.church} />
+                                  </div>
+                                  {splitName(row.member_name).rest && (
+                                    <div style={{ fontSize: 10.5, color: "var(--muted)", textTransform: "uppercase", lineHeight: 1.3, overflowWrap: "anywhere" }}>
+                                      {splitName(row.member_name).rest}
+                                    </div>
+                                  )}
+                                </div>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); clearSlot(i); }}
                                   aria-label={pt ? "Remover" : "Remove"}
-                                  style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "#dc2626", padding: 0, lineHeight: 1 }}
+                                  style={{ background: "none", border: "none", cursor: "pointer", color: "#dc2626", padding: 0, lineHeight: 1, marginTop: 1 }}
                                 >
                                   <X size={12} />
                                 </button>
@@ -462,6 +501,14 @@ export default function OracaoTab({ lang }) {
               placeholder={pt ? "Ex.: ORAÇÃO ININTERRUPTA DE 24h PELAS ELEIÇÕES E PELA PÁTRIA" : "e.g. 24h UNINTERRUPTED PRAYER FOR THE ELECTIONS AND THE NATION"}
               style={{ ...inputStyle, marginBottom: 12 }}
             />
+            <label style={labelStyle}>{pt ? "Título em inglês (opcional)" : "Title in English (optional)"}</label>
+            <input
+              value={form.title_en}
+              maxLength={200}
+              onChange={(e) => setForm({ ...form, title_en: e.target.value })}
+              placeholder={pt ? "Se vazio, o título em português aparece também em inglês" : "If empty, the Portuguese title is shown in English too"}
+              style={{ ...inputStyle, marginBottom: 12 }}
+            />
             <label style={labelStyle}>{pt ? "Nº da circular (opcional)" : "Circular number (optional)"}</label>
             <input
               value={form.circular}
@@ -470,6 +517,54 @@ export default function OracaoTab({ lang }) {
               placeholder="150/26"
               style={{ ...inputStyle, marginBottom: 12 }}
             />
+            <label style={labelStyle}>{pt ? "Nome da lista (aparece na aba)" : "List name (shown on the tab)"}</label>
+            <input
+              value={form.list_name}
+              maxLength={60}
+              onChange={(e) => setForm({ ...form, list_name: e.target.value })}
+              placeholder={pt ? "Ex.: Newark, Philadelphia, Texas" : "e.g. Newark, Philadelphia, Texas"}
+              style={{ ...inputStyle, marginBottom: 12 }}
+            />
+            <label style={labelStyle}>{pt ? "Abrangência (quem pode participar)" : "Scope (who can take part)"}</label>
+            <select
+              value={form.scope_kind}
+              onChange={(e) => setForm({ ...form, scope_kind: e.target.value })}
+              style={{ ...inputStyle, marginBottom: form.scope_kind === "all" ? 12 : 8 }}
+            >
+              <option value="all">{pt ? "Todas as igrejas" : "All churches"}</option>
+              <option value="groups">{pt ? "Polos, áreas ou regiões" : "Hubs, areas or regions"}</option>
+              <option value="churches">{pt ? "Igrejas específicas" : "Specific churches"}</option>
+            </select>
+            {form.scope_kind === "groups" && (
+              <div style={{ marginBottom: 12 }}>
+                {groups.length === 0 ? (
+                  <p style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.5 }}>
+                    {groupsOk
+                      ? (pt ? "Nenhum polo, área ou região criado. Crie em Eventos → Diretório → Polos e Áreas." : "No hubs, areas or regions yet. Create them in Events → Directory → Polos e Áreas.")
+                      : (pt ? "Não foi possível carregar os polos e áreas. Confirme que a migration 023 foi aplicada." : "Could not load hubs and areas. Make sure migration 023 was applied.")}
+                  </p>
+                ) : (
+                  <MultiCheckList
+                    items={groups.map((g) => ({ key: g.id, label: `${kindLabel(g.kind, lang)} — ${g.name}` }))}
+                    selected={form.scope_group_ids}
+                    onChange={(v) => setForm({ ...form, scope_group_ids: v })}
+                    placeholder={pt ? "Buscar polo, área ou região…" : "Search…"}
+                    maxHeight={160}
+                  />
+                )}
+              </div>
+            )}
+            {form.scope_kind === "churches" && (
+              <div style={{ marginBottom: 12 }}>
+                <MultiCheckList
+                  items={churches.filter((c) => c.display && !/^outra/i.test(c.display)).map((c) => ({ key: c.display, label: c.display })).sort((a, b) => a.label.localeCompare(b.label, "pt"))}
+                  selected={form.scope_churches}
+                  onChange={(v) => setForm({ ...form, scope_churches: v })}
+                  placeholder={pt ? "Buscar igreja…" : "Search church…"}
+                  maxHeight={180}
+                />
+              </div>
+            )}
             <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
               <div style={{ flex: 1 }}>
                 <label style={labelStyle}>{pt ? "De 00:00 de (início)" : "From 12 AM on (start)"}</label>
@@ -485,9 +580,28 @@ export default function OracaoTab({ lang }) {
               rows={5}
               value={form.reasonsText}
               onChange={(e) => setForm({ ...form, reasonsText: e.target.value })}
-              placeholder={pt ? "Pelas eleições\nPela pátria" : "For the elections\nFor the nation"}
+              placeholder={pt ? "Pelas **eleições**\nPela *pátria*" : "For the **elections**\nFor the *nation*"}
+              style={{ ...inputStyle, marginBottom: 6, resize: "vertical", fontFamily: "inherit" }}
+            />
+            <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 12, lineHeight: 1.5 }}>
+              {pt ? "Aceita **negrito**, *itálico* e [texto do link](https://endereço)." : "Supports **bold**, *italic* and [link text](https://address)."}
+            </div>
+            <label style={labelStyle}>{pt ? "Motivos de Oração em inglês (um por linha, opcional)" : "Prayer intentions in English (one per line, optional)"}</label>
+            <textarea
+              rows={5}
+              value={form.reasonsEnText}
+              onChange={(e) => setForm({ ...form, reasonsEnText: e.target.value })}
+              placeholder={pt ? "Se vazio, os motivos em português aparecem também em inglês" : "If empty, the Portuguese intentions are shown in English too"}
               style={{ ...inputStyle, marginBottom: 12, resize: "vertical", fontFamily: "inherit" }}
             />
+            {parseReasons(form.reasonsText).length > 0 && (
+              <div style={{ background: "var(--bg2)", borderRadius: 8, padding: "10px 14px", marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", marginBottom: 4 }}>{pt ? "PRÉ-VISUALIZAÇÃO" : "PREVIEW"}</div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
+                  {parseReasons(form.reasonsText).map((r, i) => <li key={i}><InlineMarkdown text={r} /></li>)}
+                </ul>
+              </div>
+            )}
             {formError && <div style={{ color: "#991b1b", fontSize: 13, marginBottom: 12 }}>{formError}</div>}
             <div style={{ display: "flex", gap: 10 }}>
               <button type="button" className="btn btn-ghost" style={{ flex: 1 }} disabled={saving} onClick={() => setForm(null)}>{pt ? "Cancelar" : "Cancel"}</button>
@@ -517,7 +631,7 @@ export default function OracaoTab({ lang }) {
             <select value={importFrom} onChange={(e) => setImportFrom(e.target.value)} style={{ ...inputStyle, marginBottom: 16 }}>
               {otherPeriods.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.id} · {c.title} ({formatDate(c.start_date, lang)} - {formatDate(c.end_date, lang)})
+                  {c.id} · {periodTabLabel(c, groups, lang) !== c.id ? `${periodTabLabel(c, groups, lang)} · ` : ""}{c.title} ({formatDate(c.start_date, lang)} - {formatDate(c.end_date, lang)})
                 </option>
               ))}
             </select>
@@ -573,10 +687,18 @@ export default function OracaoTab({ lang }) {
               )}
             </div>
 
-            <select value={church} onChange={(e) => setChurch(e.target.value)} style={{ ...inputStyle, marginBottom: 12 }}>
-              <option value="">{pt ? "Igreja (opcional)" : "Church (optional)"}</option>
-              {CHURCH_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <div style={{ marginBottom: 12 }}>
+              <PrayerChurchPicker
+                key={`${activeSlot}-${churches.some((c) => "is_hub" in c) ? "directory" : "fallback"}`}
+                value={church}
+                onChange={setChurch}
+                churches={churches}
+                pt={pt}
+                label={pt ? "Igreja (opcional)" : "Church (optional)"}
+                inputStyle={inputStyle}
+                labelStyle={labelStyle}
+              />
+            </div>
 
             {error && <div style={{ color: "#991b1b", fontSize: 13, marginBottom: 12 }}>{error}</div>}
 
