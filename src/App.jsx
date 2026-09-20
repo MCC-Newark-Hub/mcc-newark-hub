@@ -38,6 +38,7 @@ import CheckInScreen from "@/views/CheckInScreen";
 import SelfCheckInScreen from "@/views/SelfCheckInScreen";
 import RegistrationLookup from "@/views/RegistrationLookup";
 import SetlistPublicView from "@/views/SetlistPublicView";
+import PrayerPublicView from "@/views/PrayerPublicView";
 
 export default function App() {
   const navigate = useNavigate();
@@ -84,17 +85,17 @@ export default function App() {
     if (savedPin && !user && appData.dbUsers && appData.dbUsers.length > 0) {
       const mapped = authLogin(savedPin);
       if (mapped) {
-        const restoredView = localStorage.getItem("mcc_view");
-        const STAFF_VIEWS = Object.values(ROLES_SYS);
-        // Legacy mcc_view staff role strings → /events
-        if (restoredView && STAFF_VIEWS.includes(restoredView)) {
-          navigate("/events", { replace: true });
-        } else if (location.pathname === "/login" || location.pathname === "/") {
-          navigate("/", { replace: true });
+        // Only steer from the landing pages: deep links and public pages (/24h-prayers,
+        // /songs/:date, ...) must stay where they are for someone with a saved session.
+        if (location.pathname === "/login" || location.pathname === "/") {
+          const restoredView = localStorage.getItem("mcc_view");
+          const STAFF_VIEWS = Object.values(ROLES_SYS);
+          // Legacy mcc_view staff role strings → /events
+          navigate(restoredView && STAFF_VIEWS.includes(restoredView) ? "/events" : "/", { replace: true });
         }
       } else {
+        // AuthGate sends gated routes to /login on its own; public pages stay put.
         clearSession();
-        navigate("/login", { replace: true });
       }
     }
   }, [appData.dbUsers]);
@@ -139,6 +140,11 @@ export default function App() {
               <Route path="/login" element={
                 <HubLoginScreen login={login} lang={lang} setLang={setLang} />
               } />
+
+              {/* Public: 24h prayer board — kept outside PublicLayout so it stays open during maintenance mode */}
+              {["/24h-prayers", "/uninterrupted-prayers", "/uninterrupted-prayer"].map((p) => (
+                <Route key={p} path={`${p}/:id?`} element={<PrayerPublicView lang={lang} setLang={setLang} />} />
+              ))}
 
               {/* Public: event flows (no PIN required) */}
               <Route element={<PublicLayout lang={lang} />}>

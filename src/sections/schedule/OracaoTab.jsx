@@ -1,179 +1,544 @@
 import { useState, useEffect } from "react";
-import { X, CheckCircle } from "lucide-react";
+import { Circle, CircleCheck, X } from "lucide-react";
 import { sb } from "@/lib/supabase";
 import { useAppDataContext } from "@/context/AppDataContext";
+import {
+  SLOT_COUNT, HALVES, HALF_SIZE, CHURCH_OPTIONS, slotTime, slotRange,
+  todayLocal, formatDate, formatPeriodRange, formatCircular, parseReasons, pickPeriod, buildShareText, nextPeriodId,
+} from "@/lib/prayerSlots";
 
-const SLOT_COUNT = 96; // 24h × 4 slots/hour
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+const POLL_MS = 30000;
+const PUBLIC_PATH = "/24h-prayers";
 
-function slotTime(i) {
-  const h = Math.floor(i / 4);
-  const m = (i % 4) * 15;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
+const inputStyle = {
+  width: "100%", padding: "10px 12px", borderRadius: 8, border: "1.5px solid var(--border)",
+  fontSize: 14, boxSizing: "border-box", background: "var(--card)", color: "var(--text)",
+};
+const labelStyle = { fontSize: 12, fontWeight: 600, color: "var(--muted)", display: "block", marginBottom: 3 };
 
 export default function OracaoTab({ lang }) {
   const pt = lang !== "en";
   const { members = [] } = useAppDataContext() || {};
+  const today = todayLocal();
 
-  const today = new Date().toISOString().slice(0, 10);
-  const [prayerDate, setPrayerDate] = useState(today);
-  const [slots, setSlots] = useState([]); // array of DB rows
-  const [loading, setLoading] = useState(true);
-  const [activeSlot, setActiveSlot] = useState(null); // slot index being assigned
+  const [periods, setPeriods] = useState([]);
+  const [periodsLoaded, setPeriodsLoaded] = useState(false);
+  const [periodId, setPeriodId] = useState(null);
+  const [slots, setSlots] = useState([]);
+  const [slotsFor, setSlotsFor] = useState(null);
+  const [tick, setTick] = useState(0); // bump to force a reload after a write
+
+  const [form, setForm] = useState(null); // period create/edit: { id?, title, circular, start_date, end_date, reasonsText }
+  const [formError, setFormError] = useState("");
+  const [activeSlot, setActiveSlot] = useState(null);
   const [query, setQuery] = useState("");
-  const [saving, setSaving] = useState(false);
   const [manualName, setManualName] = useState("");
+  const [church, setChurch] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState("");
+  const [info, setInfo] = useState("");
+  const [showImport, setShowImport] = useState(false);
+  const [importFrom, setImportFrom] = useState("");
+  const [importing, setImporting] = useState(false);
+
+  const period = periods.find((c) => c.id === periodId) || null;
+  const loadingSlots = !!periodId && slotsFor !== periodId;
 
   useEffect(() => {
-    loadSlots();
-  }, [prayerDate]);
+    let cancelled = false;
+    (async () => {
+      const { data, error: err } = await sb.from("prayer_periods").select("*").order("start_date", { ascending: false });
+      if (cancelled) return;
+      if (err) {
+        console.error("prayer_periods load error:", err);
+        setError(pt ? "Não foi possível carregar os períodos de orações." : "Could not load the prayer periods.");
+      } else {
+        const list = data || [];
+        setPeriods(list);
+        setPeriodId((prev) => (prev && list.some((c) => c.id === prev) ? prev : pickPeriod(list, todayLocal())?.id ?? null));
+      }
+      setPeriodsLoaded(true);
+    })();
+    return () => { cancelled = true; };
+  }, [tick, pt]);
 
-  const loadSlots = async () => {
-    setLoading(true);
-    const { data } = await sb.from("schedule_oracao").select("*").eq("prayer_date", prayerDate);
-    setSlots(data || []);
-    setLoading(false);
-  };
+  useEffect(() => {
+    if (!periodId) return undefined;
+    let cancelled = false;
+    const run = async () => {
+      const { data, error: err } = await sb.from("schedule_oracao").select("*").eq("period_id", periodId);
+      if (cancelled) return;
+      if (err) {
+        console.error("schedule_oracao load error:", err);
+        setError(pt ? "Não foi possível carregar a agenda. Verifique a conexão e tente novamente." : "Could not load the agenda. Check your connection and try again.");
+      } else {
+        setSlots(data || []);
+      }
+      setSlotsFor(periodId);
+    };
+    run();
+    const t = setInterval(run, POLL_MS);
+    return () => { cancelled = true; clearInterval(t); };
+  }, [periodId, tick, pt]);
 
   const slotRow = (i) => slots.find((s) => s.slot_index === i);
+  const memberResults = query.length > 1 ? members.filter((m) => norm(m.name).includes(norm(query))).slice(0, 5) : [];
+  const filled = slots.length;
+  const pct = Math.round((filled / SLOT_COUNT) * 100);
 
-  const memberResults = query.length > 1
-    ? members.filter((m) => norm(m.name).includes(norm(query))).slice(0, 5)
-    : [];
+  // The permanent link always shows whichever period is active.
+  const publicLink = () => `${window.location.origin}${PUBLIC_PATH}`;
+
+  const copy = async (key, text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(key);
+      setTimeout(() => setCopied(""), 2000);
+    } catch {
+      setError(pt ? "Não foi possível copiar." : "Could not copy.");
+    }
+  };
+
+  // ── Period (period) management ────────────────────────────────────────────
+  const openNew = () => { setFormError(""); setForm({ title: "", circular: "", start_date: today, end_date: today, reasonsText: "" }); };
+  const openEdit = () => {
+    setFormError("");
+    setForm({
+      id: period.id, title: period.title, circular: period.circular || "",
+      start_date: period.start_date, end_date: period.end_date, reasonsText: (period.reasons || []).join("\n"),
+    });
+  };
+
+  const savePeriod = async (e) => {
+    e.preventDefault();
+    const title = form.title.trim();
+    if (!title) { setFormError(pt ? "Informe o título do período." : "Enter the period title."); return; }
+    if (!form.start_date || !form.end_date) { setFormError(pt ? "Informe as datas de início e fim." : "Enter the start and end dates."); return; }
+    if (form.end_date < form.start_date) { setFormError(pt ? "A data de fim deve ser igual ou depois da data de início." : "The end date must be on or after the start date."); return; }
+    setSaving(true);
+    setFormError("");
+    const payload = { title, circular: form.circular.trim() || null, start_date: form.start_date, end_date: form.end_date, reasons: parseReasons(form.reasonsText) };
+    const { data, error: err } = form.id
+      ? await sb.from("prayer_periods").update(payload).eq("id", form.id).select().single()
+      : await sb.from("prayer_periods").insert({ ...payload, id: nextPeriodId(periods), is_active: false }).select().single();
+    setSaving(false);
+    if (err || !data) {
+      console.error("prayer_periods save error:", err);
+      setFormError(pt ? "Não foi possível salvar. Tente novamente." : "Could not save. Try again.");
+      return;
+    }
+    setForm(null);
+    setPeriodId(data.id);
+    setTick((t) => t + 1);
+  };
+
+  const otherPeriods = periods.filter((c) => c.id !== periodId);
+
+  const openImport = () => {
+    // Default source: the latest period that started before this one, else the most recent other.
+    const before = otherPeriods.filter((c) => c.start_date < period.start_date).sort((a, b) => b.start_date.localeCompare(a.start_date));
+    setError("");
+    setInfo("");
+    setImportFrom((before[0] || otherPeriods[0])?.id || "");
+    setShowImport(true);
+  };
+
+  // Copies names + churches from another period into this one. Slots already taken here are kept.
+  const runImport = async (e) => {
+    e.preventDefault();
+    if (!importFrom) return;
+    setImporting(true);
+    setError("");
+    const { data: src, error: e1 } = await sb
+      .from("schedule_oracao")
+      .select("slot_index,slot_time,member_id,member_name,church")
+      .eq("period_id", importFrom);
+    if (e1) {
+      console.error("schedule_oracao import read error:", e1);
+      setImporting(false);
+      setError(pt ? "Não foi possível ler o período selecionado." : "Could not read the selected period.");
+      return;
+    }
+    const rows = (src || []).filter((r) => !slotRow(r.slot_index)).map((r) => ({ ...r, period_id: period.id }));
+    let imported = 0;
+    if (rows.length > 0) {
+      const { data, error: e2 } = await sb
+        .from("schedule_oracao")
+        .upsert(rows, { onConflict: "period_id,slot_index", ignoreDuplicates: true })
+        .select("id");
+      if (e2) {
+        console.error("schedule_oracao import write error:", e2);
+        setImporting(false);
+        setError(pt ? "Não foi possível importar os nomes. Tente novamente." : "Could not import the names. Try again.");
+        return;
+      }
+      imported = (data || []).length;
+    }
+    const skipped = (src || []).length - imported;
+    setImporting(false);
+    setShowImport(false);
+    setInfo(
+      pt
+        ? `${imported} ${imported === 1 ? "nome importado" : "nomes importados"}. ${skipped} ${skipped === 1 ? "horário já estava ocupado e foi mantido" : "horários já estavam ocupados e foram mantidos"}.`
+        : `${imported} ${imported === 1 ? "name" : "names"} imported. ${skipped} already-taken ${skipped === 1 ? "slot was" : "slots were"} kept.`
+    );
+    setTick((t) => t + 1);
+  };
+
+  const toggleActive = async () => {
+    const activate = !period.is_active;
+    setError("");
+    if (activate) {
+      const other = periods.find((c) => c.is_active && c.id !== period.id);
+      if (other) {
+        const msg = pt
+          ? `O período "${other.title}" (${other.id}) está ativo e será desativado. Continuar?`
+          : `The period "${other.title}" (${other.id}) is active and will be deactivated. Continue?`;
+        if (!window.confirm(msg)) return;
+      }
+    }
+    // Activate first, then deactivate the others: if the second step fails there are two active
+    // periods (the portal still shows one) instead of none.
+    const { data, error: e1 } = await sb.from("prayer_periods").update({ is_active: activate }).eq("id", period.id).select("id");
+    if (e1 || !data || data.length === 0) {
+      console.error("prayer_periods toggle error:", e1);
+      setError(pt ? "Não foi possível alterar o status do período." : "Could not change the period status.");
+      return;
+    }
+    if (activate) {
+      const { error: e2 } = await sb.from("prayer_periods").update({ is_active: false }).eq("is_active", true).neq("id", period.id);
+      if (e2) {
+        console.error("prayer_periods deactivate error:", e2);
+        setError(pt ? "Período ativado, mas não foi possível desativar o anterior. Desative-o manualmente." : "Period activated, but the previous one could not be deactivated. Deactivate it manually.");
+      }
+    }
+    setTick((t) => t + 1);
+  };
+
+  const deletePeriod = async () => {
+    const msg = pt
+      ? `Excluir "${period.title}" e os ${slots.length} nomes já cadastrados? Isso não pode ser desfeito.`
+      : `Delete "${period.title}" and its ${slots.length} names? This cannot be undone.`;
+    if (!window.confirm(msg)) return;
+    const { data, error: err } = await sb.from("prayer_periods").delete().eq("id", period.id).select("id");
+    if (err || !data || data.length === 0) {
+      console.error("prayer_periods delete error:", err);
+      setError(pt ? "Não foi possível excluir o período." : "Could not delete the period.");
+      return;
+    }
+    setError("");
+    setPeriodId(null);
+    setSlots([]);
+    setSlotsFor(null);
+    setTick((t) => t + 1);
+  };
+
+  // ── Slot assignment ─────────────────────────────────────────────────────────
+  const takenMessage = (i) =>
+    pt
+      ? `O horário ${slotRange(i)} já está ocupado. Remova o nome atual (✕) ou escolha outro horário.`
+      : `The ${slotRange(i)} slot is already taken. Remove the current name (✕) or choose another slot.`;
 
   const assignSlot = async (memberId, memberName) => {
     if (activeSlot === null || !memberName) return;
     setSaving(true);
-    const existing = slotRow(activeSlot);
-    if (existing) {
-      await sb.from("schedule_oracao").delete().eq("id", existing.id);
-    }
+    setError("");
     const row = {
-      prayer_date: prayerDate,
+      period_id: period.id,
       slot_index: activeSlot,
       slot_time: slotTime(activeSlot),
       member_id: memberId || null,
-      member_name: memberName,
+      member_name: memberName.trim(),
+      church: church || null,
     };
-    const { data, error } = await sb.from("schedule_oracao").insert(row).select().single();
-    if (!error && data) {
-      setSlots((prev) => [...prev.filter((s) => s.slot_index !== activeSlot), data]);
-    }
+    const { data, error: err } = await sb.from("schedule_oracao").insert(row).select().single();
     setSaving(false);
+    if (err?.code === "23505") {
+      setActiveSlot(null);
+      setTick((t) => t + 1);
+      setError(takenMessage(activeSlot));
+      return;
+    }
+    if (err || !data) {
+      console.error("schedule_oracao save error:", err);
+      setError(pt ? "Não foi possível salvar este horário. Tente novamente." : "Could not save this slot. Try again.");
+      return;
+    }
+    setSlots((prev) => [...prev.filter((s) => s.slot_index !== activeSlot), data]);
     setActiveSlot(null);
     setQuery("");
     setManualName("");
+    setChurch("");
   };
 
   const clearSlot = async (i) => {
     const row = slotRow(i);
     if (!row) return;
+    setError("");
     setSlots((prev) => prev.filter((s) => s.slot_index !== i));
-    await sb.from("schedule_oracao").delete().eq("id", row.id);
+    const { error: err } = await sb.from("schedule_oracao").delete().eq("id", row.id);
+    if (err) {
+      console.error("schedule_oracao delete error:", err);
+      setSlots((prev) => [...prev, row]);
+      setError(pt ? "Não foi possível remover este horário. Tente novamente." : "Could not remove this slot. Try again.");
+    }
   };
 
-  const filled = slots.length;
-  const pct = Math.round((filled / SLOT_COUNT) * 100);
+  const legend = (icon, label) => (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted)" }}>
+      {icon}
+      {label}
+    </span>
+  );
 
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
         <h3 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 18, fontWeight: 700, color: "var(--text)", marginBottom: 2 }}>
-          {pt ? "Agenda de Oração 24h" : "24h Prayer Agenda"}
+          {pt ? "Períodos de Orações Ininterruptas" : "Uninterrupted Prayer Periods"}
         </h3>
         <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 16 }}>
           {pt
-            ? "Corrente de oração ininterrupta — 96 slots de 15 minutos."
-            : "Uninterrupted prayer chain — 96 fifteen-minute slots."}
+            ? "Crie o período (normalmente vem por circular) e ative para ele aparecer na página pública, sem senha, onde os membros escolhem seus horários. São 96 horários de 15 minutos, uma pessoa por horário, sempre o mesmo horário durante o período."
+            : "Create the period (usually announced by a circular) and activate it to show it on the public page, no password, where members pick their slots. 96 fifteen-minute slots, one person per slot, the same slot every day of the period."}
         </p>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-          <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", display: "block", marginBottom: 3 }}>
-              {pt ? "Data da corrente" : "Prayer chain date"}
-            </label>
-            <input
-              type="date"
-              value={prayerDate}
-              onChange={(e) => setPrayerDate(e.target.value)}
-              style={{ padding: "8px 12px", borderRadius: 8, border: "1.5px solid var(--border)", fontSize: 14, background: "var(--card)", color: "var(--text)" }}
-            />
-          </div>
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
-              <span>{pt ? `${filled} de ${SLOT_COUNT} slots preenchidos` : `${filled} of ${SLOT_COUNT} slots filled`}</span>
-              <span style={{ fontWeight: 700, color: pct === 100 ? "#2d8a4e" : "var(--muted)" }}>{pct}%</span>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 10, flexWrap: "wrap" }}>
+          {periods.length > 0 && (
+            <div style={{ minWidth: 240, flex: 1 }}>
+              <label style={labelStyle}>{pt ? "Período" : "Period"}</label>
+              <select value={periodId || ""} onChange={(e) => setPeriodId(e.target.value)} style={inputStyle}>
+                {periods.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.id} · {c.title} ({formatDate(c.start_date, lang)} - {formatDate(c.end_date, lang)}){c.is_active ? (pt ? " — ATIVA" : " — ACTIVE") : ""}
+                  </option>
+                ))}
+              </select>
             </div>
-            <div style={{ height: 8, background: "var(--border)", borderRadius: 99, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? "#2d8a4e" : "#8B0000", borderRadius: 99, transition: "width .3s" }} />
-            </div>
-          </div>
+          )}
+          <button className="btn btn-primary" onClick={openNew}>{pt ? "Novo período" : "New period"}</button>
+          {period && (
+            <button className={period.is_active ? "btn btn-ghost" : "btn btn-accent"} onClick={toggleActive}>
+              {period.is_active ? (pt ? "Desativar" : "Deactivate") : (pt ? "Ativar no portal" : "Activate on portal")}
+            </button>
+          )}
+          {period && <button className="btn btn-ghost" onClick={openEdit}>{pt ? "Editar" : "Edit"}</button>}
+          {period && <button className="btn btn-ghost" style={{ color: "#dc2626" }} onClick={deletePeriod}>{pt ? "Excluir" : "Delete"}</button>}
+          {period && otherPeriods.length > 0 && (
+            <button className="btn btn-ghost" onClick={openImport}>{pt ? "Importar do período anterior" : "Import from previous period"}</button>
+          )}
         </div>
       </div>
 
-      {loading ? (
-        <p style={{ color: "var(--muted)", fontSize: 14 }}>{pt ? "Carregando…" : "Loading…"}</p>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 6 }}>
-          {Array.from({ length: SLOT_COUNT }, (_, i) => {
-            const row = slotRow(i);
-            const isFilled = !!row;
-            const isActive = activeSlot === i;
-            return (
-              <div
-                key={i}
-                onClick={() => { setActiveSlot(isActive ? null : i); setQuery(""); setManualName(""); }}
-                style={{
-                  border: `2px solid ${isActive ? "#8B0000" : isFilled ? "#2d8a4e" : "var(--border)"}`,
-                  borderRadius: 10,
-                  padding: "10px 12px",
-                  cursor: "pointer",
-                  background: isActive ? "#8B000008" : isFilled ? "#2d8a4e08" : "var(--card)",
-                  transition: "border-color .15s, background .15s",
-                  position: "relative",
-                }}
-              >
-                <div style={{ fontSize: 13, fontWeight: 700, color: isActive ? "#8B0000" : isFilled ? "#2d8a4e" : "var(--muted)", marginBottom: 2 }}>
-                  {slotTime(i)}
-                </div>
-                {isFilled ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <CheckCircle size={12} color="#2d8a4e" />
-                    <span style={{ fontSize: 12, color: "var(--text)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {row.member_name.split(" ")[0]}
-                    </span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); clearSlot(i); }}
-                      style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "#dc2626", padding: 0, lineHeight: 1 }}
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 11, color: "var(--muted)" }}>
-                    {pt ? "Disponível" : "Available"}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+      {info && (
+        <div style={{ background: "#f0fdf4", border: "1px solid #86efac", color: "#166534", borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 14 }}>
+          {info}
         </div>
       )}
 
-      {activeSlot !== null && (
+      {error && (
+        <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", color: "#991b1b", borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 14 }}>
+          {error}
+        </div>
+      )}
+
+      {!periodsLoaded ? (
+        <p style={{ color: "var(--muted)", fontSize: 14 }}>{pt ? "Carregando…" : "Loading…"}</p>
+      ) : !period ? (
+        <p style={{ color: "var(--muted)", fontSize: 14, padding: "24px 0" }}>
+          {pt ? "Nenhum período cadastrado. Clique em \"Novo período\" para criar." : "No prayer period yet. Click \"New period\" to create one."}
+        </p>
+      ) : (
+        <>
+          <p style={{ fontSize: 13, marginBottom: 12, color: period.is_active ? "#166534" : "var(--muted)", fontWeight: 600 }}>
+            {period.is_active
+              ? (pt ? "Ativa: visível no portal, sem senha." : "Active: visible on the portal, no password.")
+              : (pt ? "Inativa: ainda não aparece no portal. Clique em \"Ativar no portal\" para publicar." : "Inactive: not on the portal yet. Click \"Activate on portal\" to publish.")}
+          </p>
+          <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12, lineHeight: 1.6 }}>
+            {[formatCircular(period.circular, lang), formatPeriodRange(period, lang)].filter(Boolean).join(" · ")}
+            {(period.reasons || []).length > 0 && ` · ${period.reasons.length} ${pt ? "motivos de oração" : "prayer intentions"}`}
+          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
+            <button className="btn btn-ghost" disabled={!period.is_active} onClick={() => copy("link", publicLink())}>
+              {copied === "link" ? (pt ? "Link copiado!" : "Link copied!") : (pt ? "Copiar link público" : "Copy public link")}
+            </button>
+            <button className="btn btn-ghost" onClick={() => copy("list", buildShareText(period, slots, lang))} disabled={loadingSlots}>
+              {copied === "list" ? (pt ? "Lista copiada!" : "List copied!") : (pt ? "Copiar lista (WhatsApp)" : "Copy list (WhatsApp)")}
+            </button>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
+                <span>{pt ? `${filled} de ${SLOT_COUNT} horários ocupados` : `${filled} of ${SLOT_COUNT} slots taken`}</span>
+                <span style={{ fontWeight: 700, color: pct === 100 ? "#2d8a4e" : "var(--muted)" }}>{pct}%</span>
+              </div>
+              <div style={{ height: 8, background: "var(--border)", borderRadius: 99, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${pct}%`, background: "#2d8a4e", borderRadius: 99, transition: "width .3s" }} />
+              </div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 14, marginBottom: 12 }}>
+            {legend(<Circle size={16} color="#9ca3af" />, pt ? "Livre" : "Free")}
+            {legend(<CircleCheck size={16} color="#2d8a4e" />, pt ? "Ocupado" : "Taken")}
+          </div>
+
+          {loadingSlots ? (
+            <p style={{ color: "var(--muted)", fontSize: 14 }}>{pt ? "Carregando…" : "Loading…"}</p>
+          ) : (
+            <div className="prayer-cols">
+              {HALVES.map((h) => (
+                <div key={h.start} className="prayer-col">
+                  <div style={{ fontSize: 13, fontWeight: 800, color: "var(--text)", padding: "2px 2px 4px" }}>{h.label}</div>
+                  {Array.from({ length: HALF_SIZE }, (_, k) => h.start + k).map((i) => {
+                        const row = slotRow(i);
+                        const isActive = activeSlot === i;
+                        return (
+                          <div
+                            key={i}
+                            onClick={() => {
+                              if (row) { setError(takenMessage(i)); return; }
+                              setError("");
+                              setActiveSlot(isActive ? null : i);
+                              setQuery("");
+                              setManualName("");
+                              setChurch("");
+                            }}
+                            style={{
+                              border: `2px solid ${isActive ? "#8B0000" : row ? "#b7e1cd" : "var(--border)"}`,
+                              background: "var(--card)",
+                              borderRadius: 10,
+                              padding: "9px 12px",
+                              cursor: row ? "not-allowed" : "pointer",
+                              transition: "border-color .15s",
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, marginBottom: 2, fontVariantNumeric: "tabular-nums" }}>
+                              {row ? <CircleCheck size={14} color="#2d8a4e" /> : <Circle size={14} color="#9ca3af" />}
+                              {slotRange(i)}
+                            </div>
+                            {row ? (
+                              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                  {row.member_name}
+                                </span>
+                                {row.church && <span style={{ fontSize: 10, color: "var(--muted)", whiteSpace: "nowrap" }}>· {row.church.split(" ")[0]}</span>}
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); clearSlot(i); }}
+                                  aria-label={pt ? "Remover" : "Remove"}
+                                  style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "#dc2626", padding: 0, lineHeight: 1 }}
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)" }}>{pt ? "LIVRE" : "FREE"}</div>
+                            )}
+                          </div>
+                        );
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {form && (
         <div
-          style={{
-            position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 9999,
-            display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
-          }}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+          onClick={(e) => e.target === e.currentTarget && !saving && setForm(null)}
+        >
+          <form onSubmit={savePeriod} style={{ background: "var(--card)", borderRadius: 16, padding: 28, width: "100%", maxWidth: 460, maxHeight: "92vh", overflowY: "auto", boxShadow: "var(--shadow-md)" }}>
+            <h3 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 18, fontWeight: 700, marginBottom: 16 }}>
+              {form.id ? (pt ? "Editar período" : "Edit period") : (pt ? "Novo período" : "New period")}
+            </h3>
+            <label style={labelStyle}>{pt ? "Título" : "Title"}</label>
+            <input
+              autoFocus
+              value={form.title}
+              maxLength={200}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              placeholder={pt ? "Ex.: ORAÇÃO ININTERRUPTA DE 24h PELAS ELEIÇÕES E PELA PÁTRIA" : "e.g. 24h UNINTERRUPTED PRAYER FOR THE ELECTIONS AND THE NATION"}
+              style={{ ...inputStyle, marginBottom: 12 }}
+            />
+            <label style={labelStyle}>{pt ? "Nº da circular (opcional)" : "Circular number (optional)"}</label>
+            <input
+              value={form.circular}
+              maxLength={30}
+              onChange={(e) => setForm({ ...form, circular: e.target.value })}
+              placeholder="150/26"
+              style={{ ...inputStyle, marginBottom: 12 }}
+            />
+            <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>{pt ? "De 00:00 de (início)" : "From 12 AM on (start)"}</label>
+                <input type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} style={inputStyle} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>{pt ? "Até 00:00 de (fim)" : "Until 12 AM on (end)"}</label>
+                <input type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} style={inputStyle} />
+              </div>
+            </div>
+            <label style={labelStyle}>{pt ? "Motivos de Oração (um por linha, opcional)" : "Prayer intentions (one per line, optional)"}</label>
+            <textarea
+              rows={5}
+              value={form.reasonsText}
+              onChange={(e) => setForm({ ...form, reasonsText: e.target.value })}
+              placeholder={pt ? "Pelas eleições\nPela pátria" : "For the elections\nFor the nation"}
+              style={{ ...inputStyle, marginBottom: 12, resize: "vertical", fontFamily: "inherit" }}
+            />
+            {formError && <div style={{ color: "#991b1b", fontSize: 13, marginBottom: 12 }}>{formError}</div>}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button type="button" className="btn btn-ghost" style={{ flex: 1 }} disabled={saving} onClick={() => setForm(null)}>{pt ? "Cancelar" : "Cancel"}</button>
+              <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={saving}>
+                {saving ? (pt ? "Salvando…" : "Saving…") : (pt ? "Salvar" : "Save")}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {showImport && period && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+          onClick={(e) => e.target === e.currentTarget && !importing && setShowImport(false)}
+        >
+          <form onSubmit={runImport} style={{ background: "var(--card)", borderRadius: 16, padding: 28, width: "100%", maxWidth: 460, boxShadow: "var(--shadow-md)" }}>
+            <h3 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
+              {pt ? "Importar do período anterior" : "Import from previous period"}
+            </h3>
+            <p style={{ color: "var(--muted)", fontSize: 13, lineHeight: 1.5, marginBottom: 14 }}>
+              {pt
+                ? `Copia os nomes e igrejas do período escolhido para "${period.title}", cada um no mesmo horário. Horários que já estão ocupados aqui são mantidos.`
+                : `Copies the names and churches from the chosen period into "${period.title}", each in the same slot. Slots already taken here are kept.`}
+            </p>
+            <label style={labelStyle}>{pt ? "Importar de" : "Import from"}</label>
+            <select value={importFrom} onChange={(e) => setImportFrom(e.target.value)} style={{ ...inputStyle, marginBottom: 16 }}>
+              {otherPeriods.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.id} · {c.title} ({formatDate(c.start_date, lang)} - {formatDate(c.end_date, lang)})
+                </option>
+              ))}
+            </select>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button type="button" className="btn btn-ghost" style={{ flex: 1 }} disabled={importing} onClick={() => setShowImport(false)}>{pt ? "Cancelar" : "Cancel"}</button>
+              <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={importing || !importFrom}>
+                {importing ? (pt ? "Importando…" : "Importing…") : (pt ? "Importar" : "Import")}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {activeSlot !== null && period && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
           onClick={(e) => e.target === e.currentTarget && setActiveSlot(null)}
         >
           <div style={{ background: "var(--card)", borderRadius: 16, padding: 28, width: "100%", maxWidth: 380, boxShadow: "var(--shadow-md)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <h3 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 18, fontWeight: 700 }}>
-                {slotTime(activeSlot)} — {slotTime(activeSlot + 1 < SLOT_COUNT ? activeSlot + 1 : activeSlot)}
-              </h3>
+              <h3 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 18, fontWeight: 700 }}>{slotRange(activeSlot)}</h3>
               <button onClick={() => setActiveSlot(null)} style={{ background: "none", border: "none", cursor: "pointer" }}>
                 <X size={20} color="var(--muted)" />
               </button>
@@ -188,7 +553,7 @@ export default function OracaoTab({ lang }) {
                 value={query}
                 onChange={(e) => { setQuery(e.target.value); setManualName(e.target.value); }}
                 placeholder={pt ? "Nome do membro…" : "Member name…"}
-                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1.5px solid var(--border)", fontSize: 14, boxSizing: "border-box", background: "var(--card)", color: "var(--text)" }}
+                style={inputStyle}
               />
               {memberResults.length > 0 && (
                 <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "var(--card)", border: "1.5px solid var(--border)", borderRadius: 8, zIndex: 10, boxShadow: "var(--shadow-md)" }}>
@@ -197,8 +562,8 @@ export default function OracaoTab({ lang }) {
                       key={m.id}
                       onClick={() => assignSlot(m.id, m.name)}
                       style={{ padding: "10px 12px", cursor: "pointer", fontSize: 14, borderBottom: "1px solid var(--border)" }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg2)"}
-                      onMouseLeave={(e) => e.currentTarget.style.background = ""}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg2)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = ""; }}
                     >
                       <div style={{ fontWeight: 600 }}>{m.name}</div>
                       <div style={{ fontSize: 12, color: "var(--muted)" }}>{m.church}</div>
@@ -208,10 +573,15 @@ export default function OracaoTab({ lang }) {
               )}
             </div>
 
+            <select value={church} onChange={(e) => setChurch(e.target.value)} style={{ ...inputStyle, marginBottom: 12 }}>
+              <option value="">{pt ? "Igreja (opcional)" : "Church (optional)"}</option>
+              {CHURCH_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+
+            {error && <div style={{ color: "#991b1b", fontSize: 13, marginBottom: 12 }}>{error}</div>}
+
             <div style={{ display: "flex", gap: 10 }}>
-              <button className="btn btn-ghost" onClick={() => setActiveSlot(null)} style={{ flex: 1 }}>
-                {pt ? "Cancelar" : "Cancel"}
-              </button>
+              <button className="btn btn-ghost" onClick={() => setActiveSlot(null)} style={{ flex: 1 }}>{pt ? "Cancelar" : "Cancel"}</button>
               <button
                 className="btn btn-primary"
                 onClick={() => assignSlot(null, manualName || query)}

@@ -35,6 +35,7 @@ Uses React Router v6. `<BrowserRouter>` in `src/main.jsx`; full route tree in `s
 | `/events/lookup` | RegistrationLookup |
 | `/events/checkin?reg=<regNumber>` | CheckInScreen |
 | `/events/selfcheckin/:eventId` | SelfCheckInScreen |
+| `/24h-prayers/:id?` (aliases `/uninterrupted-prayers`, `/uninterrupted-prayer`) | PrayerPublicView — 24h prayer board; shows the active `prayer_periods` row. Deliberately outside `PublicLayout` so it stays open in maintenance mode |
 
 **PIN-gated routes** (wrapped in `AuthGate` → `HubShell`):
 
@@ -108,7 +109,7 @@ Pastors and Ungidos are automatically marked `exempt: true, fee: 0` at registrat
 
 ### Supabase Tables
 
-`churches`, `members`, `families`, `assistance_groups`, `events`, `registrations`, `rosters`, `teams`, `approvals`, `app_users`, `app_settings`, `audit_log`
+`churches`, `members`, `families`, `assistance_groups`, `events`, `registrations`, `rosters`, `teams`, `approvals`, `app_users`, `app_settings`, `audit_log`, `prayer_periods`, `schedule_oracao`
 
 **Critical — new tables**: RLS must be **explicitly disabled** on every new table or all writes will silently fail with no error. Always add:
 

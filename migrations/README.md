@@ -20,6 +20,7 @@ Run these files **in order** using the Supabase SQL editor or `psql`. Each migra
 | `014_payment_extension_and_reactivation.sql` | Adds `registrations.deadline_extended_to` (date) and `registrations.cancel_reason` (text) for the reactivation/extension flow; adds `events.payment_extension_days` (int, default 5) for the shorter deadline reactivated registrations get. |
 | `015_app_settings.sql` | Creates single-row `app_settings` table (`session_ttl_hours`, default 2) for global config previously hardcoded in the client — admin-configurable from Usuários & PINs. |
 | `016_audit_log.sql` | Creates `audit_log` table (actor, action, entity, details, timestamp) — every mutation in useAppData.js writes here, feeding the Admin audit log page. |
+| `022_schedule_oracao.sql` | Creates `prayer_periods` ("Período de Orações Ininterruptas": `oracao24h-NNN` id, title, optional circular number, start/end date, `reasons text[]`, `is_active`) and `schedule_oracao` (one person per slot, unique per period + slot index), RLS disabled; seeds the first period (inactive). Used by the admin Oração 24h tab and the public `/24h-prayers` board; both fail without it. |
 
 ## How to run
 
