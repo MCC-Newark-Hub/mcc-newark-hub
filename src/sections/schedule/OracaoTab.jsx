@@ -489,8 +489,8 @@ export default function OracaoTab({ lang }) {
                             {people.map((row) => (
                               <div key={row.id} style={{ display: "flex", alignItems: "flex-start", gap: 4, marginTop: 2 }} title={row.member_name}>
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
-                                    <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>
+                                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "1px 5px" }}>
+                                    <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", overflowWrap: "anywhere" }}>
                                       {splitName(row.member_name).first}
                                     </span>
                                     <ChurchLabel church={row.church} />

@@ -303,41 +303,41 @@ function PrayerBoard({ lang, setLang }) {
           onClick={() => (full ? !anyMine && setNotice({ type: "error", text: fullMessage(i) }) : toggle(i))}
           onKeyDown={(e) => { if (!full && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); toggle(i); } }}
           style={{
-            ...base, alignItems: "flex-start",
+            ...base, flexDirection: "column", alignItems: "stretch", gap: 6,
             border: `1.5px solid ${isSel ? "#8B0000" : anyMine ? "#2d8a4e" : "#e5e7eb"}`,
             background: isSel ? "#fef2f2" : "#fff",
             cursor: full ? (anyMine ? "default" : "not-allowed") : "pointer",
           }}
         >
-          {full || !isSel
-            ? <CircleCheck size={18} color={full ? "#2d8a4e" : "#d97706"} aria-label={full ? tt.prayerLegendFull : tt.prayerLegendSomeone} style={{ flexShrink: 0, marginTop: 1 }} />
-            : <CircleDot size={18} color="#8B0000" style={{ flexShrink: 0, marginTop: 1 }} />}
-          <span style={{ ...rangeStyle, marginTop: 1 }}>{range}</span>
-          <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
-            {people.map((s) => {
+          <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {full || !isSel
+              ? <CircleCheck size={18} color={full ? "#2d8a4e" : "#d97706"} aria-label={full ? tt.prayerLegendFull : tt.prayerLegendSomeone} style={{ flexShrink: 0 }} />
+              : <CircleDot size={18} color="#8B0000" style={{ flexShrink: 0 }} />}
+            <span style={{ ...rangeStyle, flex: 1 }}>{range}</span>
+            {chip}
+          </span>
+          <span style={{ display: "flex", flexDirection: "column", marginLeft: 28 }}>
+            {people.map((s, k) => {
               const isMine = mine.includes(s.id);
+              const nm = splitName(s.member_name);
               return (
-                <span key={s.id} style={{ display: "flex", alignItems: "flex-start", gap: 4, minWidth: 0 }} title={s.member_name}>
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                      <span style={{ fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>
-                        {splitName(s.member_name).first}
-                      </span>
-                      {isMine && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#2d8a4e", flexShrink: 0 }}>{tt.prayerYou}</span>}
-                      <ChurchLabel church={s.church} />
-                    </span>
-                    {splitName(s.member_name).rest && (
-                      <span style={{ display: "block", fontSize: 11.5, fontWeight: 500, color: "#6b7280", textTransform: "uppercase", lineHeight: 1.3, overflowWrap: "anywhere" }}>
-                        {splitName(s.member_name).rest}
-                      </span>
-                    )}
+                <span
+                  key={s.id}
+                  title={s.member_name}
+                  style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "2px 8px", padding: "5px 0", borderTop: k ? "1px solid #f3f4f6" : "none" }}
+                >
+                  <span style={{ overflowWrap: "anywhere" }}>
+                    <span style={{ fontWeight: 700, textTransform: "uppercase" }}>{nm.first}</span>
+                    {nm.rest && <span style={{ fontWeight: 500, color: "#6b7280", textTransform: "uppercase", fontSize: 12 }}> {nm.rest}</span>}
                   </span>
+                  <ChurchLabel church={s.church} />
+                  {isMine && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#2d8a4e" }}>{tt.prayerYou}</span>}
                   {isMine && (
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); removeMine(s); }}
                       aria-label={tt.prayerRemoveMySlot}
-                      style={{ background: "none", border: "none", cursor: "pointer", color: "#dc2626", padding: 0, display: "flex" }}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "#dc2626", padding: 0, display: "flex", marginLeft: "auto" }}
                     >
                       <X size={16} />
                     </button>
@@ -346,7 +346,6 @@ function PrayerBoard({ lang, setLang }) {
               );
             })}
           </span>
-          {chip}
         </div>
       );
     }
