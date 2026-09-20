@@ -179,10 +179,10 @@ export default function SetlistTab({ lang }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
         <div>
           <h3 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 18, fontWeight: 700, color: "var(--text)", marginBottom: 2 }}>
-            {pt ? "Lista de Músicas" : "Song Setlist"}
+            {pt ? "Lista de Louvores" : "Praise Song List"}
           </h3>
           <p style={{ color: "var(--muted)", fontSize: 13 }}>
-            {pt ? "Músicas do culto — por data e horário." : "Worship songs per service date and time."}
+            {pt ? "Louvores do culto — por data e horário." : "Praise songs per service date and time."}
           </p>
         </div>
         <button
@@ -224,7 +224,7 @@ export default function SetlistTab({ lang }) {
       {/* Add song row */}
       <div style={{ background: "var(--card)", border: "1.5px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
         <p style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-          {pt ? "Adicionar música" : "Add song"}
+          {pt ? "Adicionar louvor" : "Add praise song"}
         </p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
           {/* Número */}
@@ -276,7 +276,7 @@ export default function SetlistTab({ lang }) {
               onFocus={() => titleInput && setShowTitleDrop(titleSuggestions.length > 0)}
               onBlur={() => setTimeout(() => setShowTitleDrop(false), 150)}
               onKeyDown={(e) => e.key === "Enter" && addSong()}
-              placeholder={pt ? "Título da música…" : "Song title…"}
+              placeholder={pt ? "Título do louvor…" : "Praise song title…"}
               style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "1.5px solid var(--border)", fontSize: 13, boxSizing: "border-box", background: "var(--card)", color: "var(--text)" }}
             />
             {showTitleDrop && (
@@ -319,7 +319,7 @@ export default function SetlistTab({ lang }) {
         <p style={{ color: "var(--muted)", fontSize: 14 }}>{pt ? "Carregando…" : "Loading…"}</p>
       ) : entries.length === 0 ? (
         <div style={{ textAlign: "center", padding: "50px 0", color: "var(--muted)" }}>
-          <p style={{ fontSize: 14 }}>{pt ? "Nenhuma música nesta lista ainda." : "No songs in this setlist yet."}</p>
+          <p style={{ fontSize: 14 }}>{pt ? "Nenhum louvor nesta lista ainda." : "No praise songs in this list yet."}</p>
         </div>
       ) : (
         <div style={{ background: "var(--card)", border: "1.5px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>

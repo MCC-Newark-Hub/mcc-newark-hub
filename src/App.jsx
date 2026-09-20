@@ -38,6 +38,7 @@ import CheckInScreen from "@/views/CheckInScreen";
 import SelfCheckInScreen from "@/views/SelfCheckInScreen";
 import RegistrationLookup from "@/views/RegistrationLookup";
 import SetlistPublicView from "@/views/SetlistPublicView";
+import WorshipListPublicView from "@/views/WorshipListPublicView";
 import PrayerPublicView from "@/views/PrayerPublicView";
 
 export default function App() {
@@ -144,6 +145,11 @@ export default function App() {
               {/* Public: 24h prayer board — kept outside PublicLayout so it stays open during maintenance mode */}
               {["/24h-prayers", "/uninterrupted-prayers", "/uninterrupted-prayer"].map((p) => (
                 <Route key={p} path={`${p}/:id?`} element={<PrayerPublicView lang={lang} setLang={setLang} />} />
+              ))}
+
+              {/* Public: Culto Profético praise song list — outside PublicLayout so it stays open in maintenance mode */}
+              {["/culto-profetico", "/prophetic-service"].map((p) => (
+                <Route key={p} path={`${p}/:id?`} element={<WorshipListPublicView lang={lang} setLang={setLang} />} />
               ))}
 
               {/* Public: event flows (no PIN required) */}

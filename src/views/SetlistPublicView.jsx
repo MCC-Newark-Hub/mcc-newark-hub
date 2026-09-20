@@ -62,7 +62,7 @@ export default function SetlistPublicView() {
           <p style={{ textAlign: "center", color: "#6b7280", fontSize: 14 }}>Carregando…</p>
         ) : entries.length === 0 ? (
           <p style={{ textAlign: "center", color: "#6b7280", fontSize: 14, padding: "40px 0" }}>
-            Nenhuma música cadastrada para este dia.
+            Nenhum louvor cadastrado para este dia.
           </p>
         ) : (
           <>
