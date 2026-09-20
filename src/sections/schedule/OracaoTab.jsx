@@ -102,6 +102,7 @@ export default function OracaoTab({ lang }) {
 
   // The permanent link always shows whichever period is active.
   const publicLink = () => `${window.location.origin}${PUBLIC_PATH}`;
+  const listLink = (p) => `${publicLink()}/${periodSlug(p)}`;
 
   const copy = async (key, text) => {
     try {
@@ -382,18 +383,18 @@ export default function OracaoTab({ lang }) {
           </p>
           <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12, lineHeight: 1.6 }}>
             {pt ? "Link desta lista: " : "Link for this list: "}
-            <strong style={{ color: "var(--text)", wordBreak: "break-all" }}>{`${publicLink()}/${periodSlug(period)}`}</strong>
+            <strong style={{ color: "var(--text)", wordBreak: "break-all" }}>{listLink(period)}</strong>
             <br />
             {pt
-              ? `Sempre mostra a lista ativa com este nome, mesmo quando você criar a próxima circular. O link com todas as listas é ${publicLink()}.`
-              : `It always shows the active list with this name, even after you create the next circular. The link with every list is ${publicLink()}.`}
+              ? `Sempre mostra a lista ativa com este nome, mesmo quando você criar a próxima circular. A página com os cartões de todas as listas ativas é ${publicLink()}.`
+              : `It always shows the active list with this name, even after you create the next circular. The page with cards for every active list is ${publicLink()}.`}
           </p>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
-            <button className="btn btn-ghost" disabled={!period.is_active} onClick={() => copy("link", publicLink())}>
+            <button className="btn btn-ghost" disabled={!period.is_active} onClick={() => copy("link", listLink(period))}>
               {copied === "link" ? (pt ? "Link copiado!" : "Link copied!") : (pt ? "Copiar link público" : "Copy public link")}
             </button>
-            <button className="btn btn-ghost" disabled={!period.is_active} onClick={() => copy("link1", `${publicLink()}/${periodSlug(period)}`)}>
-              {copied === "link1" ? (pt ? "Link copiado!" : "Link copied!") : (pt ? "Copiar link só desta lista" : "Copy link for this list only")}
+            <button className="btn btn-ghost" disabled={!period.is_active} onClick={() => copy("link1", publicLink())}>
+              {copied === "link1" ? (pt ? "Link copiado!" : "Link copied!") : (pt ? "Copiar link de todas as listas" : "Copy link to all lists")}
             </button>
             <button className="btn btn-ghost" onClick={() => copy("list", buildShareText(period, slots, lang))} disabled={loadingSlots}>
               {copied === "list" ? (pt ? "Lista copiada!" : "List copied!") : (pt ? "Copiar lista (WhatsApp)" : "Copy list (WhatsApp)")}

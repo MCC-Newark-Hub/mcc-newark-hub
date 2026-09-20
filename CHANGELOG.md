@@ -10,6 +10,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **`/24h-prayers` landing page** — when more than one prayer list is active, `/24h-prayers` shows a card per list (name, title, dates, scope, slots taken with progress bar, status badge) linking to `/24h-prayers/<list>`; with a single active list it still opens that board directly. Boards opened by link show "← Todas as listas" when other lists exist. Replaces the list tabs.
+- All texts of the public prayer page (board, landing, church picker) now live in `src/i18n/strings.js` (PT + EN, `prayer*` keys, `fill()` helper for `{placeholders}`) instead of inline `pt ? … : …` ternaries, as the project convention asks.
 - **Tesouraria module** — new `treasurer` sys_role with dedicated TreasurerView. Tabs: Balanço (financial summary), Inscrições (read-only payment status), Despesas (expense tracking), Outras Entradas (donations, collections). Accessible read-only by Pastor; full edit by Treasurer and Admin.
 - `treasury_expenses` and `treasury_collections` Supabase tables (RLS disabled).
 - Receipt attachments stored as Google Drive share links (replaced Supabase Storage).
@@ -34,6 +36,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - `migrations/023_church_groups.sql` — creates `church_groups` (polo / area / regiao, unique per kind + name) and `church_group_members` (cascade on group or church delete), seeds the three polos, and adds to `prayer_periods`: `list_name`, `title_en`, `reasons_en`, `scope_kind` (`all` | `groups` | `churches`, default `all`), `scope_group_ids`, `scope_churches`. Additive: the deployed code keeps working before it is applied (the new admin fields are only sent when used; the public page tolerates missing columns), but polos/scopes need it. **Not yet applied** — run `supabase db query --linked -f migrations/023_church_groups.sql` from a terminal (validated locally against a Postgres engine: idempotent, constraints and cascades behave as the app expects).
 
 ### Changed
+- Admin Oração 24h: "Copiar link público" now copies the selected list's own link (`/24h-prayers/newark`); the link to the all-lists landing page moved to its own button "Copiar link de todas as listas".
 - **Renamed project** from `events-app` to `mcc-newark-hub` for consistency with the app's own branding: GitHub repo (`MCC-Newark-Hub/mcc-newark-hub`, auto-redirected from the old name), package name (already `mcc-newark-hub`), Supabase project display name, docs (README, CONTRIBUTING, mkdocs.yml, docs/dev/*), and CHANGELOG title. `mcc-newark-hub.vercel.app` added as a new Vercel domain (production, no redirect) alongside the existing `mcc-newark-events.vercel.app`, which stays live indefinitely so already-printed badge QR codes and shared links keep working unchanged.
 
 ### Fixed

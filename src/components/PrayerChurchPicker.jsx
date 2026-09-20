@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { splitChurches } from "@/lib/prayerSlots";
+import { STRINGS, fill } from "@/i18n/strings";
 
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
@@ -8,6 +9,7 @@ const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,
 // `restrictTo` (array of church names) limits the choices and disables the free-text option.
 // Reports the final church name, or "" while nothing valid is chosen.
 export default function PrayerChurchPicker({ value, onChange, churches, pt, label, inputStyle, labelStyle, restrictTo }) {
+  const tt = STRINGS[pt ? "pt" : "en"];
   const restricted = Array.isArray(restrictTo);
   const { hubs, others } = useMemo(() => splitChurches(churches), [churches]);
   const options = useMemo(
@@ -61,7 +63,7 @@ export default function PrayerChurchPicker({ value, onChange, churches, pt, labe
             else if (matches.length === 0 && canCustom) pickTyped();
           }
         }}
-        placeholder={pt ? "Buscar sua igreja…" : "Search your church…"}
+        placeholder={tt.prayerSearchYourChurch}
         autoComplete="off"
         style={{ ...inputStyle, borderColor: chosen ? "#2d8a4e" : inputStyle.borderColor }}
         role="combobox"
@@ -75,7 +77,7 @@ export default function PrayerChurchPicker({ value, onChange, churches, pt, labe
             <div key={o.d}>
               {showOthersHeader && !o.hub && (i === 0 || matches[i - 1].hub) && (
                 <div style={{ padding: "6px 12px", fontSize: 10.5, fontWeight: 800, letterSpacing: 0.5, color: "var(--muted, #6b7280)", background: "var(--bg2, #f3f4f6)", borderTop: i ? "1px solid var(--border, #e5e7eb)" : "none" }}>
-                  {pt ? "OUTRAS IGREJAS" : "OTHER CHURCHES"}
+                  {tt.prayerOtherChurches}
                 </div>
               )}
               <div
@@ -90,7 +92,7 @@ export default function PrayerChurchPicker({ value, onChange, churches, pt, labe
           ))}
           {matches.length === 0 && !canCustom && (
             <div style={{ ...rowStyle, borderTop: "none", color: "var(--muted, #6b7280)", cursor: "default" }}>
-              {pt ? "Nenhuma igreja encontrada" : "No church found"}
+              {tt.prayerNoChurchFound}
             </div>
           )}
           {canCustom && (
@@ -100,7 +102,7 @@ export default function PrayerChurchPicker({ value, onChange, churches, pt, labe
               onMouseLeave={hover(false)}
               style={{ ...rowStyle, borderTop: matches.length ? rowStyle.borderTop : "none", fontStyle: "italic", color: "#8B0000", fontWeight: 600 }}
             >
-              {pt ? `Usar "${custom}" (minha igreja não está na lista)` : `Use "${custom}" (my church is not on the list)`}
+              {fill(tt.prayerCustomChurch, { name: custom })}
             </div>
           )}
         </div>

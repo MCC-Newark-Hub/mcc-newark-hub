@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { Circle, CircleCheck, CircleDot, X } from "lucide-react";
 import ICMLogo from "@/components/ICMLogo";
 import PrayerChurchPicker from "@/components/PrayerChurchPicker";
@@ -8,7 +8,9 @@ import InlineMarkdown from "@/components/InlineMarkdown";
 import { useAppDataContext } from "@/context/AppDataContext";
 import { sb } from "@/lib/supabase";
 import { SLOT_COUNT, HALVES, HALF_SIZE, slotTime, slotRange, splitName, todayLocal, periodText, pickByParam, formatPeriodRange, formatCircular, pickActivePeriods } from "@/lib/prayerSlots";
-import { resolveScopeChurches, periodTabLabel, scopeLabel, joinList } from "@/lib/churchGroups";
+import { resolveScopeChurches, scopeLabel, joinList } from "@/lib/churchGroups";
+import { STRINGS, fill } from "@/i18n/strings";
+import PrayerLanding from "@/components/PrayerLanding";
 
 const MINE_KEY = "mcc_prayer_mine";
 const PROFILE_KEY = "mcc_prayer_profile";
@@ -31,8 +33,15 @@ function writeJSON(key, val) {
   }
 }
 
-export default function PrayerPublicView({ lang, setLang }) {
+// Keyed by the route param so moving between the landing page and a list starts from a clean state.
+export default function PrayerPublicView(props) {
+  const { id } = useParams();
+  return <PrayerBoard key={id || ""} {...props} />;
+}
+
+function PrayerBoard({ lang, setLang }) {
   const pt = lang !== "en";
+  const tt = STRINGS[pt ? "pt" : "en"];
   const { id: idParam } = useParams();
   const { churches = [] } = useAppDataContext() || {};
 
@@ -40,7 +49,8 @@ export default function PrayerPublicView({ lang, setLang }) {
   const [groups, setGroups] = useState([]);
   const [memberships, setMemberships] = useState([]);
   const [groupsOk, setGroupsOk] = useState(true);
-  const [selectedId, setSelectedId] = useState(null);
+  const [listCount, setListCount] = useState(0); // how many lists are active in total
+  const [counts, setCounts] = useState({}); // period id -> slots taken (landing cards)
   const [slots, setSlots] = useState([]);
   const [slotsFor, setSlotsFor] = useState(null);
   const [loaded, setLoaded] = useState(false);
@@ -70,7 +80,8 @@ export default function PrayerPublicView({ lang, setLang }) {
         setLoaded(true);
         return;
       }
-      const visible = idParam ? pickByParam(list || [], idParam, todayLocal()) : pickActivePeriods(list || [], todayLocal());
+      const all = pickActivePeriods(list || [], todayLocal());
+      const visible = idParam ? pickByParam(list || [], idParam, todayLocal()) : all;
       // Lists scoped to polos/áreas/regiões need the groups and their churches.
       const groupIds = [...new Set(visible.flatMap((p) => (p.scope_kind === "groups" ? p.scope_group_ids || [] : [])))];
       let g = [];
@@ -90,7 +101,18 @@ export default function PrayerPublicView({ lang, setLang }) {
           m = mr.data || [];
         }
       }
+      // The landing page shows how full each list is.
+      let c = {};
+      if (!idParam && visible.length > 1) {
+        const res = await Promise.all(
+          visible.map((p) => sb.from("schedule_oracao").select("id", { count: "exact", head: true }).eq("period_id", p.id))
+        );
+        if (cancelled) return;
+        c = Object.fromEntries(visible.map((p, i) => [p.id, res[i].error ? null : res[i].count ?? 0]));
+      }
       setLoadError(false);
+      setListCount(all.length);
+      setCounts(c);
       setPeriods(visible);
       setGroups(g);
       setMemberships(m);
@@ -105,8 +127,7 @@ export default function PrayerPublicView({ lang, setLang }) {
     };
   }, [idParam, tick]);
 
-  // Which list is showing: the one picked on a tab, else the first one that includes the church
-  // remembered on this device, else the first.
+  // One list (or a list opened by its link) shows its board; several lists at /24h-prayers show cards.
   const churchesReady = churches.some((c) => c.id);
   const allowedFor = (p) => {
     if (!p) return null;
@@ -116,15 +137,8 @@ export default function PrayerPublicView({ lang, setLang }) {
     }
     return resolveScopeChurches(p, memberships, churches);
   };
-  const period = useMemo(() => {
-    if (periods.length === 0) return null;
-    const picked = periods.find((p) => p.id === selectedId);
-    if (picked) return picked;
-    const mineChurch = church;
-    const byChurch = mineChurch && periods.find((p) => { const a = allowedFor(p); return Array.isArray(a) && a.includes(mineChurch); });
-    return byChurch || periods[0];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periods, selectedId, church, memberships, groupsOk, churchesReady]);
+  const landing = loaded && !idParam && periods.length > 1;
+  const period = landing ? null : periods[0] || null;
   const periodId = period?.id || null;
 
   useEffect(() => {
@@ -179,9 +193,9 @@ export default function PrayerPublicView({ lang, setLang }) {
   const confirm = async () => {
     const cleanName = name.trim().replace(/\s+/g, " ");
     const missing = cleanName.length < 2
-      ? (pt ? "Digite seu nome." : "Enter your name.")
+      ? (tt.prayerEnterYourName)
       : !churchValue
-        ? (pt ? "Escolha sua igreja." : "Choose your church.")
+        ? (tt.prayerChooseYourChurch)
         : "";
     if (missing) {
       setFormError(missing);
@@ -211,15 +225,13 @@ export default function PrayerPublicView({ lang, setLang }) {
         const ranges = (nowTaken || []).map((r) => slotRange(r.slot_index)).join(", ");
         setNotice({
           type: "error",
-          text: pt
-            ? `Não foi possível reservar ${ranges || "esse horário"}: já foi escolhido por outra pessoa. Escolha outro horário.`
-            : `Could not book ${ranges || "that slot"}: it was already taken by someone else. Please choose another slot.`,
+          text: fill(tt.prayerBookFailed, { ranges: ranges || tt.prayerThatSlot }),
         });
         setTick((t) => t + 1);
         return;
       }
       console.error("schedule_oracao insert error:", error);
-      setFormError(pt ? "Não foi possível salvar. Verifique a conexão e tente novamente." : "Could not save. Check your connection and try again.");
+      setFormError(tt.prayerCouldNotSaveCheck);
       fieldsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
@@ -233,32 +245,27 @@ export default function PrayerPublicView({ lang, setLang }) {
     const first = cleanName.split(" ")[0];
     setNotice({
       type: "ok",
-      text: pt
-        ? `Obrigado, ${first}! ${rows.length === 1 ? "Seu horário foi registrado." : "Seus horários foram registrados."}`
-        : `Thank you, ${first}! ${rows.length === 1 ? "Your slot was saved." : "Your slots were saved."}`,
+      text: fill(rows.length === 1 ? tt.prayerThanksOne : tt.prayerThanksMany, { first }),
     });
     setTick((t) => t + 1);
   };
 
   const removeMine = async (slot) => {
-    if (!window.confirm(pt ? `Remover seu horário ${slotRange(slot.slot_index)}?` : `Remove your slot ${slotRange(slot.slot_index)}?`)) return;
+    if (!window.confirm(fill(tt.prayerRemoveSlotConfirm, { range: slotRange(slot.slot_index) }))) return;
     const { data, error } = await sb.from("schedule_oracao").delete().eq("id", slot.id).select("id");
     if (error || !data || data.length === 0) {
       console.error("schedule_oracao delete error:", error);
-      setNotice({ type: "error", text: pt ? "Não foi possível remover o horário. Tente novamente." : "Could not remove the slot. Try again." });
+      setNotice({ type: "error", text: tt.prayerCouldNotRemoveThe });
       return;
     }
     const nextMine = mine.filter((id) => id !== slot.id);
     setMine(nextMine);
     writeJSON(MINE_KEY, nextMine);
     setSlots((prev) => prev.filter((s) => s.id !== slot.id));
-    setNotice({ type: "ok", text: pt ? "Horário removido." : "Slot removed." });
+    setNotice({ type: "ok", text: tt.prayerSlotRemoved });
   };
 
-  const takenMessage = (s) =>
-    pt
-      ? `O horário ${slotRange(s.slot_index)} já está ocupado. Não é possível escolhê-lo — escolha outro horário.`
-      : `The ${slotRange(s.slot_index)} slot is already taken. Please choose another slot.`;
+  const takenMessage = (s) => fill(tt.prayerSlotTaken, { range: slotRange(s.slot_index) });
 
   const renderRow = (i) => {
     const s = bySlot.get(i);
@@ -278,14 +285,14 @@ export default function PrayerPublicView({ lang, setLang }) {
           onClick={() => !isMine && setNotice({ type: "error", text: takenMessage(s) })}
           style={{ ...base, border: `1.5px solid ${isMine ? "#2d8a4e" : "#e5e7eb"}`, cursor: isMine ? "default" : "not-allowed" }}
         >
-          <CircleCheck size={18} color="#2d8a4e" aria-label={pt ? "Ocupado" : "Taken"} style={{ flexShrink: 0 }} />
+          <CircleCheck size={18} color="#2d8a4e" aria-label={tt.prayerTaken} style={{ flexShrink: 0 }} />
           <span style={rangeStyle}>{range}</span>
           <span style={{ flex: 1, minWidth: 0 }} title={s.member_name}>
             <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
               <span style={{ fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>
                 {splitName(s.member_name).first}
               </span>
-              {isMine && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#2d8a4e", flexShrink: 0 }}>{pt ? "(você)" : "(you)"}</span>}
+              {isMine && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#2d8a4e", flexShrink: 0 }}>{tt.prayerYou}</span>}
               <ChurchLabel church={s.church} />
             </span>
             {splitName(s.member_name).rest && (
@@ -298,7 +305,7 @@ export default function PrayerPublicView({ lang, setLang }) {
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); removeMine(s); }}
-              aria-label={pt ? "Remover meu horário" : "Remove my slot"}
+              aria-label={tt.prayerRemoveMySlot}
               style={{ background: "none", border: "none", cursor: "pointer", color: "#dc2626", padding: 0, display: "flex" }}
             >
               <X size={16} />
@@ -324,7 +331,7 @@ export default function PrayerPublicView({ lang, setLang }) {
       >
         {isSel ? <CircleDot size={18} style={{ flexShrink: 0 }} /> : <Circle size={18} color="#9ca3af" style={{ flexShrink: 0 }} />}
         <span style={rangeStyle}>{range}</span>
-        <span style={{ flex: 1, fontWeight: 700 }}>{isSel ? (pt ? "SELECIONADO" : "SELECTED") : (pt ? "LIVRE" : "FREE")}</span>
+        <span style={{ flex: 1, fontWeight: 700 }}>{isSel ? (tt.prayerSelected) : (tt.prayerFree)}</span>
       </button>
     );
   };
@@ -339,19 +346,21 @@ export default function PrayerPublicView({ lang, setLang }) {
 
   let body;
   if (!loaded) {
-    body = <p style={{ textAlign: "center", color: "#6b7280", fontSize: 14, padding: "30px 0" }}>{pt ? "Carregando…" : "Loading…"}</p>;
+    body = <p style={{ textAlign: "center", color: "#6b7280", fontSize: 14, padding: "30px 0" }}>{tt.prayerLoading}</p>;
   } else if (loadError && !period) {
     body = (
       <p style={{ textAlign: "center", color: "#991b1b", fontSize: 14, padding: "30px 0" }}>
-        {pt ? "Não foi possível carregar a agenda de oração. Tente novamente em instantes." : "Could not load the prayer agenda. Please try again shortly."}
+        {tt.prayerCouldNotLoadThe}
       </p>
     );
+  } else if (landing) {
+    body = <PrayerLanding periods={periods} groups={groups} counts={counts} lang={lang} />;
   } else if (!period) {
     body = (
       <p style={{ textAlign: "center", color: "#6b7280", fontSize: 14, padding: "30px 0" }}>
         {idParam
-          ? (pt ? "Este período de orações não está disponível." : "This prayer period is not available.")
-          : (pt ? "Nenhum período de orações ativo no momento." : "No prayer period is active at the moment.")}
+          ? (tt.prayerThisPrayerPeriodIs)
+          : (tt.prayerNoPrayerPeriodIs)}
       </p>
     );
   } else {
@@ -370,7 +379,7 @@ export default function PrayerPublicView({ lang, setLang }) {
         {periodText(period, lang).reasons.length > 0 && (
           <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: "12px 16px", marginBottom: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: "#03223f", marginBottom: 6 }}>
-              {pt ? "Motivos de Oração:" : "Prayer intentions:"}
+              {tt.prayerPrayerIntentions}
             </div>
             <ul style={{ margin: 0, paddingLeft: 18, color: "#374151", fontSize: 13, lineHeight: 1.6 }}>
               {periodText(period, lang).reasons.map((r, i) => <li key={i}><InlineMarkdown text={r} /></li>)}
@@ -378,59 +387,40 @@ export default function PrayerPublicView({ lang, setLang }) {
           </div>
         )}
 
-        {periods.length > 1 && (
-          <div role="tablist" aria-label={pt ? "Listas" : "Lists"} style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 12 }}>
-            {periods.map((p) => {
-              const on = p.id === period.id;
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={on}
-                  onClick={() => { setSelectedId(p.id); setSelected([]); setNotice(null); setFormError(""); }}
-                  style={{
-                    padding: "8px 18px", borderRadius: 99, cursor: "pointer", fontFamily: "'Montserrat',sans-serif", fontSize: 14, fontWeight: 700,
-                    border: `1.5px solid ${on ? "#8B0000" : "#e5e7eb"}`, background: on ? "#8B0000" : "#fff", color: on ? "#fff" : "#374151",
-                  }}
-                >
-                  {periodTabLabel(p, groups, lang)}
-                </button>
-              );
-            })}
-          </div>
+        {idParam && listCount > 1 && (
+          <p style={{ textAlign: "center", marginBottom: 12 }}>
+            <Link to="/24h-prayers" style={{ fontSize: 13, fontWeight: 700, color: "#8B0000", textDecoration: "none" }}>{tt.prayerAllLists}</Link>
+          </p>
         )}
         {Array.isArray(allowed) && allowed.length > 0 && (
           <p style={{ textAlign: "center", color: "#6b7280", fontSize: 12, marginBottom: 12 }}>
-            {pt ? "Lista para: " : "List for: "}
-            <strong style={{ color: "#374151" }}>{allowed.length <= 6 ? joinList(allowed, lang) : `${scopeLabel(period, groups, lang) || period.list_name || ""} (${allowed.length} ${pt ? "igrejas" : "churches"})`}</strong>
+            {tt.prayerListFor}
+            <strong style={{ color: "#374151" }}>{allowed.length <= 6 ? joinList(allowed, lang) : `${scopeLabel(period, groups, lang) || period.list_name || ""} (${allowed.length} ${tt.prayerChurches})`}</strong>
           </p>
         )}
 
         <div style={{ textAlign: "center", marginBottom: 12 }}>
-          <div style={{ fontSize: 15, fontWeight: 800, color: "#03223f", marginBottom: 4 }}>{pt ? "Períodos" : "Time slots"}</div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: "#03223f", marginBottom: 4 }}>{tt.prayerTimeSlots}</div>
           <p style={{ color: "#6b7280", fontSize: 13, lineHeight: 1.5 }}>
-            {pt
-              ? "Digite seu nome e escolha sua igreja, toque nos horários livres que você quer assumir e depois em Confirmar. Cada horário de 15 minutos tem uma pessoa, e você ora sempre no mesmo horário durante todo o período."
-              : "Enter your name and church, tap the free slots you want to take, then Confirm. Each 15-minute slot has one person, and you pray at the same time every day throughout the period."}
+            {tt.prayerHowTo}
           </p>
         </div>
 
         <div ref={fieldsRef} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
             <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>{pt ? "Seu nome" : "Your name"}</label>
+              <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>{tt.prayerYourName}</label>
               <input
                 value={name}
                 maxLength={80}
                 onChange={(e) => { setName(e.target.value); setFormError(""); }}
-                placeholder={pt ? "Nome e sobrenome" : "First and last name"}
+                placeholder={tt.prayerFirstAndLastName}
                 autoComplete="name"
                 style={inputStyle}
               />
             </div>
             {allowed === undefined ? (
-              <div style={{ fontSize: 13, color: "#6b7280", alignSelf: "end", paddingBottom: 10 }}>{pt ? "Carregando igrejas…" : "Loading churches…"}</div>
+              <div style={{ fontSize: 13, color: "#6b7280", alignSelf: "end", paddingBottom: 10 }}>{tt.prayerLoadingChurches}</div>
             ) : (
             <PrayerChurchPicker
               key={`${period.id}-${churches.some((c) => "is_hub" in c) ? "directory" : "fallback"}`}
@@ -439,7 +429,7 @@ export default function PrayerPublicView({ lang, setLang }) {
               onChange={(v) => { setChurch(v); setFormError(""); }}
               churches={churches}
               pt={pt}
-              label={pt ? "Igreja" : "Church"}
+              label={tt.prayerChurch}
               inputStyle={inputStyle}
               labelStyle={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}
             />
@@ -449,14 +439,14 @@ export default function PrayerPublicView({ lang, setLang }) {
         </div>
 
         <div style={{ display: "flex", justifyContent: "center", gap: 14, flexWrap: "wrap", marginBottom: 14 }}>
-          {legend(<Circle size={16} color="#9ca3af" />, pt ? "Livre" : "Free")}
-          {legend(<CircleCheck size={16} color="#2d8a4e" />, pt ? "Ocupado" : "Taken")}
-          {legend(<CircleDot size={16} color="#8B0000" />, pt ? "Selecionado" : "Selected")}
+          {legend(<Circle size={16} color="#9ca3af" />, tt.prayerFree2)}
+          {legend(<CircleCheck size={16} color="#2d8a4e" />, tt.prayerTaken)}
+          {legend(<CircleDot size={16} color="#8B0000" />, tt.prayerSelected2)}
         </div>
 
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#6b7280", marginBottom: 4 }}>
-            <span>{pt ? `${filled} de ${SLOT_COUNT} horários ocupados` : `${filled} of ${SLOT_COUNT} slots taken`}</span>
+            <span>{fill(tt.prayerSlotsOfTotal, { n: filled, total: SLOT_COUNT })}</span>
             <span style={{ fontWeight: 700 }}>{pct}%</span>
           </div>
           <div style={{ height: 8, background: "#e5e7eb", borderRadius: 99, overflow: "hidden" }}>
@@ -466,7 +456,7 @@ export default function PrayerPublicView({ lang, setLang }) {
 
         {loadError && (
           <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", color: "#991b1b", borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 14 }}>
-            {pt ? "Não foi possível atualizar os horários. Tentando novamente…" : "Could not refresh the slots. Retrying…"}
+            {tt.prayerCouldNotRefreshThe}
           </div>
         )}
 
@@ -480,7 +470,7 @@ export default function PrayerPublicView({ lang, setLang }) {
             ))}
           </div>
         ) : (
-          <p style={{ textAlign: "center", color: "#6b7280", fontSize: 14, padding: "30px 0" }}>{pt ? "Carregando…" : "Loading…"}</p>
+          <p style={{ textAlign: "center", color: "#6b7280", fontSize: 14, padding: "30px 0" }}>{tt.prayerLoading}</p>
         )}
       </>
     );
@@ -528,17 +518,15 @@ export default function PrayerPublicView({ lang, setLang }) {
           <div style={{ maxWidth: 820, margin: "0 auto", display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: "#03223f" }}>
-                {pt
-                  ? `${validSelected.length} ${validSelected.length === 1 ? "horário selecionado" : "horários selecionados"}`
-                  : `${validSelected.length} ${validSelected.length === 1 ? "slot selected" : "slots selected"}`}
+                {fill(validSelected.length === 1 ? tt.prayerSelectedOne : tt.prayerSelectedMany, { n: validSelected.length })}
               </div>
               <div style={{ fontSize: 11, color: "#6b7280", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {validSelected.map(slotRange).join(", ")}
               </div>
             </div>
-            <button type="button" className="btn btn-ghost" disabled={saving} onClick={() => setSelected([])}>{pt ? "Limpar" : "Clear"}</button>
+            <button type="button" className="btn btn-ghost" disabled={saving} onClick={() => setSelected([])}>{tt.prayerClear}</button>
             <button type="button" className="btn btn-primary" disabled={saving} onClick={confirm}>
-              {saving ? (pt ? "Salvando…" : "Saving…") : (pt ? "Confirmar" : "Confirm")}
+              {saving ? (tt.prayerSaving) : (tt.prayerConfirm)}
             </button>
           </div>
         </div>
