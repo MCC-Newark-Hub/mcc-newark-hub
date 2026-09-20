@@ -7,6 +7,8 @@ import MultiCheckList from "@/components/MultiCheckList";
 import InlineMarkdown from "@/components/InlineMarkdown";
 import { kindLabel, scopeLabel, periodTabLabel } from "@/lib/churchGroups";
 import ChurchLabel from "@/components/ChurchLabel";
+import PrayerImportModal from "@/components/PrayerImportModal";
+import { STRINGS } from "@/i18n/strings";
 import {
   SLOT_COUNT, HALVES, HALF_SIZE, slotTime, slotRange, splitName,
   todayLocal, formatDate, formatPeriodRange, formatCircular, parseReasons, periodSlug, pickPeriod, buildShareText, nextPeriodId,
@@ -49,6 +51,7 @@ export default function OracaoTab({ lang }) {
   const [showImport, setShowImport] = useState(false);
   const [importFrom, setImportFrom] = useState("");
   const [importing, setImporting] = useState(false);
+  const [showSheetImport, setShowSheetImport] = useState(false);
 
   const period = periods.find((c) => c.id === periodId) || null;
   const loadingSlots = !!periodId && slotsFor !== periodId;
@@ -346,6 +349,7 @@ export default function OracaoTab({ lang }) {
           {period && <button className="btn btn-ghost" onClick={openEdit}>{pt ? "Editar" : "Edit"}</button>}
           {period && <button className="btn btn-ghost" onClick={openDuplicate} title={pt ? "Outra lista da mesma circular, com outro nome e abrangência" : "Another list of the same circular, with its own name and scope"}>{pt ? "Nova lista deste período" : "New list for this period"}</button>}
           {period && <button className="btn btn-ghost" style={{ color: "#dc2626" }} onClick={deletePeriod}>{pt ? "Excluir" : "Delete"}</button>}
+          {period && <button className="btn btn-ghost" onClick={() => { setError(""); setInfo(""); setShowSheetImport(true); }}>{STRINGS[pt ? "pt" : "en"].prayerImportButton}</button>}
           {period && otherPeriods.length > 0 && (
             <button className="btn btn-ghost" onClick={openImport}>{pt ? "Importar do período anterior" : "Import from previous period"}</button>
           )}
@@ -612,6 +616,18 @@ export default function OracaoTab({ lang }) {
             </div>
           </form>
         </div>
+      )}
+
+      {showSheetImport && period && (
+        <PrayerImportModal
+          period={period}
+          slots={slots}
+          churches={churches}
+          groups={groups}
+          lang={lang}
+          onClose={() => setShowSheetImport(false)}
+          onDone={(msg) => { setShowSheetImport(false); setInfo(msg); setTick((t) => t + 1); }}
+        />
       )}
 
       {showImport && period && (

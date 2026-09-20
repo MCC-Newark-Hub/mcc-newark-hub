@@ -14,6 +14,12 @@ export default function PrayerLanding({ periods, groups, counts, lang }) {
     return { text: tt.prayerBadgeRunning, bg: "#f0fdf4", fg: "#166534" };
   };
 
+  const legend = [
+    { text: tt.prayerBadgeRunning, bg: "#f0fdf4", fg: "#166534", what: tt.prayerLegendRunning },
+    { text: tt.prayerBadgeUpcoming, bg: "#eff6ff", fg: "#1d4ed8", what: tt.prayerLegendUpcoming },
+    { text: tt.prayerBadgeFinished, bg: "#f3f4f6", fg: "#4b5563", what: tt.prayerLegendFinished },
+  ];
+
   return (
     <>
       <div style={{ textAlign: "center", marginBottom: 18 }}>
@@ -51,6 +57,14 @@ export default function PrayerLanding({ periods, groups, counts, lang }) {
             </Link>
           );
         })}
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "8px 18px", marginTop: 18 }}>
+        {legend.map((l) => (
+          <span key={l.text} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#6b7280" }}>
+            <span style={{ fontSize: 11, fontWeight: 800, padding: "2px 9px", borderRadius: 99, background: l.bg, color: l.fg }}>{l.text}</span>
+            {l.what}
+          </span>
+        ))}
       </div>
     </>
   );
