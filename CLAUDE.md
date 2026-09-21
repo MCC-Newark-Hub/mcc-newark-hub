@@ -36,6 +36,7 @@ Uses React Router v6. `<BrowserRouter>` in `src/main.jsx`; full route tree in `s
 | `/events/checkin?reg=<regNumber>` | CheckInScreen |
 | `/events/selfcheckin/:eventId` | SelfCheckInScreen |
 | `/24h-prayers/:id?` (aliases `/uninterrupted-prayers`, `/uninterrupted-prayer`) | PrayerPublicView — 24h prayer board; shows every active `prayer_periods` row as a tab (one period = one list, each with its own church scope). Deliberately outside `PublicLayout` so it stays open in maintenance mode |
+| `/portaria/:month?` (alias `/door-schedule`) | DoorPublicView — published door-duty month calendar (`YYYY-MM`); outside `PublicLayout` |
 
 **PIN-gated routes** (wrapped in `AuthGate` → `HubShell`):
 
@@ -109,7 +110,7 @@ Pastors and Ungidos are automatically marked `exempt: true, fee: 0` at registrat
 
 ### Supabase Tables
 
-`churches`, `members`, `families`, `assistance_groups`, `events`, `registrations`, `rosters`, `teams`, `approvals`, `app_users`, `app_settings`, `audit_log`, `prayer_periods`, `schedule_oracao`, `church_groups`, `church_group_members`
+`churches`, `members`, `families`, `assistance_groups`, `events`, `registrations`, `rosters`, `teams`, `approvals`, `app_users`, `app_settings`, `audit_log`, `prayer_periods`, `schedule_oracao`, `door_workers`, `door_months`, `door_assignments`, `church_groups`, `church_group_members`
 
 **Critical — new tables**: RLS must be **explicitly disabled** on every new table or all writes will silently fail with no error. Always add:
 

@@ -39,6 +39,7 @@ import SelfCheckInScreen from "@/views/SelfCheckInScreen";
 import RegistrationLookup from "@/views/RegistrationLookup";
 import SetlistPublicView from "@/views/SetlistPublicView";
 import WorshipListPublicView from "@/views/WorshipListPublicView";
+import DoorPublicView from "@/views/DoorPublicView";
 import PrayerPublicView from "@/views/PrayerPublicView";
 
 export default function App() {
@@ -150,6 +151,11 @@ export default function App() {
               {/* Public: Culto Profético praise song list — outside PublicLayout so it stays open in maintenance mode */}
               {["/culto-profetico", "/prophetic-service"].map((p) => (
                 <Route key={p} path={`${p}/:id?`} element={<WorshipListPublicView lang={lang} setLang={setLang} />} />
+              ))}
+
+              {/* Public: door duty schedule of a month — outside PublicLayout so it stays open in maintenance mode */}
+              {["/portaria", "/door-schedule"].map((p) => (
+                <Route key={p} path={`${p}/:month?`} element={<DoorPublicView lang={lang} setLang={setLang} />} />
               ))}
 
               {/* Public: event flows (no PIN required) */}
