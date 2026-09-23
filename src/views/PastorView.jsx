@@ -2,7 +2,7 @@ import { useState, Fragment, useRef } from "react";
 import { LayoutDashboard, ClipboardList, Clock, BarChart2, BookOpen, DollarSign } from "lucide-react";
 import { useT } from "@/i18n/strings";
 import { CATEGORIES, fmt, deadlineStatus } from "@/constants";
-import Topbar from "@/components/Topbar";
+import { useTopbarContent } from "@/context/TopbarContext";
 import Sidebar from "@/components/Sidebar";
 import CapBar from "@/components/CapBar";
 import ApprovalsPanel from "@/components/ApprovalsPanel";
@@ -68,8 +68,9 @@ function PaymentStatusStrip({ paid, exempt, pend, total, wlPaid, wlExempt, wlPen
 }
 
 function PastorView(props) {
-  const { event, regs, approvals, resolveApproval, updateEventCapacity, toggleRegistrationPaused, user, logout, activeCount, wlRegs, exRegs, pendingApprovals, lang, setLang, theme, toggleTheme, churches, members } = props;
+  const { event, regs, approvals, resolveApproval, updateEventCapacity, toggleRegistrationPaused, user, activeCount, wlRegs, exRegs, pendingApprovals, lang, churches, members } = props;
   const t = useT();
+  useTopbarContent({ title: t.pastorTitle, sub: eventSubtitle(event, lang), pendingCount: pendingApprovals.length, helpPath: "reference/roles" });
   const [sec, setSec] = useState("dashboard");
   const [regsInitialFilter, setRegsInitialFilter] = useState(null);
   const navToRegs = (filter) => { setRegsInitialFilter(filter); setSec("regs"); };
@@ -141,7 +142,6 @@ function PastorView(props) {
   ];
   return (
     <div className="app-shell">
-      <Topbar title={t.pastorTitle} sub={eventSubtitle(event, lang)} user={user} logout={logout} pendingCount={pendingApprovals.length} lang={lang} setLang={setLang} theme={theme} toggleTheme={toggleTheme} helpPath="reference/roles" />
       <div className="body-with-sidebar">
         <Sidebar navItems={navItems} activeId={sec} onSelect={setSec} />
         <div className="main-scroll">

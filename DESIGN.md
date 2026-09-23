@@ -45,7 +45,7 @@ module just built) while doing this pass. They're fixed in this same commit — 
 
 ## What Can Be Better
 
-### 1. The staff chrome renders two topbars, on every single role view
+### 1. The staff chrome renders two topbars, on every single role view — ✅ fixed, 2026-09-23
 
 `HubShell.jsx` renders `HubTopbar.jsx` (home icon, logo, PT/EN, dark-mode toggle,
 avatar, logout — the "global" bar), and then `EventsSection` renders each role's own
@@ -175,19 +175,33 @@ Ordered by impact ÷ effort, not strictly by section number above.
    existing `--warn` amber (finding #4). Scoped to the per-day calendar label; the
    month-level "no worker available" summary banner was already amber, not red.
 
-**Phase 2 — consolidate the staff chrome (biggest visual win, needs care)**
-5. Merge `HubTopbar.jsx` and `Topbar.jsx` into one bar: keep the section
-   title/subtitle and per-view actions (help, pending-approval badge) from the inner
-   bar, keep the home/logo/language/theme/avatar/logout from the outer one, drop the
-   duplication. Touches `HubShell.jsx` and all 6 staff views
-   (`AdminView`/`ClerkView`/`PastorView`/`GALeaderView`/`TeamLeaderView`/
-   `TreasurerView`) that currently render `<Topbar>` directly — mechanical but
-   touches a lot of files, so worth its own PR and a manual pass on mobile widths
-   after (finding #1).
-   - *Suggested workflow*: since you now have Figma, mock the consolidated single-bar
-     header there first (desktop + mobile) before touching 7 files — cheaper to get
-     buy-in on the exact layout (what stays, what moves into an overflow/kebab menu on
-     narrow screens) than to iterate in code.
+**Phase 2 — consolidate the staff chrome (biggest visual win, needs care) — ✅ done, 2026-09-23**
+5. ~~Merge `HubTopbar.jsx` and `Topbar.jsx` into one bar~~ (finding #1). Mocked at
+   1280px/375px in Figma first (everything fit with room to spare on desktop — no
+   cuts needed there), then implemented: a `TopbarContext` lets each view set
+   title/sub/pendingCount/helpPath via `useTopbarContent()` instead of rendering its
+   own bar; `HubTopbar.jsx` renders all of it — global chrome always inline, the
+   view's own bits (title/sub/pending badge/help) merged into the same row. Under
+   768px the secondary controls (help, PT/EN, theme, "Trocar Função", sign out)
+   collapse behind a "•••" menu and the pending badge becomes a dot. `Topbar.jsx` is
+   deleted; touched `HubShell.jsx` and all 6 staff views. Verified in the browser at
+   1024/1280/375px, light and dark, plus the "•••" menu's contents confirmed via the
+   accessibility tree (the browser tool's screenshot didn't render that one
+   `position:absolute` overlay for an unclear reason — DOM/computed-style/a11y-tree
+   all confirmed it's really there and correctly positioned, so this reads as a
+   screenshot-capture quirk, not an app bug; worth a plain visual glance next time
+   you're on a phone).
+   - *Note on 1024px*: `Administration`'s long dynamic subtitle (event name +
+     payment deadline) still ellipsis-truncates at exactly-laptop widths — same
+     truncation technique the old `Topbar.jsx` used, just less room now that it
+     shares a row. Not a regression class, but worth a look if it bothers you in
+     daily use.
+   - *What happened*: mocked in Figma first (desktop + mobile), then implemented from
+     that mockup — the Figma pass caught the desktop-fits-fine / mobile-needs-collapsing
+     decision before any of the 7 files changed. File: [MCC Newark Hub — teste de
+     acesso](https://www.figma.com/design/rDkpUjMet4ZU5AgWtxFlWB) (rename or delete it
+     once you're done looking — it was the leftover access-check file from setting up
+     the Figma connector).
 
 **Phase 3 — design-system consolidation (prevents the next dark-mode bug)**
 6. Extract a shared `PublicPageShell` (gradient background, card, logo, language

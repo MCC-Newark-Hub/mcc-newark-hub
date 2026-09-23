@@ -216,6 +216,12 @@ label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase
 .section-title{font-family:'Lora',Georgia,serif;font-size:22px;font-weight:700;color:var(--text);margin-bottom:4px;}
 .section-sub{font-size:13px;color:var(--muted);margin-bottom:18px;}
 
+/* ── HUB TOPBAR: desktop shows every control inline; mobile collapses the
+   secondary ones behind "•••" (.topbar-more-btn) — see src/hub/HubTopbar.jsx ── */
+.topbar-desktop-controls{display:flex;align-items:center;gap:10px;}
+.topbar-more-btn{display:none;}
+.topbar-pending-dot{display:none;}
+
 /* ── RESPONSIVE ── */
 .bottom-nav{display:none;}
 @media(max-width:900px){
@@ -225,6 +231,11 @@ label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase
 @media(max-width:768px){
   .topbar{padding:0 14px;height:52px;}
   .user-name{display:none;}
+  .topbar-sub{display:none;}
+  .topbar-desktop-controls{display:none;}
+  .topbar-more-btn{display:flex;}
+  .topbar-pending-full{display:none;}
+  .topbar-pending-dot{display:block;}
   .main-scroll{padding:14px;padding-bottom:80px;}
   .sidebar-desktop{display:none;}
   .bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--sidebar-bg);border-top:1px solid var(--border);z-index:100;padding:4px 0;overflow-x:auto;-webkit-overflow-scrolling:touch;justify-content:space-around;scrollbar-width:none;}

@@ -7,7 +7,7 @@ import { STATUS_CFG, SERVICE_TEAMS, deadlineStatus } from "@/constants";
 import { sb } from "@/lib/supabase";
 import { canAssignToTeam } from "@/lib/teamAssignment";
 import { eventSubtitle } from "@/lib/registrationDeadline";
-import Topbar from "@/components/Topbar";
+import { useTopbarContent } from "@/context/TopbarContext";
 import Modal from "@/components/Modal";
 import KitchenTab from "./admin/KitchenTab";
 import KitchenPlanningTab from "./admin/KitchenPlanningTab";
@@ -22,12 +22,8 @@ function TeamLeaderView(props) {
     rosters,
     setRosters,
     user,
-    logout,
     notify,
     lang,
-    setLang,
-    theme,
-    toggleTheme,
     submitApproval,
     updatePresence,
     updateReg,
@@ -44,6 +40,7 @@ function TeamLeaderView(props) {
     names.slice(0, -1).join(", ") + " e " + names[names.length - 1];
   const firstName = (user?.name || "").split(" ")[0];
   const teamsLabel = joinNames(myTeams) || t.teamTitle;
+  useTopbarContent({ title: teamsLabel, sub: eventSubtitle(event, lang), helpPath: "reference/roles" });
   // Includes cancelled rows too, unlike eventRegs — deadlineStatus needs a member's
   // full history, and reactivation needs to find the cancelled row itself.
   const allEventRegs = regs.filter((r) => r.eventId === event?.id);
@@ -201,17 +198,6 @@ function TeamLeaderView(props) {
       : [];
   return (
     <div className="app-shell">
-      <Topbar
-        title={teamsLabel}
-        sub={eventSubtitle(event, lang)}
-        user={user}
-        logout={logout}
-        lang={lang}
-        setLang={setLang}
-        theme={theme}
-        toggleTheme={toggleTheme}
-        helpPath="reference/roles"
-      />
       <div className="main-scroll">
         <div className="page-pad">
           <div style={{ marginBottom: 16 }}>

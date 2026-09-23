@@ -5,7 +5,7 @@ import { ROLE_BADGE, fmt, deadlineStatus } from "@/constants";
 import { sb } from "@/lib/supabase";
 import { eventSubtitle } from "@/lib/registrationDeadline";
 import { getRegistrationRestriction, restrictionLabel } from "@/lib/registrationAccess";
-import Topbar from "@/components/Topbar";
+import { useTopbarContent } from "@/context/TopbarContext";
 import Sidebar from "@/components/Sidebar";
 import CapBar from "@/components/CapBar";
 import StatusBadge from "@/components/StatusBadge";
@@ -82,7 +82,7 @@ function PaymentStatusStrip({ paid, exempt, pend, total, wlPaid, wlExempt, wlPen
 }
 
 function ClerkView(props) {
-  const { event, regs, setRegs, members, setMembers, families, setFamilies, gas, setGas, churches, dbTeams, dbCategories, dbFunctions, addReg, updateReg, updatePresence, promoteFromWaitlist, submitApproval, approvals, user, logout, activeCount, isFull, wlRegs, exRegs, lang, setLang, pendingApprovals, theme, toggleTheme, notify, logAudit } = props;
+  const { event, regs, setRegs, members, setMembers, families, setFamilies, gas, setGas, churches, dbTeams, dbCategories, dbFunctions, addReg, updateReg, updatePresence, promoteFromWaitlist, submitApproval, approvals, user, activeCount, isFull, wlRegs, exRegs, lang, pendingApprovals, notify, logAudit } = props;
   const t = useT();
   const restriction = getRegistrationRestriction(event, isFull);
   const [sec, setSec] = useState("regs");
@@ -121,6 +121,7 @@ function ClerkView(props) {
 
   const eventApprovals = (approvals || []).filter((a) => a.eventId === event?.id);
   const pendingApprovalList = eventApprovals.filter((a) => a.status === "pending");
+  useTopbarContent({ title: user?.name || t.clerkTitle, sub: `${t.clerkTitle} · ${eventSubtitle(event, lang)}`, pendingCount: pendingApprovalList.length, helpPath: "tutorials/register-member" });
   const resolvedApprovalList = eventApprovals.filter((a) => a.status !== "pending");
   const allActiveAll = regs.filter((r) => r.eventId === event?.id && !r.cancelled && !r.waitlisted);
   const allActive = allActiveAll.filter((r) => cityOf(r.church) === myCity);
@@ -196,7 +197,6 @@ function ClerkView(props) {
 
   return (
     <div className="app-shell">
-      <Topbar title={user?.name || t.clerkTitle} sub={`${t.clerkTitle} · ${eventSubtitle(event, lang)}`} user={user} logout={logout} pendingCount={pendingApprovalList.length} lang={lang} setLang={setLang} theme={theme} toggleTheme={toggleTheme} helpPath="tutorials/register-member" />
       <div className="body-with-sidebar">
         <Sidebar navItems={navItems} activeId={sec} onSelect={switchSec} />
         <div className="main-scroll">
