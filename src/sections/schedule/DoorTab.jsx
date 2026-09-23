@@ -11,12 +11,13 @@ const SLOT_KEYS = { mon: "doorSlotMon", tue: "doorSlotTue", wed: "doorSlotWed", 
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 const inputStyle = { padding: "9px 12px", borderRadius: 8, border: "1.5px solid var(--border)", fontSize: 14, boxSizing: "border-box", background: "var(--card)", color: "var(--text)" };
 const th = { padding: "8px 6px", fontSize: 12, fontWeight: 700, color: "var(--muted)", textAlign: "center", borderBottom: "1px solid var(--border)" };
-const td = { padding: "6px", borderBottom: "1px solid var(--border)", textAlign: "center" };
+const td = { padding: "6px", borderBottom: "1px solid var(--border)", textAlign: "center", color: "var(--text)" };
 let tempId = 0;
 
 export default function DoorTab({ lang }) {
   const tt = STRINGS[lang === "en" ? "en" : "pt"];
-  const { members = [] } = useAppDataContext() || {};
+  const { members = [], notify } = useAppDataContext() || {};
+  const say = (text) => notify && notify(text);
 
   const [workers, setWorkers] = useState([]);
   const [removed, setRemoved] = useState([]); // ids of saved workers to delete on save
@@ -32,12 +33,10 @@ export default function DoorTab({ lang }) {
   const [perService, setPerService] = useState(1);
   const [generating, setGenerating] = useState(false);
   const [uncovered, setUncovered] = useState([]);
-  const [msg, setMsg] = useState(null); // { kind: "ok" | "error", text }
   const [copied, setCopied] = useState(false);
   const [loadError, setLoadError] = useState(false);
 
   const monthLoaded = loadedMonth === month;
-  const flash = (kind, text) => setMsg({ kind, text });
   const dirty = removed.length > 0 || workers.some((w) => w._new || w._dirty);
 
   useEffect(() => {
@@ -73,11 +72,10 @@ export default function DoorTab({ lang }) {
   const addWorker = () => {
     const name = (picked ? picked.name : query).trim();
     if (!name) return;
-    if (workers.some((w) => norm(w.name) === norm(name))) { flash("error", tt.doorAlreadyAdded); return; }
+    if (workers.some((w) => norm(w.name) === norm(name))) { say(tt.doorAlreadyAdded); return; }
     setWorkers((prev) => [...prev, { id: `new-${++tempId}`, member_id: picked?.id || null, name, days: [], is_active: true, _new: true }]);
     setQuery("");
     setPicked(null);
-    setMsg(null);
   };
 
   const toggleDay = (id, slot) => {
@@ -86,13 +84,11 @@ export default function DoorTab({ lang }) {
       const days = w.days.includes(slot) ? w.days.filter((d) => d !== slot) : [...w.days, slot];
       return { ...w, days, _dirty: true };
     }));
-    setMsg(null);
   };
 
   const removeWorker = (w) => {
     setWorkers((prev) => prev.filter((x) => x.id !== w.id));
     if (!w._new) setRemoved((prev) => [...prev, w.id]);
-    setMsg(null);
   };
 
   const save = async () => {
@@ -117,19 +113,19 @@ export default function DoorTab({ lang }) {
       const byName = new Map(inserted.map((r) => [norm(r.name), r]));
       setWorkers((prev) => prev.map((w) => (w._new ? byName.get(norm(w.name)) || w : { ...w, _dirty: false })));
       setRemoved([]);
-      flash("ok", tt.doorSaved);
+      say(tt.doorSaved);
     } catch (e) {
       console.error("door_workers save error:", e);
-      flash("error", tt.doorSaveFailed);
+      say(tt.doorSaveFailed);
     } finally {
       setSaving(false);
     }
   };
 
   const generate = async () => {
-    if (dirty) { flash("error", tt.doorSaveFirst); return; }
+    if (dirty) { say(tt.doorSaveFirst); return; }
     const usable = workers.filter((w) => w.is_active && w.days.length);
-    if (!usable.length) { flash("error", tt.doorNeedWorkers); return; }
+    if (!usable.length) { say(tt.doorNeedWorkers); return; }
     if (rows.length && !window.confirm(tt.doorRegenConfirm)) return;
     setGenerating(true);
     try {
@@ -150,10 +146,10 @@ export default function DoorTab({ lang }) {
       setInfo(m.data);
       setRows(saved.sort((a, b) => a.service_date.localeCompare(b.service_date) || a.created_at.localeCompare(b.created_at)));
       setUncovered(result.uncovered);
-      flash("ok", tt.doorGenerated);
+      say(tt.doorGenerated);
     } catch (e) {
       console.error("door schedule generate error:", e);
-      flash("error", tt.doorSaveFailed);
+      say(tt.doorSaveFailed);
       const { info: i, rows: r } = await fetchMonth(month);
       setInfo(i);
       setRows(r);
@@ -166,21 +162,21 @@ export default function DoorTab({ lang }) {
     const w = workers.find((x) => x.id === workerId);
     if (!w) return;
     const { data, error } = await sb.from("door_assignments").insert({ month, service_date: date, slot, worker_id: w.id, worker_name: w.name }).select().single();
-    if (error || !data) { console.error("door assignment add error:", error); flash("error", tt.doorSaveFailed); return; }
+    if (error || !data) { console.error("door assignment add error:", error); say(tt.doorSaveFailed); return; }
     setRows((prev) => [...prev, data]);
     setUncovered((prev) => prev.filter((u) => !(u.date === date && u.slot === slot)));
   };
 
   const removeAssignment = async (row) => {
     const { data, error } = await sb.from("door_assignments").delete().eq("id", row.id).select();
-    if (error || !data?.length) { console.error("door assignment delete error:", error); flash("error", tt.doorSaveFailed); return; }
+    if (error || !data?.length) { console.error("door assignment delete error:", error); say(tt.doorSaveFailed); return; }
     setRows((prev) => prev.filter((r) => r.id !== row.id));
   };
 
   const togglePublish = async () => {
     const published_at = info?.published_at ? null : new Date().toISOString();
     const { data, error } = await sb.from("door_months").update({ published_at }).eq("month", month).select().single();
-    if (error || !data) { console.error("door publish error:", error); flash("error", tt.doorSaveFailed); return; }
+    if (error || !data) { console.error("door publish error:", error); say(tt.doorSaveFailed); return; }
     setInfo(data);
   };
 
@@ -190,7 +186,7 @@ export default function DoorTab({ lang }) {
       await navigator.clipboard.writeText(link);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch { flash("error", tt.doorSaveFailed); }
+    } catch { say(tt.doorSaveFailed); }
   };
 
   const counts = useMemo(() => {
@@ -203,16 +199,11 @@ export default function DoorTab({ lang }) {
   const fmtDay = (d) => d.slice(8, 10) + "/" + d.slice(5, 7);
   const published = !!info?.published_at;
   const card = { background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 24 };
-  const h2 = { fontFamily: "'Lora',Georgia,serif", fontSize: 18, margin: "0 0 4px" };
+  const h2 = { fontFamily: "'Lora',Georgia,serif", fontSize: 18, margin: "0 0 4px", color: "var(--text)" };
 
   return (
     <div>
       {loadError && <div role="alert" style={{ marginBottom: 16, padding: "10px 14px", borderRadius: 8, fontSize: 13, background: "#fef2f2", color: "#991b1b" }}>{tt.doorLoadFailed}</div>}
-      {msg && (
-        <div role="status" style={{ marginBottom: 16, padding: "10px 14px", borderRadius: 8, fontSize: 13, background: msg.kind === "ok" ? "#ecfdf5" : "#fef2f2", color: msg.kind === "ok" ? "#065f46" : "#991b1b" }}>
-          {msg.text}
-        </div>
-      )}
 
       {/* Availability matrix */}
       <section style={card}>
@@ -287,7 +278,7 @@ export default function DoorTab({ lang }) {
         <h2 style={h2}>{tt.doorScheduleTitle}</h2>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", margin: "8px 0 16px" }}>
           <button className="btn btn-ghost btn-sm" onClick={() => setMonth(shiftMonth(month, -1))} aria-label={tt.doorPrev}><ChevronLeft size={16} /></button>
-          <strong style={{ minWidth: 150, textAlign: "center", textTransform: "capitalize", fontSize: 16 }}>{monthTitle}</strong>
+          <strong style={{ minWidth: 150, textAlign: "center", textTransform: "capitalize", fontSize: 16, color: "var(--text)" }}>{monthTitle}</strong>
           <button className="btn btn-ghost btn-sm" onClick={() => setMonth(shiftMonth(month, 1))} aria-label={tt.doorNext}><ChevronRight size={16} /></button>
           <label style={{ marginLeft: "auto", fontSize: 12, color: "var(--muted)", display: "flex", alignItems: "center", gap: 6 }}>
             {tt.doorPerService}

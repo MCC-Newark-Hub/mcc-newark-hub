@@ -46,7 +46,7 @@ export default function DoorCalendar({ month, rows, lang = "pt", workers, onAdd,
         {here.length === 0 && <div style={{ fontSize: 12, color: editable ? "#b91c1c" : "var(--muted)" }}>{editable ? tt.doorEmptyService : "—"}</div>}
         {here.map((r) => (
           <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, fontWeight: 600, lineHeight: 1.35 }}>
-            <span style={{ overflowWrap: "anywhere" }}>{r.worker_name}</span>
+            <span style={{ overflowWrap: "anywhere", color: "var(--text)" }}>{r.worker_name}</span>
             {editable && (
               <button onClick={() => onRemove(r)} aria-label={`${tt.doorRemoveWorker}: ${r.worker_name}`} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "var(--muted)", display: "flex" }}>
                 <X size={12} />
@@ -83,7 +83,7 @@ export default function DoorCalendar({ month, rows, lang = "pt", workers, onAdd,
           return (
             <div key={c.date} style={{ ...box, display: "flex", gap: 12 }}>
               <div style={{ minWidth: 64 }}>
-                <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "'Lora',Georgia,serif", lineHeight: 1 }}>{c.day}</div>
+                <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "'Lora',Georgia,serif", lineHeight: 1, color: "var(--text)" }}>{c.day}</div>
                 <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "capitalize" }}>{weekdayName(c.date)}</div>
               </div>
               <div style={{ flex: 1 }}>{slots.map((s) => slotBlock(c.date, s, slots.length > 1))}</div>
