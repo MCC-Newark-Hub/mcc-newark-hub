@@ -83,7 +83,7 @@ html,body,#root{height:100%;}
 body{font-family:'Montserrat','Segoe UI',sans-serif;background:var(--bg);color:var(--text);transition:background .25s,color .25s;}
 
 /* ── BUTTONS ── */
-.btn{border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;transition:all .18s;font-family:'Montserrat',inherit;white-space:nowrap;letter-spacing:.01em;}
+.btn{border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;transition:transform 160ms ease-out,background-color 180ms ease,box-shadow 180ms ease,border-color 180ms ease;font-family:'Montserrat',inherit;white-space:nowrap;letter-spacing:.01em;}
 .btn-primary{background:var(--primary);color:#fff;box-shadow:0 2px 8px rgba(139,0,0,.25);}.btn-primary:hover{background:var(--primary-hover);transform:translateY(-1px);box-shadow:0 4px 12px rgba(139,0,0,.3);}
 .btn-accent{background:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(180,25,38,.25);}.btn-accent:hover{background:var(--accent-hover);transform:translateY(-1px);}
 .btn-ok{background:var(--ok);color:#fff;}.btn-ok:hover{background:var(--ok-hover);}
@@ -91,6 +91,9 @@ body{font-family:'Montserrat','Segoe UI',sans-serif;background:var(--bg);color:v
 .btn-ghost{background:transparent;border:1.5px solid var(--border);color:var(--text);}.btn-ghost:hover{background:var(--bg2);border-color:var(--muted);}
 .btn-warn{background:var(--warn);color:#fff;}
 .btn-sm{padding:5px 12px;font-size:12px;border-radius:6px;}.btn-xs{padding:3px 8px;font-size:11px;border-radius:5px;}
+/* Press feedback: every .btn variant, on click or tap — this rule must stay after the
+   :hover rules above so it wins the specificity tie when a mouse press happens mid-hover. */
+.btn:active{transform:scale(.97);}
 
 /* ── CARDS ── */
 .card{background:var(--card);border-radius:var(--r);border:1px solid var(--border);padding:20px;box-shadow:var(--shadow);transition:background .25s,border-color .25s;}
@@ -122,8 +125,17 @@ label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase
 .table tr:hover td{background:var(--table-hover-bg);}
 
 /* ── MODALS ── */
-.modal-bg{position:fixed;inset:0;background:var(--overlay);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;backdrop-filter:blur(2px);}
-.modal{background:var(--modal-bg);border-radius:16px;padding:28px;width:100%;max-width:580px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg);border:1px solid var(--border);}
+/* @starting-style animates the mount (entrance) with no JS: unsupported browsers just
+   render the end state directly, same as before this change. Exit stays instant — every
+   modal here unmounts immediately on close, and animating that needs each call site to
+   delay its own unmount, which is a bigger change than this one. Origin stays centered:
+   modals aren't anchored to a trigger. */
+.modal-bg{position:fixed;inset:0;background:var(--overlay);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;backdrop-filter:blur(2px);opacity:1;transition:opacity 180ms ease-out;
+  @starting-style{opacity:0;}
+}
+.modal{background:var(--modal-bg);border-radius:16px;padding:28px;width:100%;max-width:580px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg);border:1px solid var(--border);opacity:1;transform:scale(1);transition:opacity 180ms ease-out,transform 180ms ease-out;
+  @starting-style{opacity:0;transform:scale(.96);}
+}
 
 /* ── STAT CARDS ── */
 .stat-card{background:var(--card);border-radius:var(--r);padding:18px 20px;border:1px solid var(--border);box-shadow:var(--shadow);transition:background .25s;}
@@ -139,8 +151,14 @@ label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase
 .si:hover{background:var(--table-hover-bg);color:var(--text);}
 .si.active{background:var(--sidebar-active-bg);color:var(--sidebar-active-text);border-left-color:var(--sidebar-active-border);font-weight:700;}
 .avatar{width:32px;height:32px;border-radius:50%;background:var(--icm-crimson);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;letter-spacing:.05em;}
-.toast{position:fixed;bottom:24px;right:24px;background:var(--icm-navy-deep);color:#f8f7f3;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;animation:su .3s ease;box-shadow:var(--shadow-lg);max-width:320px;border-left:4px solid var(--icm-crimson);}
-@keyframes su{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+/* Entrance and exit are both transitions (not the old keyframe), so a second toast
+   arriving mid-exit retargets smoothly instead of snapping. .toast-leaving is added by
+   App.jsx just before unmount, giving the exit its own (faster) transition. */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--icm-navy-deep);color:#f8f7f3;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;box-shadow:var(--shadow-lg);max-width:320px;border-left:4px solid var(--icm-crimson);
+  opacity:1;transform:translateY(0);transition:opacity 220ms ease-out,transform 220ms ease-out;
+  @starting-style{opacity:0;transform:translateY(16px);}
+}
+.toast.toast-leaving{opacity:0;transform:translateY(8px);transition:opacity 160ms ease-out,transform 160ms ease-out;}
 
 /* ── FORM LAYOUTS ── */
 .fr{display:grid;grid-template-columns:1fr 1fr;gap:14px;}

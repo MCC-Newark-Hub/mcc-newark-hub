@@ -52,10 +52,16 @@ export default function App() {
   const toggleTheme = () => setTheme((t) => (t === "light" ? "dark" : "light"));
   const [roleSwitcher, setRoleSwitcher] = useState(false);
   const [lookupPrefill, setLookupPrefill] = useState("");
-  const [toast, setToast] = useState(null);
+  const [toast, setToast] = useState(null); // { msg, leaving }
   const userRef = useRef(null);
 
-  const notify = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3500); };
+  // Two-phase removal so the toast can transition out instead of vanishing: "leaving"
+  // triggers the CSS exit transition, then it's unmounted once that finishes.
+  const notify = (msg) => {
+    setToast({ msg, leaving: false });
+    setTimeout(() => setToast((t) => (t ? { ...t, leaving: true } : t)), 3200);
+    setTimeout(() => setToast(null), 3500);
+  };
 
   const appData = useAppData({ getUserRef: () => userRef.current, notify });
   const { user, login: authLogin, logout: authLogout } = useAuth(appData.dbUsers || []);
@@ -135,7 +141,7 @@ export default function App() {
       <LangContext.Provider value={lang}>
         <SwitchRoleContext.Provider value={user?.sysRoles?.length > 1 ? () => setRoleSwitcher(true) : null}>
           <div data-theme={theme} style={{ minHeight: "100vh", fontFamily: "'Montserrat','Segoe UI',sans-serif" }}>
-            {toast && <div className="toast">{toast}</div>}
+            {toast && <div className={`toast${toast.leaving ? " toast-leaving" : ""}`}>{toast.msg}</div>}
 
             <Routes>
               {/* Public: PIN login */}

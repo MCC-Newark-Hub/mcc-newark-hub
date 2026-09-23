@@ -162,15 +162,18 @@ yet, not existing-app debt.
 
 Ordered by impact ÷ effort, not strictly by section number above.
 
-**Phase 1 — global, mechanical, low-risk (do first, one PR)**
-1. Add `.btn:active{transform:scale(.97)}` to `index.css` — every button in the app
-   gets press feedback for free (finding #2).
-2. Give `.modal`/`.modal-bg` an enter/exit transition (finding #2). Keep it under
-   200ms, `ease-out`, centered origin.
-3. Add a matching exit transition to `.toast` instead of an instant unmount
-   (finding #2).
-4. Retone the Portaria "not yet covered" red to a calmer neutral/amber, reserving red
-   for genuinely urgent (this-week) gaps (finding #4).
+**Phase 1 — global, mechanical, low-risk (do first, one PR) — ✅ done, 2026-09-23**
+1. ~~Add `.btn:active{transform:scale(.97)}` to `index.css`~~ — every button in the app
+   now gets press feedback for free (finding #2).
+2. ~~Give `.modal`/`.modal-bg` an enter transition~~ — fade+scale in via `@starting-style`
+   (finding #2). Exit stays instant for now: animating it needs every modal call site to
+   delay its own unmount, which is bigger than "mechanical" — left for a later pass if
+   it's worth it.
+3. ~~Add a matching exit transition to `.toast`~~ instead of an instant unmount
+   (finding #2) — `App.jsx`'s `notify()` now flips a `leaving` flag before removing it.
+4. ~~Retone the Portaria "not yet covered" label~~ from a hard `#b91c1c` red to the
+   existing `--warn` amber (finding #4). Scoped to the per-day calendar label; the
+   month-level "no worker available" summary banner was already amber, not red.
 
 **Phase 2 — consolidate the staff chrome (biggest visual win, needs care)**
 5. Merge `HubTopbar.jsx` and `Topbar.jsx` into one bar: keep the section

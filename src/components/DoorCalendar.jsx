@@ -43,7 +43,7 @@ export default function DoorCalendar({ month, rows, lang = "pt", workers, onAdd,
     return (
       <div key={slot} style={{ marginTop: showLabel ? 4 : 0 }}>
         {showLabel && <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".04em", color: "var(--muted)", textTransform: "uppercase" }}>{tt[SLOT_KEYS[slot]]}</div>}
-        {here.length === 0 && <div style={{ fontSize: 12, color: editable ? "#b91c1c" : "var(--muted)" }}>{editable ? tt.doorEmptyService : "—"}</div>}
+        {here.length === 0 && <div style={{ fontSize: 12, color: editable ? "var(--warn)" : "var(--muted)" }}>{editable ? tt.doorEmptyService : "—"}</div>}
         {here.map((r) => (
           <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, fontWeight: 600, lineHeight: 1.35 }}>
             <span style={{ overflowWrap: "anywhere", color: "var(--text)" }}>{r.worker_name}</span>
