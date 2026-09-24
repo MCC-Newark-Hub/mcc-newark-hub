@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import HubTopbar from "./HubTopbar";
+import { TopbarContext } from "@/context/TopbarContext";
 
 const SECTION_LABELS = {
   "/events":   { pt: "Eventos",        en: "Events" },
@@ -14,6 +16,11 @@ export default function HubShell({ user, logout, lang, setLang, theme, toggleThe
   const section = Object.keys(SECTION_LABELS).find((k) => location.pathname.startsWith(k));
   const sectionLabel = section ? (SECTION_LABELS[section][lang] || SECTION_LABELS[section].pt) : null;
 
+  // Set by the active view via useTopbarContent() — title/sub/pendingCount/helpPath.
+  // Reset on every route change so a stale title never survives a navigation that
+  // doesn't go through a clean unmount (e.g. switching sub-tabs with useState).
+  const [topbarContent, setTopbarContent] = useState(null);
+
   return (
     <div className="app-shell">
       <HubTopbar
@@ -24,8 +31,11 @@ export default function HubShell({ user, logout, lang, setLang, theme, toggleThe
         theme={theme}
         toggleTheme={toggleTheme}
         sectionLabel={sectionLabel}
+        topbarContent={topbarContent}
       />
-      <Outlet />
+      <TopbarContext.Provider value={setTopbarContent}>
+        <Outlet />
+      </TopbarContext.Provider>
     </div>
   );
 }

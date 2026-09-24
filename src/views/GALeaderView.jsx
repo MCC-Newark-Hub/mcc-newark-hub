@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useT } from "@/i18n/strings";
 import { deadlineStatus } from "@/constants";
 import { sb } from "@/lib/supabase";
-import Topbar from "@/components/Topbar";
+import { useTopbarContent } from "@/context/TopbarContext";
 import Modal from "@/components/Modal";
 import SearchSelect from "@/components/SearchSelect";
 import FamiliesPanel from "@/components/directory/FamiliesPanel";
@@ -18,8 +18,9 @@ import { groupByFamily } from "@/lib/family";
 const cityOf = (s) => (s || "").split(",")[0].trim().toLowerCase();
 
 function GALeaderView(props) {
-  const { event, regs, setRegs, members, setMembers, gas, families, setFamilies, churches, user, logout, lang, setLang, theme, toggleTheme, notify, submitApproval, logAudit } = props;
+  const { event, regs, setRegs, members, setMembers, gas, families, setFamilies, churches, user, lang, notify, submitApproval, logAudit } = props;
   const t = useT();
+  useTopbarContent({ title: t.gaTitle, sub: eventSubtitle(event, lang), helpPath: "reference/roles" });
   const [resendingId, setResendingId] = useState(null);
   const [managingGA, setManagingGA] = useState(null);
   const [pendingMove, setPendingMove] = useState(null); // { member, fromGA, toGA }
@@ -118,17 +119,6 @@ function GALeaderView(props) {
 
   return (
     <div className="app-shell">
-      <Topbar
-        title={t.gaTitle}
-        sub={eventSubtitle(event, lang)}
-        user={user}
-        logout={logout}
-        lang={lang}
-        setLang={setLang}
-        theme={theme}
-        toggleTheme={toggleTheme}
-        helpPath="reference/roles"
-      />
       <div className="main-scroll">
         <div className="page-pad">
           <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 10 }}>

@@ -3,7 +3,7 @@ import { TrendingUp, ClipboardList, Receipt, PlusCircle, Plus, Pencil, Trash2, E
 import { sb } from "@/lib/supabase";
 import { fmt } from "@/constants";
 import { useT } from "@/i18n/strings";
-import Topbar from "@/components/Topbar";
+import { useTopbarContent } from "@/context/TopbarContext";
 import Sidebar from "@/components/Sidebar";
 import { eventSubtitle } from "@/lib/registrationDeadline";
 
@@ -553,7 +553,8 @@ export function TesourariaSection({ event, regs, updateReg, notify, logAudit, re
 
 // ── Main view ─────────────────────────────────────────────────────────────────
 export default function TreasurerView(props) {
-  const { event, regs, updateReg, user, logout, notify, lang, setLang, theme, toggleTheme, logAudit, dbExpenseCategories, dbIncomeTypes } = props;
+  const { event, regs, updateReg, notify, lang, logAudit, dbExpenseCategories, dbIncomeTypes } = props;
+  useTopbarContent({ title: "Tesouraria", sub: eventSubtitle(event, lang), helpPath: "reference/roles" });
   const [sec,      setSec]      = useState("balanco");
   const [expenses, setExpenses] = useState([]);
   const [extras,   setExtras]   = useState([]);
@@ -586,12 +587,6 @@ export default function TreasurerView(props) {
 
   return (
     <div className="app-shell">
-      <Topbar
-        title="Tesouraria"
-        sub={eventSubtitle(event, lang)}
-        user={user} logout={logout} lang={lang} setLang={setLang} theme={theme} toggleTheme={toggleTheme}
-        helpPath="reference/roles"
-      />
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         <Sidebar navItems={navItems} activeId={sec} onSelect={setSec} />
         <div className="main-scroll">

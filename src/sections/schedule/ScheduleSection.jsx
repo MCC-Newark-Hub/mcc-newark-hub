@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { DoorOpen, Flower2, Moon, Music } from "lucide-react";
 import RotationTab from "./RotationTab";
+import DoorTab from "./DoorTab";
 import OracaoTab from "./OracaoTab";
 import PraiseListsTab from "./PraiseListsTab";
 
@@ -45,7 +46,7 @@ export default function ScheduleSection({ lang }) {
 
       {/* Content */}
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "32px 24px" }}>
-        {tab === "portaria" && <RotationTab type="portaria" lang={lang} />}
+        {tab === "portaria" && <DoorTab lang={lang} />}
         {tab === "flores"   && <RotationTab type="flores"   lang={lang} />}
         {tab === "oracao"   && <OracaoTab lang={lang} />}
         {tab === "musicas"  && <PraiseListsTab lang={lang} />}

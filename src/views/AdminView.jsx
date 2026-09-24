@@ -4,7 +4,7 @@ import { useT } from "@/i18n/strings";
 import { CATEGORIES, TEAMS, ROLE_BADGE, ROLE_GROUPS, fmt, classifyVoice, normalizeNote, isValidNote } from "@/constants";
 import { sb } from "@/lib/supabase";
 import { eventSubtitle } from "@/lib/registrationDeadline";
-import Topbar from "@/components/Topbar";
+import { useTopbarContent } from "@/context/TopbarContext";
 import Sidebar from "@/components/Sidebar";
 import CapBar from "@/components/CapBar";
 import StatusBadge from "@/components/StatusBadge";
@@ -38,8 +38,9 @@ import { groupByFamily, familyIdOf } from "@/lib/family";
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
 function AdminView(props) {
-  const { event, user, logout, pendingApprovals, lang, setLang, theme, toggleTheme } = props;
+  const { event, pendingApprovals, lang } = props;
   const t = useT();
+  useTopbarContent({ title: t.adminTitle, sub: eventSubtitle(event, lang), pendingCount: pendingApprovals.length, helpPath: "reference/roles" });
   const [sec, setSec] = useState("overview");
   const [regsInitialFilter, setRegsInitialFilter] = useState(null);
   const navToRegs = (filter) => { setRegsInitialFilter(filter); setSec("regs"); };
@@ -64,7 +65,6 @@ function AdminView(props) {
   ];
   return (
     <div className="app-shell">
-      <Topbar title={t.adminTitle} sub={eventSubtitle(event, lang)} user={user} logout={logout} pendingCount={pendingApprovals.length} lang={lang} setLang={setLang} theme={theme} toggleTheme={toggleTheme} helpPath="reference/roles" />
       <div className="body-with-sidebar">
         <Sidebar navItems={navItems} activeId={sec} onSelect={setSec} />
         <div className="main-scroll">

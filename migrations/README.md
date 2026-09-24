@@ -26,6 +26,7 @@ Run these files **in order** using the Supabase SQL editor or `psql`. Each migra
 | `025_praise_lists.sql` | Creates `praise_songs`, `worship_lists`, `worship_list_items` and the `praise_song_last_sung` view for Culto Profético › Lista de Louvores (RLS disabled). Catalogue starts empty; apply **before** deploying the code that uses it. |
 | `026_worship_list_published.sql` | Adds `worship_lists.published_at` (NULL = not published) for the read-only page sent to the Grupo de Louvor. Apply **before** deploying the code that uses it. |
 | `027_worship_list_church.sql` | Adds `worship_lists.church` (which church the list belongs to; shown on the published page). Apply **before** deploying the code that uses it. |
+| `028_door_schedule.sql` | Creates `door_workers` (door-duty workers + `days` availability), `door_months` (generated month, people per service, `published_at`) and `door_assignments` (who is on each service), RLS disabled. Used by Escalas › Portaria and the public `/portaria/YYYY-MM` page; both fail without it. Apply **before** deploying the code that uses it. |
 
 ## How to run
 
