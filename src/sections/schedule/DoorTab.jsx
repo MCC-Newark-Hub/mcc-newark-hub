@@ -5,7 +5,7 @@ import { useAppDataContext } from "@/context/AppDataContext";
 import { STRINGS, fill } from "@/i18n/strings";
 import DoorCalendar from "@/components/DoorCalendar";
 import { DOOR_SLOTS, monthKey, shiftMonth, monthServices, generateSchedule } from "@/lib/doorSchedule";
-import { fetchMonth, fetchWorkers, DOOR_PUBLIC_PATH } from "@/lib/doorData";
+import { fetchMonth, fetchWorkers, replaceMonthAssignments, DOOR_PUBLIC_PATH } from "@/lib/doorData";
 
 const SLOT_KEYS = { mon: "doorSlotMon", tue: "doorSlotTue", wed: "doorSlotWed", thu: "doorSlotThu", sat: "doorSlotSat", ebd: "doorSlotEbd", sun: "doorSlotSun" };
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
@@ -96,23 +96,25 @@ export default function DoorTab({ lang }) {
     try {
       const fresh = workers.filter((w) => w._new);
       const changed = workers.filter((w) => !w._new && w._dirty);
-      let inserted = [];
+      const toRemove = removed;
+      // Local state is reconciled after each step that succeeds, not only at the end: if a later
+      // step fails, a retry must not insert the new workers a second time.
       if (fresh.length) {
         const { data, error } = await sb.from("door_workers").insert(fresh.map((w) => ({ member_id: w.member_id, name: w.name, days: w.days }))).select();
         if (error || !data || data.length !== fresh.length) throw error || new Error("insert returned no rows");
-        inserted = data;
+        const byName = new Map(data.map((r) => [norm(r.name), r]));
+        setWorkers((prev) => prev.map((w) => (w._new ? byName.get(norm(w.name)) || w : w)));
       }
       for (const w of changed) {
         const { data, error } = await sb.from("door_workers").update({ days: w.days }).eq("id", w.id).select();
         if (error || !data?.length) throw error || new Error(`update changed no rows for ${w.id}`);
+        setWorkers((prev) => prev.map((x) => (x.id === w.id ? { ...x, _dirty: false } : x)));
       }
-      if (removed.length) {
-        const { data, error } = await sb.from("door_workers").delete().in("id", removed).select();
+      if (toRemove.length) {
+        const { data, error } = await sb.from("door_workers").delete().in("id", toRemove).select();
         if (error || !data?.length) throw error || new Error("delete changed no rows");
+        setRemoved((prev) => prev.filter((id) => !toRemove.includes(id)));
       }
-      const byName = new Map(inserted.map((r) => [norm(r.name), r]));
-      setWorkers((prev) => prev.map((w) => (w._new ? byName.get(norm(w.name)) || w : { ...w, _dirty: false })));
-      setRemoved([]);
       say(tt.doorSaved);
     } catch (e) {
       console.error("door_workers save error:", e);
@@ -133,16 +135,11 @@ export default function DoorTab({ lang }) {
       const result = generateSchedule(usable, services, { perService, seed: Math.floor(Math.random() * 1e9) });
       const m = await sb.from("door_months").upsert({ month, per_service: perService, generated_at: new Date().toISOString() }).select().single();
       if (m.error) throw m.error;
-      const del = await sb.from("door_assignments").delete().eq("month", month);
-      if (del.error) throw del.error;
-      let saved = [];
-      if (result.assignments.length) {
-        const ins = await sb.from("door_assignments").insert(
-          result.assignments.map((a) => ({ month, service_date: a.date, slot: a.slot, worker_id: a.workerId, worker_name: a.workerName })),
-        ).select();
-        if (ins.error) throw ins.error;
-        saved = ins.data;
-      }
+      const { data: saved, error } = await replaceMonthAssignments(
+        month,
+        result.assignments.map((a) => ({ month, service_date: a.date, slot: a.slot, worker_id: a.workerId, worker_name: a.workerName })),
+      );
+      if (error) throw error;
       setInfo(m.data);
       setRows(saved.sort((a, b) => a.service_date.localeCompare(b.service_date) || a.created_at.localeCompare(b.created_at)));
       setUncovered(result.uncovered);

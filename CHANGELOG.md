@@ -61,6 +61,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - **Renamed project** from `events-app` to `mcc-newark-hub` for consistency with the app's own branding: GitHub repo (`MCC-Newark-Hub/mcc-newark-hub`, auto-redirected from the old name), package name (already `mcc-newark-hub`), Supabase project display name, docs (README, CONTRIBUTING, mkdocs.yml, docs/dev/*), and CHANGELOG title. `mcc-newark-hub.vercel.app` added as a new Vercel domain (production, no redirect) alongside the existing `mcc-newark-events.vercel.app`, which stays live indefinitely so already-printed badge QR codes and shared links keep working unchanged.
 
 ### Fixed
+- Escalas › Portaria: if saving the availability failed partway (e.g. the new workers were inserted but a day change on an existing one failed), retrying inserted the new workers a second time. Local state is now reconciled after every step that succeeds.
+- Escalas › Portaria: "Gerar novamente" deleted the month's assignments before inserting the new ones, so a failed insert left a published month empty on `/portaria/YYYY-MM`. The old rows are now put back when the insert fails (`replaceMonthAssignments` in `src/lib/doorData.js`; tests in `src/test/doorData.test.jsx`).
 - Badge CSV/PDF showing empty team for roster-assigned members.
 - Waitlist filter and member category sync on class move (CIA report work).
 - Middle dot rendering as literal `·` in ClerkView stats.
