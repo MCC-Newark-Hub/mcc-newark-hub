@@ -20,6 +20,10 @@ Path alias: `@/` maps to `./src/` (configured in `vite.config.js`).
 
 Every change (feature, fix, refactor) must be added to `CHANGELOG.md` under `[Unreleased]` in the same commit/session that makes it — not deferred. Use the categories already defined at the bottom of that file (Added/Changed/Fixed/Removed/Security/Database).
 
+## Frontend rules
+
+Before building or changing UI, read `FRONTEND_SYSTEM_GUIDELINES.md`. It covers tokens, spacing and type scales, motion curves, responsive rules, and the PR checklist.
+
 ## Architecture
 
 ### Router

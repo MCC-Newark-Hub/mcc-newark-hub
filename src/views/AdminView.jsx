@@ -1,5 +1,5 @@
 import { useState, useRef, Fragment } from "react";
-import { LayoutDashboard, ClipboardList, Users, Building2, Clock, BarChart2, Calendar, Upload, Check, Plus, FolderOpen, KeyRound, Eye, EyeOff, BookOpen, Pencil, Trash2, ChevronDown, ChevronUp, X, ShieldCheck, IdCard, UtensilsCrossed, Star, Download, DollarSign } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Users, Clock, BarChart2, Calendar, Check, Plus, FolderOpen, Eye, EyeOff, Pencil, Trash2, ChevronDown, ChevronUp, X, IdCard, UtensilsCrossed, Download, DollarSign } from "lucide-react";
 import { useT } from "@/i18n/strings";
 import { CATEGORIES, TEAMS, ROLE_BADGE, ROLE_GROUPS, fmt, classifyVoice, normalizeNote, isValidNote } from "@/constants";
 import { sb } from "@/lib/supabase";
@@ -23,12 +23,9 @@ import RegistrationsTab from "./admin/RegistrationsTab";
 import TeamsTab from "./admin/TeamsTab";
 import EventsTab from "./admin/EventsTab";
 import ReportsTab from "./admin/ReportsTab";
-import AuditLogTab from "./admin/AuditLogTab";
 import BadgeGeneratorTab from "./admin/BadgeGeneratorTab";
 import KitchenTab from "./admin/KitchenTab";
 import KitchenPlanningTab from "./admin/KitchenPlanningTab";
-import FuncoesTab from "./admin/FuncoesTab";
-import ListasTab from "./admin/ListasTab";
 import RegistrationDashboard from "./admin/RegistrationDashboard";
 import { TesourariaSection } from "./TreasurerView";
 import MemberFunctionsView from "@/components/MemberFunctionsView";
@@ -50,17 +47,10 @@ function AdminView(props) {
     { id: "resumo", icon: <BarChart2 size={16} />, label: "Resumo" },
     { id: "regs", icon: <ClipboardList size={16} />, label: t.registrations },
     { id: "teams", icon: <Users size={16} />, label: t.teams },
-    { id: "ga", icon: <Building2 size={16} />, label: t.groups },
     { id: "approvals", icon: <Clock size={16} />, label: `${t.approvals}${pendingApprovals.length > 0 ? ` (${pendingApprovals.length})` : ""}` },
     { id: "reports", icon: <BarChart2 size={16} />, label: t.reports },
     { id: "events", icon: <Calendar size={16} />, label: t.events },
-    { id: "import", icon: <Upload size={16} />, label: "Importar" },
-    { id: "users", icon: <KeyRound size={16} />, label: "Usuários & PINs" },
-    { id: "directory", icon: <BookOpen size={16} />, label: "Diretório" },
-    { id: "funcoes", icon: <Star size={16} />, label: "Funções" },
     { id: "tesouraria", icon: <DollarSign size={16} />, label: "Tesouraria" },
-    { id: "listas", icon: <FolderOpen size={16} />, label: "Listas" },
-    { id: "audit", icon: <ShieldCheck size={16} />, label: "Auditoria" },
     { id: "kitchen", icon: <UtensilsCrossed size={16} />, label: "Cozinha" },
     { id: "badges", icon: <IdCard size={16} />, label: "Crachás" },
   ];
@@ -75,28 +65,9 @@ function AdminView(props) {
             {sec === "tesouraria" && <TesourariaSection event={props.event} regs={props.regs} updateReg={props.updateReg} notify={props.notify} logAudit={props.logAudit} readOnly={false} dbExpenseCategories={props.dbExpenseCategories} dbIncomeTypes={props.dbIncomeTypes} />}
             {sec === "regs" && <RegistrationsTab {...props} initialFilter={regsInitialFilter} />}
             {sec === "teams" && <TeamsTab {...props} />}
-            {sec === "ga" && <AdminGA {...props} />}
             {sec === "approvals" && <ApprovalsPanel {...props} />}
             {sec === "reports" && <ReportsTab {...props} />}
             {sec === "events" && <EventsTab events={props.events} setEvents={props.setEvents} event={props.event} setEvent={props.setEvent} lang={props.lang} notify={props.notify} rosters={props.rosters} setRosters={props.setRosters} logAudit={props.logAudit} />}
-            {sec === "import" && <AdminImport members={props.members} setMembers={props.setMembers} families={props.families} setFamilies={props.setFamilies} gas={props.gas} setGas={props.setGas} rosters={props.rosters} setRosters={props.setRosters} churches={props.churches} setChurches={props.setChurches} notify={props.notify} />}
-            {sec === "users" && <AdminUsers dbUsers={props.dbUsers} setDbUsers={props.setDbUsers} churches={props.churches} dbTeams={props.dbTeams} gas={props.gas} notify={props.notify} settings={props.settings} updateSessionTtlHours={props.updateSessionTtlHours} logAudit={props.logAudit} />}
-            {sec === "directory" && <AdminDirectory {...props} dbTeams={props.dbTeams} setDbTeams={props.setDbTeams} dbInstruments={props.dbInstruments} setDbInstruments={props.setDbInstruments} dbVoiceTypes={props.dbVoiceTypes} setDbVoiceTypes={props.setDbVoiceTypes} />}
-            {sec === "funcoes" && <FuncoesTab members={props.members} setMembers={props.setMembers} gas={props.gas} notify={props.notify} logAudit={props.logAudit} />}
-            {sec === "listas" && (
-              <div className="card" style={{ padding: "18px 20px" }}>
-                <h2 style={{ fontWeight: 700, fontSize: 17, marginBottom: 18 }}>Listas</h2>
-                <ListasTab
-                  dbFunctions={props.dbFunctions} setDbFunctions={props.setDbFunctions}
-                  dbCategories={props.dbCategories} setDbCategories={props.setDbCategories}
-                  dbImmigrationStatuses={props.dbImmigrationStatuses} setDbImmigrationStatuses={props.setDbImmigrationStatuses}
-                  dbExpenseCategories={props.dbExpenseCategories} setDbExpenseCategories={props.setDbExpenseCategories}
-                  dbIncomeTypes={props.dbIncomeTypes} setDbIncomeTypes={props.setDbIncomeTypes}
-                  notify={props.notify}
-                />
-              </div>
-            )}
-            {sec === "audit" && <AuditLogTab dbUsers={props.dbUsers} />}
             {sec === "kitchen" && (
               <>
                 <KitchenTab regs={props.regs} event={props.event} />
@@ -318,7 +289,7 @@ function AdminOverview({ event, regs, activeCount, wlRegs, exRegs, members, lang
   );
 }
 
-function AdminGA({ gas, setGas, members, churches, regs, event, notify }) {
+export function AdminGA({ gas, setGas, members, churches, regs, event, notify }) {
   const t = useT();
   const [showNew, setShowNew] = useState(false);
   const [newGA, setNewGA] = useState({ name: "", church: "", leaderId: "" });
@@ -670,7 +641,7 @@ function parseCSV(text) {
 function makeCSV(headers,rows) { var lines=[headers.join(",")]; rows.forEach(row=>{lines.push(headers.map(h=>{var v=String(row[h]||""); return v.includes(",")?'"'+v+'"':v;}).join(","));}); return lines.join("\n"); }
 function downloadCSV(filename,text) { var blob=new Blob([text],{type:"text/csv"}); var url=URL.createObjectURL(blob); var a=document.createElement("a"); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url); }
 
-function AdminImport({ members, setMembers, families, setFamilies, gas, setGas, rosters, setRosters, churches, setChurches, notify }) {
+export function AdminImport({ members, setMembers, families, setFamilies, gas, setGas, rosters, setRosters, churches, setChurches, notify }) {
   const t = useT();
   const [activeTab, setActiveTab] = useState("members");
   const [preview, setPreview] = useState(null);
@@ -837,7 +808,7 @@ function SessionTtlCard({ settings, updateSessionTtlHours }) {
   );
 }
 
-function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify, settings, updateSessionTtlHours, logAudit }) {
+export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify, settings, updateSessionTtlHours, logAudit }) {
   const [editing, setEditing] = useState(null); // { id, name, pin, sysRole, initials, church }
   const [showPin, setShowPin] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1200,7 +1171,7 @@ function makeTh(sk, sd, toggle) {
 
 // ── Directory ─────────────────────────────────────────────────────────────────
 
-function AdminDirectory({ churches, setChurches, members, setMembers, families, setFamilies, gas, setGas, rosters, setRosters, dbTeams, setDbTeams, dbInstruments, setDbInstruments, dbVoiceTypes, setDbVoiceTypes, dbCategories, dbFunctions, dbImmigrationStatuses, events, regs, setRegs, notify, logAudit }) {
+export function AdminDirectory({ churches, setChurches, members, setMembers, families, setFamilies, gas, setGas, rosters, setRosters, dbTeams, setDbTeams, dbInstruments, setDbInstruments, dbVoiceTypes, setDbVoiceTypes, dbCategories, dbFunctions, dbImmigrationStatuses, events, regs, setRegs, notify, logAudit }) {
   const TABS = [
     { id: "churches",    label: "Igrejas",               count: churches?.length },
     { id: "church_groups", label: "Polos e Áreas" },
