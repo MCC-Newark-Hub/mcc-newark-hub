@@ -172,15 +172,27 @@ export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreat
     setNotice({ kind: "ok", text: tt.praiseSaved });
   };
 
-  // The service is over: close the list for editing and publish the read-only link for the Grupo de Louvor.
+  // Publishing only opens the read-only link for the Grupo de Louvor — the list stays editable
+  // (leader/preacher and songs sometimes change after the service starts). Only "Finalizar" locks it.
   const publish = async () => {
     if (!list || !window.confirm(tt.praisePublishConfirm)) return;
     setBusy(true);
-    const { data, error } = await updateList(list.id, { published_at: new Date().toISOString(), locked: true });
+    const { data, error } = await updateList(list.id, { published_at: new Date().toISOString() });
     setBusy(false);
     if (error) { fail(); return; }
     setList((prev) => ({ ...prev, ...data }));
     setNotice({ kind: "ok", text: tt.praisePublished });
+  };
+
+  // The service is really over: close the list for editing. The public link (if published) keeps working.
+  const finalize = async () => {
+    if (!list || !window.confirm(tt.praiseFinalizeConfirm)) return;
+    setBusy(true);
+    const { data, error } = await updateList(list.id, { locked: true });
+    setBusy(false);
+    if (error) { fail(); return; }
+    setList((prev) => ({ ...prev, ...data }));
+    setNotice({ kind: "ok", text: tt.praiseFinalized });
   };
 
   const setField = (k) => (e) => setHeader((h) => ({ ...h, [k]: e.target.value }));
@@ -248,8 +260,11 @@ export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreat
                 <button className="btn btn-primary" onClick={save} disabled={busy}>
                   {busy ? tt.praiseSaving : tt.praiseSave}
                 </button>
-                {list && items.length > 0 && (
+                {list && items.length > 0 && !list.published_at && (
                   <button className="btn btn-ok" onClick={publish} disabled={busy}>{tt.praisePublish}</button>
+                )}
+                {list && items.length > 0 && (
+                  <button className="btn btn-danger" onClick={finalize} disabled={busy}>{tt.praiseFinalize}</button>
                 )}
               </div>
             </>
