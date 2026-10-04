@@ -32,7 +32,7 @@ FROM (VALUES
   ('area',   'main',             'responsavel', 'M287',     'Nairon Pimentel'),
   ('polo',   'Newark',           'responsavel', 'M287',     'Nairon Pimentel'),
   ('polo',   'Costa Oeste',      'responsavel', 'MUF4D74A', 'Armando Rocha'),
-  ('polo',   'Texas',            'responsavel', NULL,       'Luiz Laranjeira'),
+  ('polo',   'Texas',            'responsavel', NULL,       'Pr. Luiz Laranjeira'),
   ('church', 'Newark, NJ',       'responsavel', 'M287',     'Nairon Pimentel'),
   ('church', 'Newark, NJ',       'co',          'M180',     'Jairo Oliveira'),
   ('church', 'Philadelphia, PA', 'responsavel', 'M287',     'Nairon Pimentel'),
