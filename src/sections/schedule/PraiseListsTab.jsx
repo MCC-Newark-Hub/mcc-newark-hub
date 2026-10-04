@@ -59,9 +59,10 @@ export default function PraiseListsTab({ lang }) {
     return "";
   };
 
+  // Locking is independent from publishing: a published list stays editable until it is finalized,
+  // and finalizing/reopening never touches its public link.
   const toggleLock = async (list) => {
-    // Unlocking also reopens a published list (its public link goes back to "not published").
-    const { data, error } = await updateList(list.id, list.locked || list.published_at ? { locked: false, published_at: null } : { locked: true });
+    const { data, error } = await updateList(list.id, { locked: !list.locked });
     if (error) { say(tt.praiseSaveFailed); return; }
     setLists((prev) => prev.map((l) => (l.id === list.id ? { ...l, ...data } : l)));
   };
@@ -146,7 +147,11 @@ export default function PraiseListsTab({ lang }) {
                 <div key={l.id} className="card" style={{ padding: 14 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
                     <div>
-                      <p style={{ fontWeight: 700 }}>{l.service_date.split("-").reverse().join("/")} · {tt[TYPE_KEYS[l.service_type]]} {l.published_at ? <span className="badge badge-green">{tt.praisePublishedBadge}</span> : locked && <span className="badge badge-gray">{tt.praiseLockedBadge}</span>}</p>
+                      <p style={{ fontWeight: 700 }}>
+                        {l.service_date.split("-").reverse().join("/")} · {tt[TYPE_KEYS[l.service_type]]}{" "}
+                        {l.published_at && <span className="badge badge-green">{tt.praisePublishedBadge}</span>}{" "}
+                        {locked && <span className="badge badge-gray">{tt.praiseLockedBadge}</span>}
+                      </p>
                       <p style={{ fontSize: 12, color: "var(--muted)" }}>
                         {[l.church, l.group_name, l.leader && `${tt.praiseLeader}: ${l.leader}`, l.preacher && `${tt.praisePreacher}: ${l.preacher}`, fill(tt.praiseBy, { name: l.entered_by })].filter(Boolean).join(" · ")}
                       </p>
@@ -155,7 +160,7 @@ export default function PraiseListsTab({ lang }) {
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                         {l.published_at && <button className="btn btn-ghost btn-sm" onClick={() => copyListLink(l)}><LinkIcon size={14} /> {tt.praiseCopyListLink}</button>}
                         <button className="btn btn-ghost btn-sm" onClick={() => toggleLock(l)}>
-                          {locked ? <LockOpen size={14} /> : <Lock size={14} />} {l.published_at ? tt.praiseReopen : locked ? tt.praiseUnlock : tt.praiseLock}
+                          {locked ? <LockOpen size={14} /> : <Lock size={14} />} {locked ? tt.praiseReopen : tt.praiseFinalize}
                         </button>
                         <button className="btn btn-ghost btn-sm" onClick={() => openEditor(l)}><Pencil size={14} /> {tt.praiseEdit}</button>
                         <button className="btn btn-danger btn-sm" onClick={() => removeList(l)} aria-label={tt.praiseDeleteAction}><Trash2 size={14} /></button>
