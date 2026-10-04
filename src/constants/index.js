@@ -12,6 +12,11 @@ export const MAINTENANCE_ALLOWED_USER_IDS = [
   4, // Nairon Pimentel (pastor)
 ];
 
+// Users who see the Organograma besides admins (it lists people by church and function).
+export const ORG_CHART_USER_IDS = [
+  4, // Nairon Pimentel (pastor)
+];
+
 // ── Categories, Roles, Teams, Churches ────────────────────────────────────────
 
 export const CATEGORIES = ["0-3", "Criança", "Intermediário", "Adolescente", "Jovem", "Adulto"];

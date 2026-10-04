@@ -17,6 +17,7 @@ import BulkBar from "@/components/BulkBar";
 import FamiliesPanel from "@/components/directory/FamiliesPanel";
 import GroupsPanel from "@/components/directory/GroupsPanel";
 import ChurchGroupsPanel from "@/components/directory/ChurchGroupsPanel";
+import OrgChartPanel from "@/components/directory/OrgChartPanel";
 import RolesMultiSelect from "@/components/directory/RolesMultiSelect";
 import RegistrationsTab from "./admin/RegistrationsTab";
 import TeamsTab from "./admin/TeamsTab";
@@ -1203,6 +1204,7 @@ function AdminDirectory({ churches, setChurches, members, setMembers, families, 
   const TABS = [
     { id: "churches",    label: "Igrejas",               count: churches?.length },
     { id: "church_groups", label: "Polos e Áreas" },
+    { id: "org_chart",    label: "Organograma" },
     { id: "members",     label: "Membros",               count: members?.length },
     { id: "families",    label: "Famílias",              count: families?.length },
     { id: "groups",      label: "Grupos de Assistência", count: gas?.length },
@@ -2019,6 +2021,9 @@ function AdminDirectory({ churches, setChurches, members, setMembers, families, 
       {tab === "church_groups" && (
         <ChurchGroupsPanel churches={churches} notify={notify} logAudit={logAudit} />
       )}
+
+      {/* ── Organograma (built from polos + members' functions) ─────────────── */}
+      {tab === "org_chart" && <OrgChartPanel churches={churches} members={members} canEdit />}
 
       {/* ── GA Groups ────────────────────────────────────────────────────── */}
       {tab === "groups" && (

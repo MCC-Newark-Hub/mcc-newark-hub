@@ -1,12 +1,13 @@
 import { useState, Fragment, useRef } from "react";
-import { LayoutDashboard, ClipboardList, Clock, BarChart2, BookOpen, DollarSign } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Clock, BarChart2, BookOpen, DollarSign, Network } from "lucide-react";
 import { useT } from "@/i18n/strings";
-import { CATEGORIES, fmt, deadlineStatus } from "@/constants";
+import { CATEGORIES, fmt, deadlineStatus, ORG_CHART_USER_IDS } from "@/constants";
 import { useTopbarContent } from "@/context/TopbarContext";
 import Sidebar from "@/components/Sidebar";
 import CapBar from "@/components/CapBar";
 import ApprovalsPanel from "@/components/ApprovalsPanel";
 import MemberFunctionsView from "@/components/MemberFunctionsView";
+import OrgChartPanel from "@/components/directory/OrgChartPanel";
 import RegistrationsTab from "./admin/RegistrationsTab";
 import ReportsTab from "./admin/ReportsTab";
 import RegistrationDashboard from "./admin/RegistrationDashboard";
@@ -139,6 +140,7 @@ function PastorView(props) {
     { id: "reports", icon: <BarChart2 size={16} />, label: t.reports },
     ...(showFinancials ? [{ id: "tesouraria", icon: <DollarSign size={16} />, label: "Tesouraria" }] : []),
     { id: "functions", icon: <BookOpen size={16} />, label: "Membros com Funções" },
+    ...(ORG_CHART_USER_IDS.includes(user?.id) ? [{ id: "org", icon: <Network size={16} />, label: t.orgTitle }] : []),
   ];
   return (
     <div className="app-shell">
@@ -359,6 +361,7 @@ function PastorView(props) {
             {sec === "reports" && <ReportsTab regs={regs} event={event} wlRegs={wlRegs} exRegs={exRegs} lang={lang} members={props.members} gas={props.gas} showFinancials={showFinancials} />}
             {sec === "tesouraria" && showFinancials && <TesourariaSection event={event} regs={regs} updateReg={props.updateReg} notify={props.notify} logAudit={props.logAudit} readOnly={true} dbExpenseCategories={props.dbExpenseCategories} dbIncomeTypes={props.dbIncomeTypes} />}
             {sec === "functions" && <MemberFunctionsView members={props.members} gas={props.gas} notify={props.notify} />}
+            {sec === "org" && ORG_CHART_USER_IDS.includes(user?.id) && <OrgChartPanel churches={churches} members={members} />}
           </div>
         </div>
       </div>

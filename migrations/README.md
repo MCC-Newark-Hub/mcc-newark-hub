@@ -27,6 +27,7 @@ Run these files **in order** using the Supabase SQL editor or `psql`. Each migra
 | `026_worship_list_published.sql` | Adds `worship_lists.published_at` (NULL = not published) for the read-only page sent to the Grupo de Louvor. Apply **before** deploying the code that uses it. |
 | `027_worship_list_church.sql` | Adds `worship_lists.church` (which church the list belongs to; shown on the published page). Apply **before** deploying the code that uses it. |
 | `028_door_schedule.sql` | Creates `door_workers` (door-duty workers + `days` availability), `door_months` (generated month, people per service, `published_at`) and `door_assignments` (who is on each service), RLS disabled. Used by Escalas › Portaria and the public `/portaria/YYYY-MM` page; both fail without it. Apply **before** deploying the code that uses it. |
+| `028_org_responsibles.sql` | Creates `org_responsibles` (who is responsible / co-responsible for the Área, each Polo and each Igreja in the Organograma; a member or a typed name), RLS disabled, and seeds the first responsibles. Apply **before** deploying the code that uses it. |
 
 ## How to run
 
