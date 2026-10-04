@@ -275,3 +275,22 @@ label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase
 @media(min-width:640px){
   .prayer-cols{grid-template-columns:1fr 1fr;align-items:start;}
 }
+
+/* ── ORGANOGRAMA (Diretório) ── tree built from the directory; lines are borders, nothing animates ── */
+.org-tree,.org-tree ul{list-style:none;margin:0;padding:0;}
+.org-tree ul{margin-left:12px;padding-left:16px;border-left:2px solid var(--border);}
+.org-tree li{margin:8px 0;}
+.org-node{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;overflow-wrap:anywhere;}
+.org-area{font-family:'Lora',Georgia,serif;font-size:20px;font-weight:700;color:var(--text);}
+.org-polo{font-size:16px;font-weight:700;color:var(--primary);}
+.org-church{font-size:14px;font-weight:700;color:var(--text);}
+.org-role{font-size:13px;font-weight:600;color:var(--text-secondary);}
+.org-person{font-size:13px;color:var(--text);}
+.org-empty{font-size:12px;color:var(--muted);}
+.org-resp{font-size:12px;font-weight:600;color:var(--text-secondary);background:var(--bg2);border:1px solid var(--border);border-radius:99px;padding:2px 8px;}
+.org-edit{min-width:44px;min-height:32px;padding:4px 8px;}
+.org-tree summary{cursor:pointer;list-style:none;min-height:24px;}
+.org-tree summary::-webkit-details-marker{display:none;}
+.org-tree summary::before{content:"▸";display:inline-block;width:16px;color:var(--muted);}
+.org-tree details[open]>summary::before{content:"▾";}
+@media (max-width:640px){.org-tree ul{margin-left:4px;padding-left:12px;}.org-tree summary{min-height:44px;display:flex;align-items:center;}}
