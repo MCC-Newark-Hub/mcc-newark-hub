@@ -89,6 +89,7 @@ function NewSongForm({ initial, songs, tt, createdBy, autoApprove, onCancel, onC
   const [title, setTitle] = useState(typedCategory ? "" : initial);
   const [category, setCategory] = useState(typedCategory || "avulso");
   const [theme, setTheme] = useState("");
+  const [language, setLanguage] = useState("pt");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -107,7 +108,7 @@ function NewSongForm({ initial, songs, tt, createdBy, autoApprove, onCancel, onC
     setBusy(true);
     setError("");
     const { data, error: err } = await createSong({
-      code: normalizedCode, title, category, theme: themeApplies(category) ? theme : "", status: autoApprove ? "active" : "pending", createdBy,
+      code: normalizedCode, title, category, theme: themeApplies(category) ? theme : "", language: category === "cia" ? language : "pt", status: autoApprove ? "active" : "pending", createdBy,
     });
     setBusy(false);
     if (err) { setError(err.code === "duplicate_code" ? fill(tt.praiseCodeTaken, { label: normalizedCode }) : tt.praiseSaveFailed); return; }
@@ -140,6 +141,15 @@ function NewSongForm({ initial, songs, tt, createdBy, autoApprove, onCancel, onC
             <select value={theme} onChange={(e) => setTheme(e.target.value)} style={inputStyle}>
               <option value="">{tt.praiseNoTheme}</option>
               {THEMES.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+        )}
+        {category === "cia" && (
+          <div>
+            <label style={labelStyle}>{tt.praiseLanguage}</label>
+            <select value={language} onChange={(e) => setLanguage(e.target.value)} style={inputStyle}>
+              <option value="pt">{tt.praiseLangPt}</option>
+              <option value="en">{tt.praiseLangEn}</option>
             </select>
           </div>
         )}

@@ -82,12 +82,12 @@ describe("isListLocked", () => {
     expect(isListLocked(list, new Date(2026, 8, 20, 22, 0))).toBe(false);
   });
 
-  it("is still open before 06:00 the next morning", () => {
-    expect(isListLocked(list, new Date(2026, 8, 21, 5, 59))).toBe(false);
+  it("is still open just before midnight", () => {
+    expect(isListLocked(list, new Date(2026, 8, 20, 23, 59))).toBe(false);
   });
 
-  it("locks at 06:00 the next day", () => {
-    expect(isListLocked(list, new Date(2026, 8, 21, 6, 0))).toBe(true);
+  it("locks at midnight (00:00 of the next day)", () => {
+    expect(isListLocked(list, new Date(2026, 8, 21, 0, 0))).toBe(true);
   });
 
   it("a manual lock wins", () => {

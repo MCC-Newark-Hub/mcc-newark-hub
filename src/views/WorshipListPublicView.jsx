@@ -10,7 +10,7 @@ import { STRINGS, fill } from "@/i18n/strings";
 import {
   fetchSongs, fetchListsByDate, fetchRecentLists, createList, updateList, addListItem, removeListItem, saveItemPositions,
 } from "@/lib/praiseData";
-import { SERVICE_TYPES, dateKey, isListLocked, moveItem, renumber, songLabel, listPath } from "@/lib/praiseLists";
+import { SERVICE_TYPES, dateKey, isListLocked, isFinalizeEnabled, moveItem, renumber, songLabel, listPath } from "@/lib/praiseLists";
 
 const NAME_KEY = "mcc_worship_name";
 const CHURCH_KEY = "mcc_worship_church"; // last church chosen on this device
@@ -263,9 +263,14 @@ export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreat
                 {list && items.length > 0 && !list.published_at && (
                   <button className="btn btn-ok" onClick={publish} disabled={busy}>{tt.praisePublish}</button>
                 )}
-                {list && items.length > 0 && (
-                  <button className="btn btn-danger" onClick={finalize} disabled={busy}>{tt.praiseFinalize}</button>
-                )}
+                {admin && list && items.length > 0 && (() => {
+                  const enabled = isFinalizeEnabled(date, type);
+                  return (
+                    <button className="btn btn-danger" onClick={finalize} disabled={busy || !enabled} title={enabled ? undefined : tt.praiseFinalizeEarly}>
+                      {tt.praiseFinalize}
+                    </button>
+                  );
+                })()}
               </div>
             </>
           )}

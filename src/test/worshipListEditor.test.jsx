@@ -48,28 +48,29 @@ describe("ServiceListForm", () => {
     expect(screen.queryByText(tt.praiseLocked)).toBeNull();
   });
 
-  it("stays editable for anyone with the link once published — only Finalizar locks it", async () => {
+  it("stays editable for anyone with the link once published — Finalizar is not shown to non-admins", async () => {
     fetchListsByDate.mockResolvedValue({ data: [PUBLISHED_OPEN], error: null });
     renderForm();
     expect(await screen.findByPlaceholderText(tt.praiseSearchPlaceholder)).toBeTruthy();
     expect(screen.getByText(tt.praiseSave)).toBeTruthy();
-    expect(screen.getByText(tt.praiseFinalize)).toBeTruthy();
-    expect(screen.queryByText(tt.praisePublish)).toBeNull(); // already published — nothing left to publish
+    expect(screen.queryByText(tt.praiseFinalize)).toBeNull(); // admin-only
+    expect(screen.queryByText(tt.praisePublish)).toBeNull(); // already published
     expect(screen.queryByText(tt.praiseLocked)).toBeNull();
   });
 
-  it("offers both Publicar link and Finalizar for a saved, unpublished list with songs", async () => {
+  it("offers Publicar link (no Finalizar) for a saved unpublished list to a regular user", async () => {
     fetchListsByDate.mockResolvedValue({ data: [DRAFT], error: null });
     renderForm();
     expect(await screen.findByText(tt.praisePublish)).toBeTruthy();
-    expect(screen.getByText(tt.praiseFinalize)).toBeTruthy();
+    expect(screen.queryByText(tt.praiseFinalize)).toBeNull();
   });
 
-  it("Finalizar locks the list without touching published_at", async () => {
+  it("Finalizar locks the list without touching published_at (admin only)", async () => {
     fetchListsByDate.mockResolvedValue({ data: [PUBLISHED_OPEN], error: null });
     updateList.mockResolvedValue({ data: { locked: true }, error: null });
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    renderForm();
+    // time is frozen at 20:00 on a Sunday noite → canFinalizeAt = 20:00 → enabled
+    renderForm({ admin: true, defaultName: "Leo" });
     fireEvent.click(await screen.findByText(tt.praiseFinalize));
     await waitFor(() => expect(updateList).toHaveBeenCalledWith("l1", { locked: true }));
     expect(await screen.findByText(tt.praiseFinalized)).toBeTruthy();
