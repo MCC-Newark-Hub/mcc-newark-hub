@@ -24,8 +24,8 @@ export const THEMES = [
 
 export const SERVICE_TYPES = ["ebd", "noite", "outro"];
 
-// A list locks by itself at this local hour on the day after the service.
-export const AUTO_LOCK_HOUR = 6;
+// A list locks by itself at midnight (00:00) at the end of the service day.
+export const AUTO_LOCK_HOUR = 0;
 
 // How long "cantado há X dias" is shown.
 export const RECENT_DAYS = 90;
@@ -158,6 +158,31 @@ export function sungText(tt, days) {
 // Admins and the Grupo de Louvor team leader approve, edit and delete songs and manage lists.
 export const GL_TEAM = "Grupo de Louvor";
 export const canManagePraise = (user) => !!user && ((user.sysRoles || []).includes("admin") || (user.teamLeads || []).includes(GL_TEAM));
+
+// Service start times by weekday (0=Sun, 6=Sat) and type.
+// "Finalizar" becomes available 15 min after the service starts.
+const SERVICE_START = {
+  ebd:   { h: 10, m: 45 },
+  noite: { weekend: { h: 19, m: 45 }, weekday: { h: 20, m: 15 } },
+  outro: { h: 20, m: 0 },
+};
+
+export function canFinalizeAt(serviceDate, serviceType) {
+  const [y, mo, d] = String(serviceDate).split("-").map(Number);
+  if (!y || !mo || !d) return null;
+  const dow = new Date(y, mo - 1, d).getDay();
+  let h, m;
+  if (serviceType === "ebd") { ({ h, m } = SERVICE_START.ebd); }
+  else if (serviceType === "noite") {
+    ({ h, m } = (dow === 0 || dow === 6) ? SERVICE_START.noite.weekend : SERVICE_START.noite.weekday);
+  } else { ({ h, m } = SERVICE_START.outro); }
+  return new Date(y, mo - 1, d, h, m + 15, 0);
+}
+
+export function isFinalizeEnabled(serviceDate, serviceType, now = new Date()) {
+  const at = canFinalizeAt(serviceDate, serviceType);
+  return !at || now >= at;
+}
 
 // What the "N°" column shows on the published page: only the number ("CL-004" -> "4", like the paper list).
 // The prefix is for the database. Songs without a number fall back to their category tag (AVL, CIA, ENG).

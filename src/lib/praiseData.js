@@ -21,12 +21,13 @@ export async function fetchSongs() {
 }
 
 // A duplicate code comes back as error.code === "duplicate_code".
-export async function createSong({ code, title, category, theme, status = "pending", createdBy }) {
+export async function createSong({ code, title, category, theme, language, status = "pending", createdBy }) {
   const row = {
     code: code ? normalizeCode(code) : null,
     title: title.trim(),
     category,
     theme: theme || null,
+    language: language || "pt",
     status,
     created_by: createdBy || null,
   };

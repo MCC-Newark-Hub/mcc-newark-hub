@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
-import { Link as LinkIcon, Lock, LockOpen, Trash2, Check, Pencil, Plus, X } from "lucide-react";
+import { Link as LinkIcon, Lock, LockOpen, Trash2, Check, Pencil, Plus, X, ChevronLeft, ChevronRight } from "lucide-react";
 import SongPicker from "@/components/SongPicker";
 import { ServiceListForm } from "@/views/WorshipListPublicView";
 import { useAppDataContext } from "@/context/AppDataContext";
 import { STRINGS, fill } from "@/i18n/strings";
 import { fetchSongs, fetchRecentLists, updateSong, deleteSong, updateList, deleteList } from "@/lib/praiseData";
-import { CATEGORIES, THEMES, themeApplies, dateKey, isListLocked, songLabel, canManagePraise, listPath } from "@/lib/praiseLists";
+import { CATEGORIES, THEMES, themeApplies, dateKey, isListLocked, songLabel, canManagePraise, listPath, norm } from "@/lib/praiseLists";
 
 const CAT_KEYS = { coletanea: "praiseCatColetanea", cia: "praiseCatCia", avulso: "praiseCatAvulso", english: "praiseCatEnglish" };
 const TYPE_KEYS = { ebd: "praiseTypeEbd", noite: "praiseTypeNoite", outro: "praiseTypeOutro" };
@@ -23,6 +23,9 @@ export default function PraiseListsTab({ lang }) {
   const [lists, setLists] = useState([]);
   const [editing, setEditing] = useState(null);
   const [editorFor, setEditorFor] = useState(null); // { key, date, type } while the list editor is open
+  const [catQuery, setCatQuery] = useState("");
+  const [catPage, setCatPage] = useState(1);
+  const [catPerPage, setCatPerPage] = useState(20);
 
   const reload = () => {
     fetchSongs().then(({ data }) => setSongs(data));
@@ -119,22 +122,61 @@ export default function PraiseListsTab({ lang }) {
         )
       )}
 
-      {sub === "catalog" && (
-        <div>
-          <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>{fill(tt.praiseCatalogCount, { n: songs.length })}</p>
-          {canManage && (
-            <SongPicker
-              songs={songs}
-              onPick={(s) => setEditing(s)}
-              onCreated={(s) => setSongs((prev) => [...prev, s])}
-              tt={tt}
-              enteredBy={user?.name}
-              today={today}
-              autoApprove
-            />
-          )}
-        </div>
-      )}
+      {sub === "catalog" && (() => {
+        const q = norm(catQuery);
+        const filtered = q
+          ? songs.filter((s) => norm(s.title).includes(q) || norm(s.code || "").includes(q) || norm(s.theme || "").includes(q))
+          : songs;
+        const totalPages = Math.max(1, Math.ceil(filtered.length / catPerPage));
+        const safePage = Math.min(catPage, totalPages);
+        const pageSongs = filtered.slice((safePage - 1) * catPerPage, safePage * catPerPage);
+        return (
+          <div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
+              <input
+                value={catQuery}
+                onChange={(e) => { setCatQuery(e.target.value); setCatPage(1); }}
+                placeholder={tt.praiseCatalogSearch}
+                style={{ ...inputStyle, flex: "1 1 220px", maxWidth: 360 }}
+              />
+              <p style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>{fill(tt.praiseCatalogCount, { n: filtered.length })}</p>
+              <select value={catPerPage} onChange={(e) => { setCatPerPage(Number(e.target.value)); setCatPage(1); }} style={{ ...inputStyle, width: "auto" }}>
+                {[10, 20, 50].map((n) => <option key={n} value={n}>{n} {tt.praiseCatalogPerPage}</option>)}
+              </select>
+            </div>
+            {canManage && (
+              <SongPicker songs={songs} onPick={(s) => setEditing(s)} onCreated={(s) => setSongs((prev) => [...prev, s])} tt={tt} enteredBy={user?.name} today={today} autoApprove />
+            )}
+            <div style={{ display: "grid", gap: 6, marginTop: 10 }}>
+              {pageSongs.map((s) => (
+                <SongRow key={s.id} song={s} tt={tt}>
+                  {canManage && (
+                    <>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setEditing(s)} aria-label={tt.praiseEdit}><Pencil size={14} /></button>
+                      <button className="btn btn-danger btn-sm" onClick={() => removeSong(s)} aria-label={tt.praiseDeleteAction}><Trash2 size={14} /></button>
+                    </>
+                  )}
+                </SongRow>
+              ))}
+            </div>
+            {totalPages > 1 && (
+              <div style={{ display: "flex", gap: 6, alignItems: "center", justifyContent: "center", marginTop: 12, flexWrap: "wrap" }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => setCatPage((p) => Math.max(1, p - 1))} disabled={safePage === 1}><ChevronLeft size={14} /></button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).filter((p) => Math.abs(p - safePage) <= 2 || p === 1 || p === totalPages).reduce((acc, p, i, arr) => {
+                  if (i > 0 && arr[i - 1] !== p - 1) acc.push("…");
+                  acc.push(p);
+                  return acc;
+                }, []).map((p, i) => p === "…" ? (
+                  <span key={`e${i}`} style={{ padding: "0 4px", color: "var(--muted)", fontSize: 13 }}>…</span>
+                ) : (
+                  <button key={p} className={`btn btn-sm ${p === safePage ? "btn-primary" : "btn-ghost"}`} onClick={() => setCatPage(p)}>{p}</button>
+                ))}
+                <button className="btn btn-ghost btn-sm" onClick={() => setCatPage((p) => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}><ChevronRight size={14} /></button>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {sub === "lists" && (
         <>
@@ -207,10 +249,11 @@ export default function PraiseListsTab({ lang }) {
 }
 
 function SongRow({ song, tt, children }) {
+  const langTag = song.category === "cia" && song.language === "en" ? tt.praiseLangEn : null;
   return (
     <div className="card" style={{ padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
       <div style={{ flex: 1, minWidth: 180 }}>
-        <p style={{ fontWeight: 600 }}>{songLabel(song)}</p>
+        <p style={{ fontWeight: 600 }}>{songLabel(song)}{langTag && <span className="badge badge-blue" style={{ marginLeft: 6 }}>{langTag}</span>}</p>
         <p style={{ fontSize: 12, color: "var(--muted)" }}>
           {[tt[CAT_KEYS[song.category]], song.theme, song.times_sung ? fill(tt.praiseTimesSung, { n: song.times_sung }) : null, song.created_by && fill(tt.praiseBy, { name: song.created_by })].filter(Boolean).join(" · ")}
         </p>
@@ -221,13 +264,13 @@ function SongRow({ song, tt, children }) {
 }
 
 function EditSongModal({ song, tt, canDelete, onClose, onSave, onDelete }) {
-  const [form, setForm] = useState({ title: song.title, code: song.code || "", category: song.category, theme: song.theme || "", status: song.status });
+  const [form, setForm] = useState({ title: song.title, code: song.code || "", category: song.category, theme: song.theme || "", language: song.language || "pt", status: song.status });
   const [error, setError] = useState("");
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const submit = async () => {
     if (!form.title.trim()) return;
-    setError(await onSave({ title: form.title, code: form.code.trim(), category: form.category, theme: themeApplies(form.category) ? form.theme || null : null, status: form.status }));
+    setError(await onSave({ title: form.title, code: form.code.trim(), category: form.category, theme: themeApplies(form.category) ? form.theme || null : null, language: form.language, status: form.status }));
   };
 
   return (
@@ -251,6 +294,15 @@ function EditSongModal({ song, tt, canDelete, onClose, onSave, onDelete }) {
               <select value={form.theme} onChange={set("theme")} style={inputStyle}>
                 <option value="">{tt.praiseNoTheme}</option>
                 {THEMES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+          )}
+          {form.category === "cia" && (
+            <div>
+              <label style={labelStyle}>{tt.praiseLanguage}</label>
+              <select value={form.language} onChange={set("language")} style={inputStyle}>
+                <option value="pt">{tt.praiseLangPt}</option>
+                <option value="en">{tt.praiseLangEn}</option>
               </select>
             </div>
           )}
