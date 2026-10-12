@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
-import { Pencil, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Pencil, Trash2, X, Download, FileDown } from "lucide-react";
 import { sb } from "@/lib/supabase";
 import { useT, useLang, fill } from "@/i18n/strings";
-import { buildOrgChart, roleTotals, responsiblesOf, AREA_REF } from "@/lib/orgChart";
+import { buildOrgChart, roleTotals, responsiblesOf, allRows, isRowOpen, AREA_REF } from "@/lib/orgChart";
 import { fetchResponsibles, addResponsible, removeResponsible } from "@/lib/orgData";
+import { exportImage, exportPdf } from "@/lib/exportElement";
+import { useWideScreen } from "@/hooks/useWideScreen";
+import OrgChartDiagram from "@/components/directory/OrgChartDiagram";
 
 const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 
@@ -20,6 +23,12 @@ export default function OrgChartPanel({ churches, members, canEdit = false }) {
   const [failed, setFailed] = useState(false);
   const [respFailed, setRespFailed] = useState(false);
   const [showNames, setShowNames] = useState(true);
+  const [view, setView] = useState("tree"); // "tree" | "diagram" — the drawing is a tablet/desktop view
+  const [exporting, setExporting] = useState(null); // "image" | "pdf" | null
+  const [exportError, setExportError] = useState(false);
+  const [overrides, setOverrides] = useState(() => new Map()); // rows the user opened/closed in the drawing; the rest follow the defaults (also used by the export)
+  const wide = useWideScreen();
+  const sheetRef = useRef(null); // off-screen copy of the drawing, mounted only while exporting: same file on any device
   const [editing, setEditing] = useState(null); // { scope, ref, label } while the responsibles modal is open
   // Only the ministry levels for now; buildOrgChart already accepts scope "all" for GAs, louvor, etc. later.
   const scope = "ministry";
@@ -40,6 +49,27 @@ export default function OrgChartPanel({ churches, members, canEdit = false }) {
 
   const chart = useMemo(() => buildOrgChart({ groups, links, churches, members, responsibles: rows, scope, lang }), [groups, links, churches, members, rows, lang]);
   const totals = useMemo(() => roleTotals(chart), [chart]);
+  const showDiagram = wide && view === "diagram";
+  const isOpen = (key, role) => isRowOpen(overrides, key, role);
+  const toggleRow = (key, role) => setOverrides((prev) => new Map(prev).set(key, !isRowOpen(prev, key, role)));
+  const diagramRows = useMemo(() => allRows(chart), [chart]);
+  const allOpen = diagramRows.length > 0 && diagramRows.every((r) => isRowOpen(overrides, r.key, r.role));
+  const setAll = (open) => setOverrides(new Map(diagramRows.map((r) => [r.key, open])));
+  const stamp = new Date().toISOString().slice(0, 10);
+  const runExport = async (kind, make) => {
+    setExporting(kind); setExportError(false);
+    try {
+      // let React mount the off-screen sheet and lay it out before it is captured
+      await new Promise((resolve) => (window.requestAnimationFrame ? window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)) : setTimeout(resolve, 50)));
+      await make();
+    } catch {
+      setExportError(true);
+    } finally {
+      setExporting(null);
+    }
+  };
+  const downloadImage = () => runExport("image", () => exportImage(sheetRef.current, `organograma-${stamp}`, tt.orgTitle));
+  const downloadPdf = () => runExport("pdf", () => exportPdf(sheetRef.current, `organograma-${stamp}`, tt.orgTitle, { page: "a4" }));
   const memberById = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
   const peopleText = (n) => (n === 1 ? tt.orgPeopleOne : fill(tt.orgPeopleMany, { n }));
 
@@ -87,12 +117,31 @@ export default function OrgChartPanel({ churches, members, canEdit = false }) {
       <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 16 }}>{tt.orgIntro}</p>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
-        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-          <input type="checkbox" checked={showNames} onChange={(e) => setShowNames(e.target.checked)} /> {tt.orgShowNames}
-        </label>
+        {wide && [["tree", tt.orgViewTree], ["diagram", tt.orgViewDiagram]].map(([id, label]) => (
+          <button key={id} type="button" className={`btn btn-sm ${view === id ? "btn-primary" : "btn-ghost"}`} onClick={() => setView(id)}>{label}</button>
+        ))}
+        {showDiagram && diagramRows.length > 0 && (
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAll(!allOpen)}>
+            {allOpen ? tt.orgCollapseAll : tt.orgExpandAll}
+          </button>
+        )}
+        {!showDiagram && (
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, textTransform: "none", letterSpacing: 0, whiteSpace: "nowrap" }}>
+            <input type="checkbox" checked={showNames} onChange={(e) => setShowNames(e.target.checked)} /> {tt.orgShowNames}
+          </label>
+        )}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginLeft: "auto" }}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={downloadImage} disabled={!!exporting || !loaded || failed}>
+            <Download size={14} /> {exporting === "image" ? tt.orgExporting : tt.orgDownloadImage}
+          </button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={downloadPdf} disabled={!!exporting || !loaded || failed}>
+            <FileDown size={14} /> {exporting === "pdf" ? tt.orgExporting : tt.orgDownloadPdf}
+          </button>
+        </div>
       </div>
+      {exportError && <p style={{ color: "var(--danger)", fontSize: 13, marginBottom: 12 }}>{tt.orgExportFailed}</p>}
 
-      {totals.length > 0 && (
+      {!showDiagram && totals.length > 0 && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
           <span style={{ fontSize: 12, color: "var(--muted)" }}>{tt.orgTotals}:</span>
           {totals.map((t) => <span key={t.role} className="badge badge-blue">{t.role}: {t.count}</span>)}
@@ -103,6 +152,13 @@ export default function OrgChartPanel({ churches, members, canEdit = false }) {
 
       {!loaded ? <p style={{ color: "var(--muted)", fontSize: 14 }}>…</p> : failed ? (
         <p style={{ color: "var(--danger)", fontSize: 14 }}>{tt.orgLoadFailed}</p>
+      ) : showDiagram ? (
+        <>
+          <p style={{ color: "var(--muted)", fontSize: 12, marginBottom: 8 }}>{tt.orgDiagramHint}</p>
+          <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: "var(--r)" }}>
+            <OrgChartDiagram chart={chart} tt={tt} lang={lang} isOpen={isOpen} onToggle={toggleRow} />
+          </div>
+        </>
       ) : (
         <ul className="org-tree">
           <li>
@@ -125,6 +181,12 @@ export default function OrgChartPanel({ churches, members, canEdit = false }) {
             )}
           </li>
         </ul>
+      )}
+
+      {exporting && loaded && !failed && (
+        <div className="org-offscreen" aria-hidden="true">
+          <div ref={sheetRef}><OrgChartDiagram chart={chart} tt={tt} lang={lang} isOpen={isOpen} /></div>
+        </div>
       )}
 
       {editing && (

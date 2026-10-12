@@ -294,3 +294,34 @@ label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase
 .org-tree summary::before{content:"▸";display:inline-block;width:16px;color:var(--muted);}
 .org-tree details[open]>summary::before{content:"▾";}
 @media (max-width:640px){.org-tree ul{margin-left:4px;padding-left:12px;}.org-tree summary{min-height:44px;display:flex;align-items:center;}}
+
+/* ── ORGANOGRAMA (desenho) ── always a light sheet, so the exported image/PDF prints well in dark mode too ── */
+.orgd{--card:#ffffff;--border:#cfc8c1;--text:#03223f;--text-secondary:#4a5568;--muted:#7a746e;--primary:#8B0000;--bg2:#f7f5f2;
+  background:#fff;color:var(--text);padding:24px;width:max-content;min-width:100%;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;font-family:'Montserrat','Segoe UI',sans-serif;}
+.orgd-box{background:var(--card);border:2px solid var(--border);border-radius:var(--r);padding:8px 12px;text-align:center;box-sizing:border-box;}
+.orgd-area{border-color:var(--text);padding:12px 20px;}
+.orgd-polo{border-color:var(--primary);}
+.orgd-title{font-family:'Lora',Georgia,serif;font-weight:700;font-size:16px;}
+.orgd-polo .orgd-title{color:var(--primary);}
+.orgd-name{font-weight:700;font-size:13px;}
+.orgd-resp{font-size:11px;font-weight:600;color:var(--text-secondary);margin-top:2px;}
+.orgd-count{font-size:11px;color:var(--muted);margin-top:4px;}
+.orgd-stub{width:0;height:16px;border-left:2px solid var(--border);}
+.orgd-polos{display:flex;gap:24px;align-items:flex-start;}
+.orgd-col{position:relative;width:272px;padding-top:16px;}
+.orgd-col::before{content:"";position:absolute;top:0;left:-12px;right:-12px;border-top:2px solid var(--border);}
+.orgd-col:first-child::before{left:50%;}
+.orgd-col:last-child::before{right:50%;}
+.orgd-col:only-child::before{display:none;}
+.orgd-col::after{content:"";position:absolute;top:0;left:50%;height:16px;border-left:2px solid var(--border);}
+.orgd-churches{margin:12px 0 0 24px;padding-left:16px;border-left:2px solid var(--border);}
+.orgd-church{position:relative;margin:8px 0;text-align:left;}
+.orgd-church::before{content:"";position:absolute;left:-18px;top:50%;width:16px;border-top:2px solid var(--border);}
+.orgd-foot{margin-top:20px;font-size:10px;color:var(--muted);align-self:flex-end;}
+/* the diagram is a wide-screen view (tablet up); the tree stays the phone view */
+.org-offscreen{position:fixed;left:-20000px;top:0;pointer-events:none;}
+.orgd-group{margin-top:6px;}
+.orgd-role{font-size:11px;font-weight:700;color:var(--text-secondary);}
+.orgd-person{font-size:12px;color:var(--text);padding-left:8px;overflow-wrap:anywhere;}
+.orgd-toggle{font:inherit;font-size:11px;font-weight:700;color:var(--primary);background:none;border:0;padding:4px 0;cursor:pointer;min-height:24px;}
+.orgd-toggle:active{transform:scale(.97);}

@@ -1276,7 +1276,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
         {TABS.map((tb) => (
           <button key={tb.id} className={`btn btn-sm ${tab === tb.id ? "btn-primary" : "btn-ghost"}`} onClick={() => switchTab(tb.id)}>
-            {tb.label} <span style={{ opacity: .65, fontWeight: 400, marginLeft: 4 }}>({tb.count ?? 0})</span>
+            {tb.label}{tb.count != null && <span style={{ opacity: .65, fontWeight: 400, marginLeft: 4 }}>({tb.count})</span>}
           </button>
         ))}
       </div>
