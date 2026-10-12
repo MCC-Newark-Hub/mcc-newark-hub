@@ -1,6 +1,17 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import OrgChartPanel from "@/components/directory/OrgChartPanel";
+
+const fakeCanvas = { width: 1000, height: 500, toDataURL: () => "data:image/png;base64,AAA", toBlob: (cb) => cb(new Blob(["x"], { type: "image/png" })) };
+vi.mock("html2canvas", () => ({ default: vi.fn(async () => fakeCanvas) }));
+const addImage = vi.fn();
+vi.mock("jspdf", () => ({
+  jsPDF: vi.fn(function FakeJsPDF() {
+    this.internal = { pageSize: { getWidth: () => 842, getHeight: () => 595 } };
+    this.addImage = addImage;
+    this.output = () => new Blob(["x"], { type: "application/pdf" });
+  }),
+}));
 
 vi.mock("@/lib/orgData", () => ({
   fetchResponsibles: vi.fn(async () => ({ data: [
@@ -70,5 +81,72 @@ describe("OrgChartPanel", () => {
     fireEvent.change(screen.getByPlaceholderText("Buscar membro ou digitar um nome"), { target: { value: "Pr Marcos" } });
     fireEvent.click(screen.getByText("Adicionar “Pr Marcos” (sem cadastro)"));
     expect(await screen.findAllByText("Pr Marcos")).toBeTruthy();
+  });
+
+  describe("drawing and export", () => {
+    const setScreen = (wide) => { window.matchMedia = (q) => ({ matches: wide, media: q, addEventListener() {}, removeEventListener() {} }); };
+    afterEach(() => { delete window.matchMedia; delete navigator.share; delete navigator.canShare; });
+
+    it("offers the drawing on tablet/desktop: pastor/ungido/diácono open by name, obreiros closed to a count", async () => {
+      setScreen(true);
+      render(<OrgChartPanel churches={churches} members={members} />);
+      fireEvent.click(await screen.findByText("Desenho"));
+      expect(screen.queryByLabelText("Mostrar nomes")).toBeNull(); // the names checkbox belongs to the tree
+      expect(screen.getAllByText("Resp. Pr. Bruno").length).toBeGreaterThan(0);
+      expect(screen.getByText("▾ Pastor · 1")).toBeTruthy();
+      expect(screen.getByText("Bruno")).toBeTruthy(); // the pastor, listed by name
+      expect(screen.getByText("▸ Obreiro · 1")).toBeTruthy();
+      expect(screen.queryByText("Ana")).toBeNull(); // the obreiro stays collapsed
+    });
+
+    it("opens and closes any function row on click", async () => {
+      setScreen(true);
+      render(<OrgChartPanel churches={churches} members={members} />);
+      fireEvent.click(await screen.findByText("Desenho"));
+      fireEvent.click(screen.getByText("▸ Obreiro · 1"));
+      expect(screen.getByText("Ana")).toBeTruthy();
+      fireEvent.click(screen.getByText("▾ Obreiro · 1"));
+      expect(screen.queryByText("Ana")).toBeNull();
+      fireEvent.click(screen.getByText("▾ Pastor · 1")); // pastors can be closed too
+      expect(screen.queryByText("Bruno")).toBeNull();
+      expect(screen.getByText("▸ Pastor · 1")).toBeTruthy();
+    });
+
+    it("opens or closes everything at once", async () => {
+      setScreen(true);
+      render(<OrgChartPanel churches={churches} members={members} />);
+      fireEvent.click(await screen.findByText("Desenho"));
+      fireEvent.click(screen.getByText("Abrir tudo"));
+      expect(screen.getByText("Ana")).toBeTruthy();
+      expect(screen.getByText("Bruno")).toBeTruthy();
+      fireEvent.click(screen.getByText("Fechar tudo"));
+      expect(screen.queryByText("Ana")).toBeNull();
+      expect(screen.queryByText("Bruno")).toBeNull();
+      expect(screen.getByText("▸ Pastor · 1")).toBeTruthy();
+    });
+
+    it("keeps the tree only on a phone, but still offers the export", async () => {
+      setScreen(false);
+      render(<OrgChartPanel churches={churches} members={members} />);
+      await screen.findByText("Bruno");
+      expect(screen.queryByText("Desenho")).toBeNull();
+      expect(screen.getByText("Baixar imagem")).toBeTruthy();
+      expect(screen.getByText("Baixar PDF")).toBeTruthy();
+    });
+
+    it("exports the image and an A4 PDF through the share sheet", async () => {
+      setScreen(false);
+      const share = vi.fn().mockResolvedValue(undefined);
+      navigator.canShare = () => true;
+      navigator.share = share;
+      render(<OrgChartPanel churches={churches} members={members} />);
+      fireEvent.click(await screen.findByText("Baixar imagem"));
+      await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+      expect(share.mock.calls[0][0].files[0].name).toMatch(/^organograma-\d{4}-\d{2}-\d{2}\.png$/);
+      fireEvent.click(screen.getByText("Baixar PDF"));
+      await waitFor(() => expect(share).toHaveBeenCalledTimes(2));
+      expect(share.mock.calls[1][0].files[0].name).toMatch(/\.pdf$/);
+      expect(addImage).toHaveBeenCalled();
+    });
   });
 });

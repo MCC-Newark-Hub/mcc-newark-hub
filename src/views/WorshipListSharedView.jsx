@@ -5,6 +5,7 @@ import { STRINGS } from "@/i18n/strings";
 import { fetchListById, fetchSongsByIds } from "@/lib/praiseData";
 import { songNumberLabel } from "@/lib/praiseLists";
 import { churchCity } from "@/lib/prayerSlots";
+import { exportImage, exportPdf } from "@/lib/exportElement";
 
 const NAVY = "#03223f";
 
@@ -12,34 +13,6 @@ const NAVY = "#03223f";
 function fileBase(list) {
   const city = list.church ? churchCity(list.church).toLowerCase().replace(/\s+/g, "-") : "louvores";
   return `louvores-${city}-${list.service_date}`;
-}
-
-// Renders the printable card to a canvas (2x for a crisp image/PDF).
-async function renderCanvas(el) {
-  const { default: html2canvas } = await import("html2canvas");
-  return html2canvas(el, { backgroundColor: "#ffffff", scale: 2 });
-}
-
-// On a phone this opens the native share sheet (WhatsApp, etc.) straight from the file;
-// otherwise it falls back to a plain download.
-async function shareOrDownload(blob, filename, mime, title) {
-  try {
-    const file = new File([blob], filename, { type: mime });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title });
-      return;
-    }
-  } catch {
-    // share failed or was cancelled — fall back to a plain download below
-  }
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
 // "DOMINGO - 02/08/2026" (PT) / "SUNDAY - 08/02/2026" (EN)
@@ -81,34 +54,12 @@ export default function WorshipListSharedView({ id, lang = "pt", setLang }) {
 
   const cell = { border: `2px solid ${NAVY}`, padding: "14px 12px" };
 
-  const downloadImage = async () => {
-    setExporting("image"); setExportError(false);
-    try {
-      const canvas = await renderCanvas(cardRef.current);
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-      if (!blob) throw new Error("empty blob");
-      await shareOrDownload(blob, `${fileBase(list)}.png`, "image/png", tt.praiseSharedTitle);
-    } catch {
-      setExportError(true);
-    } finally {
-      setExporting(null);
-    }
+  const runExport = async (kind, make) => {
+    setExporting(kind); setExportError(false);
+    try { await make(); } catch { setExportError(true); } finally { setExporting(null); }
   };
-
-  const downloadPdf = async () => {
-    setExporting("pdf"); setExportError(false);
-    try {
-      const canvas = await renderCanvas(cardRef.current);
-      const { jsPDF } = await import("jspdf");
-      const doc = new jsPDF({ unit: "px", format: [canvas.width, canvas.height] });
-      doc.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, canvas.width, canvas.height);
-      await shareOrDownload(doc.output("blob"), `${fileBase(list)}.pdf`, "application/pdf", tt.praiseSharedTitle);
-    } catch {
-      setExportError(true);
-    } finally {
-      setExporting(null);
-    }
-  };
+  const downloadImage = () => runExport("image", () => exportImage(cardRef.current, fileBase(list), tt.praiseSharedTitle));
+  const downloadPdf = () => runExport("pdf", () => exportPdf(cardRef.current, fileBase(list), tt.praiseSharedTitle));
 
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(160deg,#8B0000 0%,#b41926 50%,#03223f 100%)", display: "flex", justifyContent: "center", padding: "32px 16px" }}>

@@ -115,3 +115,13 @@ export function roleTotals(chart) {
   chart.polos.forEach((p) => p.churches.forEach(add));
   return orderedRoles([...counts.keys()], "all").map((role) => ({ role, count: counts.get(role) }));
 }
+
+// Drawing: every function row inside a church box can be opened or closed. Pastor, Ungido and Diácono start
+// open (listed by name); Obreiro starts closed (just the count), since a church can have a dozen of them.
+export const CLOSED_BY_DEFAULT = ["Obreiro"];
+export const rowKey = (church, role) => `${church.id || church.display}|${role}`;
+export const isRowOpen = (overrides, key, role) => (overrides.has(key) ? overrides.get(key) : !CLOSED_BY_DEFAULT.includes(role));
+
+// Every (church, function) row of the chart, to open or close them all at once.
+export const allRows = (chart) =>
+  chart.polos.flatMap((p) => p.churches).flatMap((c) => c.byRole.map((r) => ({ key: rowKey(c, r.role), role: r.role })));
