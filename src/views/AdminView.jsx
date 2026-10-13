@@ -1190,6 +1190,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
   const [filterType, setFilterType] = useState(""); // "" | "members" | "visitors"
   const [filterChurch, setFilterChurch] = useState("");
   const [filterGa, setFilterGa] = useState("");
+  const [filterGender, setFilterGender] = useState(""); // "" | "M" | "F"
   const [editing, setEditing] = useState(null);
   const [formData, setFormData] = useState({});
   const [deleting, setDeleting] = useState(null); // { ids:[], label:"" }
@@ -1214,7 +1215,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
   const ChTh = makeTh(chSk, chSd, chToggle);
   const MbTh = makeTh(mbSk, mbSd, mbToggle);
 
-  const switchTab = (id) => { setTab(id); setSearch(""); setEditing(null); setSelected([]); setFormData({}); setFilterChurch(""); setFilterGa(""); setGroupBy(""); setFilterType(""); };
+  const switchTab = (id) => { setTab(id); setSearch(""); setEditing(null); setSelected([]); setFormData({}); setFilterChurch(""); setFilterGa(""); setGroupBy(""); setFilterType(""); setFilterGender(""); };
 
   // ── Helpers ──────────────────────────────────────────────────────────────
   const toggleSel = (id) => setSelected((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
@@ -1320,14 +1321,19 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
                 ))}
               </div>
               <div className="pt">
+                {[["", "Ambos"], ["M", "Masculino"], ["F", "Feminino"]].map(([v, l]) => (
+                  <button key={v} className={`pt-btn ${filterGender === v ? "active" : ""}`} onClick={() => setFilterGender(v)}>{l}</button>
+                ))}
+              </div>
+              <div className="pt">
                 {[["", "Sem agrup."], ["church", "Por Igreja"], ["ga", "Por Grupo"], ["family", "Por Família"]].map(([v, l]) => (
                   <button key={v} className={`pt-btn ${groupBy === v ? "active" : ""}`} onClick={() => setGroupBy(v)}>{l}</button>
                 ))}
               </div>
             </>
           )}
-          {(filterChurch || filterGa || filterType) && (
-            <button className="btn btn-ghost btn-sm" onClick={() => { setFilterChurch(""); setFilterGa(""); setFilterType(""); }}>✕ Limpar</button>
+          {(filterChurch || filterGa || filterType || filterGender) && (
+            <button className="btn btn-ghost btn-sm" onClick={() => { setFilterChurch(""); setFilterGa(""); setFilterType(""); setFilterGender(""); }}>✕ Limpar</button>
           )}
         </>
       )}
@@ -1550,6 +1556,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
             else if (filterGa && filterGa !== "__none__" && m.gaId !== filterGa) return false;
             if (filterType === "members" && m.isGuest) return false;
             if (filterType === "visitors" && !m.isGuest) return false;
+            if (filterGender && m.gender !== filterGender) return false;
             if (!search) return true;
             return ["name", "firstName", "lastName", "church", "category", "role", "badgeName"].some((f) => norm(m[f]).includes(norm(search))) ||
               norm((gas || []).find((g) => g.id === m.gaId)?.name || "").includes(norm(search));
