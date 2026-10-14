@@ -11,6 +11,7 @@ vi.mock("@/views/AdminView", () => ({
   AdminImport: () => <div>conteúdo-importar</div>,
   AdminUsers: () => <div>conteúdo-usuarios</div>,
 }));
+vi.mock("@/components/directory/OverviewPanel", () => ({ default: () => <div>conteúdo-visao-geral</div> }));
 vi.mock("@/views/admin/FuncoesTab", () => ({ default: () => <div>conteúdo-funcoes</div> }));
 vi.mock("@/views/admin/ListasTab", () => ({ default: () => <div>conteúdo-listas</div> }));
 vi.mock("@/views/admin/AuditLogTab", () => ({ default: () => <div>conteúdo-auditoria</div> }));
@@ -20,8 +21,10 @@ const admin = { sysRole: "admin", sysRoles: ["admin"] };
 const clerk = { sysRole: "clerk", sysRoles: ["clerk"] };
 
 describe("Diretório section (items moved out of Eventos)", () => {
-  it("gives the admin Diretório, Grupos de Assistência, Funções and Importar", () => {
+  it("opens the admin on the Visão Geral, with Diretório, Grupos de Assistência, Funções and Importar next to it", () => {
     withUser(admin, <CMSSection lang="pt" />);
+    expect(screen.getByText("conteúdo-visao-geral")).toBeTruthy();
+    fireEvent.click(screen.getAllByText("Diretório")[0]);
     expect(screen.getByText("conteúdo-diretorio")).toBeTruthy();
     fireEvent.click(screen.getAllByText("Grupos de Assistência")[0]);
     expect(screen.getByText("conteúdo-ga")).toBeTruthy();
@@ -31,9 +34,19 @@ describe("Diretório section (items moved out of Eventos)", () => {
     expect(screen.getByText("conteúdo-importar")).toBeTruthy();
   });
 
-  it("does not open the admin tools to other profiles", () => {
-    withUser(clerk, <CMSSection lang="pt" />);
-    expect(screen.queryByText("conteúdo-diretorio")).toBeNull();
+  it("gives pastors and church secretaries only the Visão Geral — none of the admin tools", () => {
+    for (const user of [clerk, { sysRole: "pastor", sysRoles: ["pastor"] }]) {
+      const { unmount } = withUser(user, <CMSSection lang="pt" />);
+      expect(screen.getByText("conteúdo-visao-geral")).toBeTruthy();
+      expect(screen.queryByText("Grupos de Assistência")).toBeNull();
+      expect(screen.queryByText("conteúdo-diretorio")).toBeNull();
+      unmount();
+    }
+  });
+
+  it("keeps the placeholder for profiles with no Diretório role", () => {
+    withUser({ sysRole: "team_leader", sysRoles: ["team_leader"] }, <CMSSection lang="pt" />);
+    expect(screen.queryByText("conteúdo-visao-geral")).toBeNull();
     expect(screen.getByText(/Em construção/)).toBeTruthy();
   });
 });

@@ -29,6 +29,7 @@ Run these files **in order** using the Supabase SQL editor or `psql`. Each migra
 | `028_door_schedule.sql` | Creates `door_workers` (door-duty workers + `days` availability), `door_months` (generated month, people per service, `published_at`) and `door_assignments` (who is on each service), RLS disabled. Used by Escalas › Portaria and the public `/portaria/YYYY-MM` page; both fail without it. Apply **before** deploying the code that uses it. |
 | `028_org_responsibles.sql` | Creates `org_responsibles` (who is responsible / co-responsible for the Área, each Polo and each Igreja in the Organograma; a member or a typed name), RLS disabled, and seeds the first responsibles. Apply **before** deploying the code that uses it. |
 | `030_lookup_lists.sql` | Creates `immigration_statuses`, `expense_categories` and `income_types` (the lists edited in Configurações › Listas) with RLS disabled, seeded with the values the app already used as fallbacks. Fixes "Could not find the table 'public.immigration_statuses' in the schema cache". Safe to re-run. |
+| `031_user_church_scope.sql` | Adds `app_users.churches` and `set_user_churches()` (the church scope picked in Usuários & PINs, which never reached the database) and seeds Pr Jairo (Newark, Philadelphia) and Pr Dilton (New York). Needed by the Diretório › Visão Geral access rules. Apply **before** deploying. |
 
 ## How to run
 

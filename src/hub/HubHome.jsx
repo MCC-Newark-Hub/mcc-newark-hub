@@ -19,7 +19,7 @@ const SECTIONS = [
     color: "#03223f",
     pt: { label: "Diretório", desc: "Membros, famílias, grupos e funções" },
     en: { label: "Directory", desc: "Members, families, groups and roles" },
-    roles: ["admin", "clerk"],
+    roles: ["admin", "clerk", "pastor"],
     live: true,
   },
   {

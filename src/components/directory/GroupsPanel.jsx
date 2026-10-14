@@ -77,7 +77,7 @@ export default function GroupsPanel({ members, setMembers, gas, setGas, churches
 
   const rawList = (gas || []).filter((g) =>
     ["name", "church"].some((f) => norm(g[f]).includes(norm(search)))
-  ).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  ).sort((a, b) => (a.church || "").localeCompare(b.church || "", "pt") || (a.name || "").localeCompare(b.name || "", "pt", { numeric: true })); // by church first: a GA belongs to a church
   const list = sortData(rawList, gaSk, gaSd);
   const allIds = list.map((g) => g.id).filter(Boolean);
 
