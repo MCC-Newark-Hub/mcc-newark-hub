@@ -13,6 +13,7 @@ export function mapMember(m) {
     gender: m.gender,
     category: m.category,
     church: m.church,
+    createdAt: m.created_at || null,
     role: m.role || '',
     roles: m.roles || (m.role ? [m.role] : []),
     familyId: m.family_id,

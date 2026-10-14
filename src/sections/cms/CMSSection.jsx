@@ -1,26 +1,38 @@
 import { useState } from "react";
-import { BookOpen, Building2, Star, Upload } from "lucide-react";
-import { ROLES_SYS } from "@/constants";
+import { BookOpen, Building2, Star, Upload, LayoutDashboard } from "lucide-react";
 import { useAppDataContext } from "@/context/AppDataContext";
 import { useTopbarContent } from "@/context/TopbarContext";
 import Sidebar from "@/components/Sidebar";
 import FuncoesTab from "@/views/admin/FuncoesTab";
+import OverviewPanel from "@/components/directory/OverviewPanel";
 import { AdminDirectory, AdminGA, AdminImport } from "@/views/AdminView";
 
 // Diretório: members, families, groups and functions — the tools that used to sit in the Eventos menu.
-// They are admin-only (as they were), so any other profile that reaches /cms still gets the placeholder.
+// The tools are admin-only (as they were). Pastors and church secretaries get just the Visão Geral, limited to the
+// churches their access allows (see scopeFor); any other profile that reaches /cms gets the placeholder.
 export default function CMSSection({ lang }) {
   const props = useAppDataContext() || {};
-  const role = props.user?.primaryRole || props.user?.sysRole;
-  if (role !== ROLES_SYS.ADMIN) return <CMSPlaceholder lang={lang} />;
-  return <CMSAdmin props={props} lang={lang} />;
+  const roles = props.user?.sysRoles?.length ? props.user.sysRoles : [props.user?.sysRole];
+  if (roles.includes("admin")) return <CMSAdmin props={props} lang={lang} />;
+  if (roles.includes("pastor") || roles.includes("clerk")) return <CMSOverviewOnly lang={lang} />;
+  return <CMSPlaceholder lang={lang} />;
+}
+
+function CMSOverviewOnly({ lang }) {
+  useTopbarContent({ title: lang === "en" ? "Directory" : "Diretório" });
+  return (
+    <div className="app-shell">
+      <div className="main-scroll"><div className="page-pad"><OverviewPanel /></div></div>
+    </div>
+  );
 }
 
 function CMSAdmin({ props, lang }) {
   const pt = lang !== "en";
-  const [sec, setSec] = useState("directory");
+  const [sec, setSec] = useState("overview");
   useTopbarContent({ title: pt ? "Diretório" : "Directory" });
   const navItems = [
+    { id: "overview", icon: <LayoutDashboard size={16} />, label: pt ? "Visão Geral" : "Overview" },
     { id: "directory", icon: <BookOpen size={16} />, label: pt ? "Diretório" : "Directory" },
     { id: "ga", icon: <Building2 size={16} />, label: pt ? "Grupos de Assistência" : "Assistance groups" },
     { id: "funcoes", icon: <Star size={16} />, label: pt ? "Funções" : "Functions" },
@@ -32,6 +44,7 @@ function CMSAdmin({ props, lang }) {
         <Sidebar navItems={navItems} activeId={sec} onSelect={setSec} />
         <div className="main-scroll">
           <div className="page-pad">
+            {sec === "overview" && <OverviewPanel />}
             {sec === "directory" && <AdminDirectory {...props} />}
             {sec === "ga" && <AdminGA {...props} />}
             {sec === "funcoes" && <FuncoesTab members={props.members} setMembers={props.setMembers} gas={props.gas} notify={props.notify} logAudit={props.logAudit} />}

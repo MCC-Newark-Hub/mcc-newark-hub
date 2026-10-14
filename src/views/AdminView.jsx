@@ -1,8 +1,9 @@
 import { useState, useRef, Fragment } from "react";
 import { LayoutDashboard, ClipboardList, Users, Clock, BarChart2, Calendar, Check, Plus, FolderOpen, Eye, EyeOff, Pencil, Trash2, ChevronDown, ChevronUp, X, IdCard, UtensilsCrossed, Download, DollarSign } from "lucide-react";
-import { useT } from "@/i18n/strings";
+import { useT, fill } from "@/i18n/strings";
 import { CATEGORIES, TEAMS, ROLE_BADGE, ROLE_GROUPS, fmt, classifyVoice, normalizeNote, isValidNote } from "@/constants";
 import { sb } from "@/lib/supabase";
+import { groupGasByChurch } from "@/lib/gaGroups";
 import { eventSubtitle } from "@/lib/registrationDeadline";
 import { useTopbarContent } from "@/context/TopbarContext";
 import Sidebar from "@/components/Sidebar";
@@ -302,54 +303,64 @@ export function AdminGA({ gas, setGas, members, churches, regs, event, notify })
         <h2 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 22 }}>{t.groups}</h2>
         <button className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={() => setShowNew(true)}><Plus size={14} /> {t.newGA}</button>
       </div>
-      <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 14 }}>One church can have multiple groups.</p>
-      {gas.map((ga) => {
-        const gam = members.filter((m) => m.gaId === ga.id);
-        const lead = members.find((m) => m.id === ga.leaderId);
-        const counts = { confirmed: 0, pending: 0, not_registered: 0 };
-        gam.forEach((m) => counts[getStatus(m.id)]++);
-        const isOpen = open === ga.id;
-        return (
-          <div className="card" key={ga.id} style={{ marginBottom: 10, padding: 0, overflow: "hidden" }}>
-            <div style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", flexWrap: "wrap", gap: 8 }} onClick={() => setOpen(isOpen ? null : ga.id)}>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 15 }}>{ga.name}</div>
-                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{ga.church} · {t.leader}: {lead?.name || t.noLeader} · {gam.length} {t.members}</div>
-              </div>
-              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                {counts.confirmed > 0 && <span className="badge badge-green">{counts.confirmed}✓</span>}
-                {counts.pending > 0 && <span className="badge badge-yellow">{counts.pending} <Clock size={10} /></span>}
-                {counts.not_registered > 0 && <span className="badge badge-gray">{counts.not_registered}○</span>}
-                <span style={{ color: "#6b7280" }}>{isOpen ? "▲" : "▼"}</span>
-              </div>
-            </div>
-            {isOpen && (
-              <div style={{ borderTop: "1px solid var(--border)" }}>
-                <div className="table-wrap">
-                  <table className="table">
-                    <thead><tr><th>{t.memberName}</th><th>{t.cat}</th><th>{t.cargo}</th><th>{t.regH}</th><th>{t.payH}</th></tr></thead>
-                    <tbody>
-                      {gam.map((m) => {
-                        const s = getStatus(m.id);
-                        const r = eventRegs.find((x) => x.memberId === m.id);
-                        return (
-                          <tr key={m.id}>
-                            <td style={{ fontWeight: 600 }}>{m.name}</td>
-                            <td><span className="badge badge-blue">{m.category}</span></td>
-                            <td>{m.role ? <span className={`badge ${ROLE_BADGE[m.role]}`}>{m.role}</span> : <span style={{ color: "#9ca3af" }}>—</span>}</td>
-                            <td>{s === "not_registered" ? <span className="badge badge-gray">○ {t.notRegistered}</span> : s === "pending" ? <span className="badge badge-yellow"><Clock size={10} /></span> : <span className="badge badge-green"><Check size={10} /></span>}</td>
-                            <td>{!r ? "—" : r.exempt ? <span style={{ color: "#6b7280" }}>{t.exempt}</span> : r.paid ? <span style={{ color: "#2d8a4e", fontWeight: 600 }}><Check size={10} /> {fmt(r.fee)}</span> : <span style={{ color: "#d4820a", fontWeight: 600 }}><Clock size={10} /> {fmt(r.fee)}</span>}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+      <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 14 }}>{t.gaSubtitle}</p>
+      {groupGasByChurch(gas, members).map((churchGroup) => (
+        <section key={churchGroup.church || "__none__"} style={{ marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", margin: "0 0 10px", paddingBottom: 6, borderBottom: "2px solid var(--border)" }}>
+            <h3 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 18, fontWeight: 700 }}>{churchGroup.church || t.gaNoChurch}</h3>
+            <span style={{ fontSize: 12, color: "var(--muted)" }}>
+              {churchGroup.gas.length === 1 ? t.gaGroupsOne : fill(t.gaGroupsMany, { n: churchGroup.gas.length })} · {churchGroup.members} {t.members}
+            </span>
+          </div>
+        {churchGroup.gas.map((ga) => {
+          const gam = members.filter((m) => m.gaId === ga.id);
+          const lead = members.find((m) => m.id === ga.leaderId);
+          const counts = { confirmed: 0, pending: 0, not_registered: 0 };
+          gam.forEach((m) => counts[getStatus(m.id)]++);
+          const isOpen = open === ga.id;
+          return (
+            <div className="card" key={ga.id} style={{ marginBottom: 10, padding: 0, overflow: "hidden" }}>
+              <div style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", flexWrap: "wrap", gap: 8 }} onClick={() => setOpen(isOpen ? null : ga.id)}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>{ga.name}</div>
+                  <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{t.leader}: {lead?.name || t.noLeader} · {gam.length} {t.members}</div>
+                </div>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  {counts.confirmed > 0 && <span className="badge badge-green">{counts.confirmed}✓</span>}
+                  {counts.pending > 0 && <span className="badge badge-yellow">{counts.pending} <Clock size={10} /></span>}
+                  {counts.not_registered > 0 && <span className="badge badge-gray">{counts.not_registered}○</span>}
+                  <span style={{ color: "#6b7280" }}>{isOpen ? "▲" : "▼"}</span>
                 </div>
               </div>
-            )}
-          </div>
-        );
-      })}
+              {isOpen && (
+                <div style={{ borderTop: "1px solid var(--border)" }}>
+                  <div className="table-wrap">
+                    <table className="table">
+                      <thead><tr><th>{t.memberName}</th><th>{t.cat}</th><th>{t.cargo}</th><th>{t.regH}</th><th>{t.payH}</th></tr></thead>
+                      <tbody>
+                        {gam.map((m) => {
+                          const s = getStatus(m.id);
+                          const r = eventRegs.find((x) => x.memberId === m.id);
+                          return (
+                            <tr key={m.id}>
+                              <td style={{ fontWeight: 600 }}>{m.name}</td>
+                              <td><span className="badge badge-blue">{m.category}</span></td>
+                              <td>{m.role ? <span className={`badge ${ROLE_BADGE[m.role]}`}>{m.role}</span> : <span style={{ color: "#9ca3af" }}>—</span>}</td>
+                              <td>{s === "not_registered" ? <span className="badge badge-gray">○ {t.notRegistered}</span> : s === "pending" ? <span className="badge badge-yellow"><Clock size={10} /></span> : <span className="badge badge-green"><Check size={10} /></span>}</td>
+                              <td>{!r ? "—" : r.exempt ? <span style={{ color: "#6b7280" }}>{t.exempt}</span> : r.paid ? <span style={{ color: "#2d8a4e", fontWeight: 600 }}><Check size={10} /> {fmt(r.fee)}</span> : <span style={{ color: "#d4820a", fontWeight: 600 }}><Clock size={10} /> {fmt(r.fee)}</span>}</td>
+                            </tr>
+                          );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+          })}
+        </section>
+      ))}
       {showNew && (
         <div className="modal-bg" onClick={(e) => e.target === e.currentTarget && setShowNew(false)}>
           <div className="modal">
