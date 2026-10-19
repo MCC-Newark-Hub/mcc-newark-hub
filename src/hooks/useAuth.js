@@ -6,8 +6,9 @@ export function useAuth(dbUsers) {
   const [user, setUser] = useState(null);
 
   const login = function (pin) {
+    // an inactive account (active === false) can no longer sign in
     var u = dbUsers.find(function (x) {
-      return x.pin === pin;
+      return x.pin === pin && x.active !== false;
     });
     if (!u)
       u = INIT_USERS.find(function (x) {

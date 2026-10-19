@@ -850,6 +850,17 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
   };
   const cancel = () => setEditing(null);
 
+  // Switch an account off (or back on) instead of deleting it: it stops signing in, the audit log keeps its name.
+  const setActive = async (u, active) => {
+    const activeAdmins = (dbUsers || []).filter((x) => x.active !== false && (x.sys_roles || [x.sys_role]).includes("admin"));
+    if (!active && activeAdmins.length === 1 && activeAdmins[0].id === u.id) { notify("Não dá para desativar o último administrador ativo."); return; }
+    if (!active && !window.confirm(`Desativar "${u.name}"? A conta deixa de entrar no sistema, mas pode ser reativada.`)) return;
+    const { data, error } = await sb.from("app_users").update({ active }).eq("id", u.id).select();
+    if (error || !data?.length) { notify("Erro ao salvar: " + (error?.message || "usuário não encontrado")); return; }
+    setDbUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, active } : x)));
+    logAudit?.(active ? "app_user_reactivated" : "app_user_deactivated", "app_user", u.id, u.name, {});
+  };
+
   const save = async () => {
     if (!editing.name.trim()) { notify("Nome é obrigatório."); return; }
     if (editing.newPin && editing.newPin.length !== 4) { notify("PIN deve ter 4 dígitos."); return; }
@@ -1112,11 +1123,11 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
           </thead>
           <tbody>
             {sortData(dbUsers, sk, sd).map((u) => (
-              <tr key={u.id}>
+              <tr key={u.id} style={{ opacity: u.active === false ? 0.55 : 1 }}>
                 <td>
                   <div className="avatar" style={{ width: 28, height: 28, fontSize: 10 }}>{u.initials || u.name?.slice(0, 2).toUpperCase()}</div>
                 </td>
-                <td style={{ fontWeight: 600 }}>{u.name}</td>
+                <td style={{ fontWeight: 600 }}>{u.name}{u.active === false && <span className="badge badge-gray" style={{ marginLeft: 6 }}>Inativa</span>}</td>
                 <td>
                   {(u.sys_roles?.length ? u.sys_roles : [u.sys_role || u.sysRole]).map((r) => (
                     <span key={r} className="badge badge-blue" style={{ marginRight: 2 }}>{ROLE_LABELS[r] || r}</span>
@@ -1145,9 +1156,10 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
                   </div>
                 </td>
                 <td>
-                  <button className="btn btn-ghost btn-sm" onClick={() => startEdit(u)}>
-                    Editar
-                  </button>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => startEdit(u)}>Editar</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setActive(u, u.active === false)}>{u.active === false ? "Reativar" : "Desativar"}</button>
+                  </div>
                 </td>
               </tr>
             ))}
