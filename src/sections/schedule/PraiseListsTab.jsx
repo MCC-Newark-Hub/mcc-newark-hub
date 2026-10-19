@@ -5,7 +5,7 @@ import { ServiceListForm } from "@/views/WorshipListPublicView";
 import { useAppDataContext } from "@/context/AppDataContext";
 import { STRINGS, fill } from "@/i18n/strings";
 import { fetchSongs, fetchRecentLists, updateSong, deleteSong, updateList, deleteList } from "@/lib/praiseData";
-import { CATEGORIES, THEMES, themeApplies, dateKey, isListLocked, songLabel, canManagePraise, listPath, norm } from "@/lib/praiseLists";
+import { CATEGORIES, THEMES, themeApplies, dateKey, isListLocked, songLabel, songListLabel, canManagePraise, listPath, hasNumberPrefix, songErrorText, catalogTotals, filterCatalog } from "@/lib/praiseLists";
 
 const CAT_KEYS = { coletanea: "praiseCatColetanea", cia: "praiseCatCia", avulso: "praiseCatAvulso", english: "praiseCatEnglish" };
 const TYPE_KEYS = { ebd: "praiseTypeEbd", noite: "praiseTypeNoite", outro: "praiseTypeOutro" };
@@ -24,6 +24,7 @@ export default function PraiseListsTab({ lang }) {
   const [editing, setEditing] = useState(null);
   const [editorFor, setEditorFor] = useState(null); // { key, date, type } while the list editor is open
   const [catQuery, setCatQuery] = useState("");
+  const [catCategory, setCatCategory] = useState("all");
   const [catPage, setCatPage] = useState(1);
   const [catPerPage, setCatPerPage] = useState(20);
 
@@ -56,7 +57,7 @@ export default function PraiseListsTab({ lang }) {
 
   const saveEdit = async (patch) => {
     const { data, error } = await updateSong(editing.id, patch);
-    if (error) return error.code === "duplicate_code" ? fill(tt.praiseCodeTaken, { label: patch.code }) : tt.praiseSaveFailed;
+    if (error) return songErrorText(tt, error, patch.code);
     setSongs((prev) => prev.map((s) => (s.id === editing.id ? { ...s, ...data } : s)));
     setEditing(null);
     return "";
@@ -123,15 +124,32 @@ export default function PraiseListsTab({ lang }) {
       )}
 
       {sub === "catalog" && (() => {
-        const q = norm(catQuery);
-        const filtered = q
-          ? songs.filter((s) => norm(s.title).includes(q) || norm(s.code || "").includes(q) || norm(s.theme || "").includes(q))
-          : songs;
+        const filtered = filterCatalog(songs, catQuery, catCategory);
         const totalPages = Math.max(1, Math.ceil(filtered.length / catPerPage));
         const safePage = Math.min(catPage, totalPages);
         const pageSongs = filtered.slice((safePage - 1) * catPerPage, safePage * catPerPage);
+        const totals = catalogTotals(songs);
+        const fmt = (n) => n.toLocaleString(lang === "en" ? "en-US" : "pt-BR");
         return (
           <div>
+            <div role="group" aria-label={tt.praiseCatalogFilter} style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+              {[["all", tt.praiseCatalogTotal, totals.total], ...CATEGORIES.map((c) => [c, tt[CAT_KEYS[c]], totals.byCategory[c]])].map(([key, label, n]) => {
+                const active = catCategory === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    className="card"
+                    aria-pressed={active}
+                    onClick={() => { setCatCategory(key); setCatPage(1); }}
+                    style={{ padding: "8px 14px", minWidth: 92, minHeight: 44, textAlign: "left", cursor: "pointer", fontFamily: "inherit", color: "var(--text)", borderColor: active ? "var(--primary)" : undefined, background: active ? "var(--sidebar-active-bg)" : undefined, boxShadow: active ? "0 0 0 1px var(--primary)" : undefined }}
+                  >
+                    <div style={{ fontSize: 11, fontWeight: 700, color: active ? "var(--primary)" : "var(--muted)", textTransform: "uppercase", letterSpacing: ".6px" }}>{label}</div>
+                    <div style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 22, fontWeight: 700 }}>{fmt(n)}</div>
+                  </button>
+                );
+              })}
+            </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
               <input
                 value={catQuery}
@@ -210,7 +228,7 @@ export default function PraiseListsTab({ lang }) {
                     )}
                   </div>
                   <ol style={{ margin: "8px 0 0", paddingLeft: 20, fontSize: 14 }}>
-                    {l.items.map((i) => <li key={i.id}>{songLabel(songsById.get(i.song_id))}</li>)}
+                    {l.items.map((i) => <li key={i.id}>{songListLabel(songsById.get(i.song_id)) || "…"}</li>)}
                   </ol>
                 </div>
               );
@@ -267,9 +285,10 @@ function EditSongModal({ song, tt, canDelete, onClose, onSave, onDelete }) {
   const [form, setForm] = useState({ title: song.title, code: song.code || "", category: song.category, theme: song.theme || "", language: song.language || "pt", status: song.status });
   const [error, setError] = useState("");
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const numberInTitle = hasNumberPrefix(form.title);
 
   const submit = async () => {
-    if (!form.title.trim()) return;
+    if (!form.title.trim() || numberInTitle) return;
     setError(await onSave({ title: form.title, code: form.code.trim(), category: form.category, theme: themeApplies(form.category) ? form.theme || null : null, language: form.language, status: form.status }));
   };
 
@@ -277,7 +296,7 @@ function EditSongModal({ song, tt, canDelete, onClose, onSave, onDelete }) {
     <div className="modal-bg" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal" style={{ maxWidth: 440 }}>
         <div style={{ display: "grid", gap: 10 }}>
-          <div><label style={labelStyle}>{tt.praiseSongTitle}</label><input value={form.title} onChange={set("title")} style={inputStyle} maxLength={200} /></div>
+          <div><label style={labelStyle}>{tt.praiseSongTitle}</label><input value={form.title} onChange={set("title")} style={inputStyle} maxLength={200} />{numberInTitle && <p style={{ fontSize: 12, color: "#b91c1c", marginTop: 4 }}>{tt.praiseTitleNoNumber}</p>}</div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <div style={{ flex: "1 1 140px" }}>
               <label style={labelStyle}>{tt.praiseCategory}</label>
@@ -316,7 +335,7 @@ function EditSongModal({ song, tt, canDelete, onClose, onSave, onDelete }) {
           {error && <p style={{ color: "#b91c1c", fontSize: 13 }}>{error}</p>}
           <div style={{ display: "flex", gap: 8, justifyContent: "space-between", flexWrap: "wrap" }}>
             <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn btn-primary" onClick={submit}>{tt.praiseSaveChanges}</button>
+              <button className="btn btn-primary" onClick={submit} disabled={numberInTitle}>{tt.praiseSaveChanges}</button>
               <button className="btn btn-ghost" onClick={onClose}>{tt.praiseCancel}</button>
             </div>
             {canDelete && <button className="btn btn-danger" onClick={onDelete}><Trash2 size={14} /> {tt.praiseDeleteAction}</button>}
