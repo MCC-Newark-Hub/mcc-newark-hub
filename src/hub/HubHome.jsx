@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Calendar, BookOpen, Settings, Clock, GraduationCap } from "lucide-react";
+import { Calendar, BookOpen, Settings, Clock, GraduationCap, Music } from "lucide-react";
 
 const SECTIONS = [
   {
@@ -29,6 +29,16 @@ const SECTIONS = [
     color: "#065f46",
     pt: { label: "Escalas", desc: "Portaria, flores e agenda de oração 24h" },
     en: { label: "Schedules", desc: "Door duty, flowers and 24h prayer agenda" },
+    roles: ["admin", "clerk", "pastor", "ga_leader", "team_leader", "treasurer"],
+    live: true,
+  },
+  {
+    id: "worship",
+    path: "/worship",
+    icon: Music,
+    color: "#7c3aed",
+    pt: { label: "Culto Profético", desc: "Lista de louvores, catálogo e histórico" },
+    en: { label: "Prophetic Service", desc: "Praise song lists, catalogue and history" },
     roles: ["admin", "clerk", "pastor", "ga_leader", "team_leader", "treasurer"],
     live: true,
   },

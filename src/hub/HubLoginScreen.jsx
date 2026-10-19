@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { STRINGS } from "@/i18n/strings";
 import { MAINTENANCE_MODE } from "@/constants";
 import ICMLogo from "@/components/ICMLogo";
@@ -10,17 +10,13 @@ export default function HubLoginScreen({ login, lang, setLang }) {
   const t = STRINGS[lang] || STRINGS.pt;
   const pt = lang !== "en";
   const navigate = useNavigate();
-  const location = useLocation();
   const [pin, setPin] = useState("");
   const [err, setErr] = useState("");
 
   const handleSubmit = (p) => {
     if (login(p)) {
-      const from = location.state?.from;
-      const STAFF_VIEWS = ["admin", "clerk", "pastor", "ga_leader", "team_leader", "treasurer"];
-      // Legacy mcc_view values map to /events
-      const dest = from && !STAFF_VIEWS.includes(from) ? from : "/";
-      navigate(dest, { replace: true });
+      // Always land on the Home: it shows the modules (cards) the person's profile can open.
+      navigate("/", { replace: true });
     } else if (MAINTENANCE_MODE) {
       setErr(pt ? "PIN incorreto ou acesso restrito durante a manutenção." : "Incorrect PIN or access restricted during maintenance.");
       setPin("");

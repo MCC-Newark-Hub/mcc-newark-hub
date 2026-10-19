@@ -8,6 +8,7 @@ const SECTION_LABELS = {
   "/cms":      { pt: "Diretório",      en: "Directory" },
   "/settings": { pt: "Configurações",  en: "Settings" },
   "/schedule": { pt: "Agenda",         en: "Schedule" },
+  "/worship":  { pt: "Culto Profético", en: "Prophetic Service" },
   "/apprentice":{ pt: "Aprendiz",      en: "Apprentice" },
 };
 

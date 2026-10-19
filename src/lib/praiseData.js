@@ -1,6 +1,6 @@
 // Supabase access for the Lista de Louvores. Every function resolves to { data, error } and never throws.
 import { sb } from "@/lib/supabase";
-import { normalizeCode, isValidCode, hasNumberPrefix } from "@/lib/praiseLists";
+import { normalizeCode, isValidCode, hasNumberPrefix, formatSongTitle } from "@/lib/praiseLists";
 
 const UNIQUE_VIOLATION = "23505";
 
@@ -50,7 +50,7 @@ export async function createSong({ code, title, category, theme, language, statu
   if (invalid) return { data: null, error: invalid };
   const row = {
     code: code ? normalizeCode(code) : null,
-    title: title.trim(),
+    title: formatSongTitle(title),
     category,
     theme: theme || null,
     language: withLanguage(category, language),
@@ -68,7 +68,7 @@ export async function updateSong(id, patch) {
   const clean = { ...patch };
   if (clean.category === "english") clean.language = "en";
   if ("code" in clean) clean.code = clean.code ? normalizeCode(clean.code) : null;
-  if ("title" in clean) clean.title = clean.title.trim();
+  if ("title" in clean) clean.title = formatSongTitle(clean.title);
   const { data, error } = await sb.from("praise_songs").update(clean).eq("id", id).select();
   if (error) return { data: null, error: error.code === UNIQUE_VIOLATION ? { ...error, code: "duplicate_code" } : error };
   if (!data?.length) return { data: null, error: { code: "not_found", message: "No row updated" } };

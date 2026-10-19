@@ -3,8 +3,8 @@ import { Plus } from "lucide-react";
 import { fill } from "@/i18n/strings";
 import { createSong } from "@/lib/praiseData";
 import {
-  CATEGORIES, THEMES, themeApplies, searchSongs, findSimilarSongs, categoryFromCode, normalizeCode, recency, songLabel, sungText,
-  hasNumberPrefix, songErrorText,
+  CATEGORIES, THEMES, themeApplies, searchSongs, findSimilarSongs, categoryFromCode, normalizeCode, formatCode, recency, songLabel, sungText,
+  hasNumberPrefix, songErrorText, upperTitle,
 } from "@/lib/praiseLists";
 
 const inputStyle = { width: "100%", padding: "9px 12px", borderRadius: 8, border: "1.5px solid var(--border)", fontSize: 14, background: "var(--card)", color: "var(--text)", fontFamily: "'Montserrat',sans-serif", boxSizing: "border-box" };
@@ -49,6 +49,7 @@ export default function SongPicker({ songs, excludeIds = [], onPick, onCreated, 
                 style={{ display: "flex", width: "100%", alignItems: "center", gap: 8, flexWrap: "wrap", textAlign: "left", padding: "10px 12px", background: "none", border: "none", borderBottom: "1px solid var(--border)", cursor: inList ? "not-allowed" : "pointer", opacity: inList ? 0.5 : 1, color: "var(--text)", fontFamily: "'Montserrat',sans-serif", fontSize: 14 }}
               >
                 <span style={{ fontWeight: 600 }}>{songLabel(s)}</span>
+                <span className="badge badge-gray">{tt[CAT_KEYS[s.category]]}</span>
                 {s.status === "pending" && <span className="badge badge-yellow">{tt.praisePending}</span>}
                 {inList && <span className="badge badge-gray">{tt.praiseAlreadyInList}</span>}
                 {r && !inList && <span style={{ fontSize: 12, color: "var(--muted)" }}>{sungText(tt, r.days)}</span>}
@@ -84,10 +85,12 @@ export default function SongPicker({ songs, excludeIds = [], onPick, onCreated, 
 }
 
 function NewSongForm({ initial, songs, tt, createdBy, autoApprove, onCancel, onCreated }) {
-  // What was typed looks like a code ("cl 1", "ENG-31")? Start from it; otherwise it is a title.
+  // What was typed is a number ("198"), looks like a code ("cl 1", "ENG-31") or is a title. The prefix is internal:
+  // people only type the number, and the category decides the prefix.
   const typedCategory = categoryFromCode(initial);
-  const [code, setCode] = useState(typedCategory ? normalizeCode(initial) : "");
-  const [title, setTitle] = useState(typedCategory ? "" : initial);
+  const typedNumber = typedCategory ? normalizeCode(initial).split("-")[1] : /^\d{1,4}$/.test(initial.trim()) ? initial.trim() : "";
+  const [number, setNumber] = useState(typedNumber ? String(Number(typedNumber)) : "");
+  const [title, setTitle] = useState(typedNumber ? "" : upperTitle(initial));
   const [category, setCategory] = useState(typedCategory || "avulso");
   const [theme, setTheme] = useState("");
   const [language, setLanguage] = useState("pt");
@@ -95,25 +98,19 @@ function NewSongForm({ initial, songs, tt, createdBy, autoApprove, onCancel, onC
   const [error, setError] = useState("");
 
   const similar = useMemo(() => findSimilarSongs(title, songs), [title, songs]);
-  const normalizedCode = code.trim() ? normalizeCode(code) : "";
-  const taken = normalizedCode ? songs.find((s) => s.code === normalizedCode) : null;
+  const code = number ? formatCode(category, number) : "";
+  const taken = code ? songs.find((s) => s.code === code) : null;
   const numberInTitle = hasNumberPrefix(title);
-
-  const onCodeChange = (v) => {
-    setCode(v);
-    const cat = categoryFromCode(v);
-    if (cat) setCategory(cat);
-  };
 
   const submit = async () => {
     if (!title.trim() || taken || numberInTitle || busy) return;
     setBusy(true);
     setError("");
     const { data, error: err } = await createSong({
-      code: normalizedCode, title, category, theme: themeApplies(category) ? theme : "", language: category === "cia" ? language : "pt", status: autoApprove ? "active" : "pending", createdBy,
+      code, title, category, theme: themeApplies(category) ? theme : "", language: category === "cia" ? language : "pt", status: autoApprove ? "active" : "pending", createdBy,
     });
     setBusy(false);
-    if (err) { setError(songErrorText(tt, err, normalizedCode)); return; }
+    if (err) { setError(songErrorText(tt, err, number)); return; }
     onCreated(data);
   };
 
@@ -123,7 +120,7 @@ function NewSongForm({ initial, songs, tt, createdBy, autoApprove, onCancel, onC
       <div style={{ display: "grid", gap: 10 }}>
         <div>
           <label style={labelStyle}>{tt.praiseSongTitle}</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} style={inputStyle} maxLength={200} autoFocus />
+          <input value={title} onChange={(e) => setTitle(upperTitle(e.target.value))} style={inputStyle} maxLength={200} autoFocus />
           {numberInTitle && <p style={{ fontSize: 12, color: "#b91c1c", marginTop: 4 }}>{tt.praiseTitleNoNumber}</p>}
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -135,7 +132,7 @@ function NewSongForm({ initial, songs, tt, createdBy, autoApprove, onCancel, onC
           </div>
           <div style={{ flex: "1 1 140px" }}>
             <label style={labelStyle}>{tt.praiseCode}</label>
-            <input value={code} onChange={(e) => onCodeChange(e.target.value)} placeholder={tt.praiseCodeHint} style={inputStyle} maxLength={20} />
+            <input value={number} onChange={(e) => setNumber(e.target.value.replace(/\D/g, "").slice(0, 4))} inputMode="numeric" placeholder={tt.praiseCodeHint} style={inputStyle} maxLength={4} />
           </div>
         </div>
         {themeApplies(category) && (
