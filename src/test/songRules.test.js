@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { hasNumberPrefix, isValidCode, songErrorText, catalogTotals, filterCatalog, songListLabel } from "@/lib/praiseLists";
+import { hasNumberPrefix, isValidCode, songErrorText, catalogTotals, filterCatalog, songLabel, songNumber, searchSongs, formatSongTitle, upperTitle } from "@/lib/praiseLists";
 import { STRINGS } from "@/i18n/strings";
 
 const insert = vi.fn();
@@ -136,16 +136,49 @@ describe("filterCatalog", () => {
   });
 });
 
-describe("songListLabel", () => {
-  it("shows only the number, without the prefix", () => {
-    expect(songListLabel({ code: "CL-198", title: "Ele É a Minha Alegria" })).toBe("198 · Ele É a Minha Alegria");
-    expect(songListLabel({ code: "CIA-004", title: "Clamo, Ó Senhor" })).toBe("4 · Clamo, Ó Senhor");
-    expect(songListLabel({ code: "ENG-031", title: "Still" })).toBe("31 · Still");
+describe("numbers without the internal prefix", () => {
+  it("songNumber strips the prefix and the zero padding", () => {
+    expect(songNumber({ code: "CL-198" })).toBe("198");
+    expect(songNumber({ code: "CIA-004" })).toBe("4");
+    expect(songNumber({ code: "ENG-031" })).toBe("31");
+    expect(songNumber({ code: null })).toBe("");
+    expect(songNumber(undefined)).toBe("");
   });
-  it("shows just the title when the song has no number", () => {
-    expect(songListLabel({ code: null, title: "Em Caminhos de Dor" })).toBe("Em Caminhos de Dor");
+  it("songLabel shows only the number and the title, or just the title when there is no number", () => {
+    expect(songLabel({ code: "CL-198", title: "ELE É A MINHA ALEGRIA" })).toBe("198 · ELE É A MINHA ALEGRIA");
+    expect(songLabel({ code: "CIA-004", title: "CLAMO, Ó SENHOR" })).toBe("4 · CLAMO, Ó SENHOR");
+    expect(songLabel({ code: null, title: "EM CAMINHOS DE DOR" })).toBe("EM CAMINHOS DE DOR");
+    expect(songLabel(undefined)).toBe("");
   });
-  it("is empty for a song that is not loaded, so callers can show a placeholder", () => {
-    expect(songListLabel(undefined)).toBe("");
+  it("a plain number finds that number in every category, exact matches first", () => {
+    const songs = [
+      { id: "1", code: "CL-004", title: "QUANDO TE PROSTRARES", category: "coletanea" },
+      { id: "2", code: "CIA-004", title: "CLAMO, Ó SENHOR", category: "cia" },
+      { id: "3", code: "CL-041", title: "OUTRO", category: "coletanea" },
+      { id: "4", code: null, title: "SEM NUMERO", category: "avulso" },
+    ];
+    expect(searchSongs(songs, "4").map((x) => x.id).slice(0, 2).sort()).toEqual(["1", "2"]);
+    expect(searchSongs(songs, "004").map((x) => x.id).slice(0, 2).sort()).toEqual(["1", "2"]);
+    expect(searchSongs(songs, "41").map((x) => x.id)).toEqual(["3"]);
+    expect(searchSongs(songs, "cl 4").map((x) => x.id)[0]).toBe("1");
+  });
+});
+
+describe("titles are always UPPERCASE", () => {
+  it("formatSongTitle uppercases accents, trims and squeezes spaces", () => {
+    expect(formatSongTitle("  Quão grande   é o meu Deus ")).toBe("QUÃO GRANDE É O MEU DEUS");
+    expect(formatSongTitle("Ó, vem derramar (Salmo 23)")).toBe("Ó, VEM DERRAMAR (SALMO 23)");
+    expect(formatSongTitle(null)).toBe("");
+  });
+  it("upperTitle keeps the user's spaces while typing", () => {
+    expect(upperTitle("teus ")).toBe("TEUS ");
+  });
+  it("createSong saves the title in uppercase whatever was typed", async () => {
+    await createSong({ title: "Teus Sonhos", category: "avulso" });
+    expect(insert).toHaveBeenLastCalledWith(expect.objectContaining({ title: "TEUS SONHOS" }));
+  });
+  it("updateSong saves the title in uppercase too", async () => {
+    await updateSong("s1", { title: "supremo Deus (digno de louvor)" });
+    expect(update).toHaveBeenLastCalledWith(expect.objectContaining({ title: "SUPREMO DEUS (DIGNO DE LOUVOR)" }));
   });
 });

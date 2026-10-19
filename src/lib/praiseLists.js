@@ -96,18 +96,23 @@ export function categoryFromCode(code) {
   return CATEGORIES.find((c) => CODE_PREFIX[c] === prefix) || null;
 }
 
-// One search box for number and title. Ranked: exact code, code prefix, title prefix, title contains.
+// One search box for number and title. A plain number ("198") finds that number in every category (the prefixes are
+// internal); "cl 1" / "CIA-12" still work. Ranked: exact number/code, number/code prefix, title prefix, title contains.
 // Pending songs are searchable too (they are usable on a list before approval).
 export function searchSongs(songs, query, limit = 8) {
   const q = norm(query);
   if (!q) return [];
   const qCode = normalizeCode(query).toLowerCase();
+  const qNumber = /^\d+$/.test(q) ? String(Number(q)) : null;
   const scored = [];
   for (const s of songs || []) {
     const code = (s.code || "").toLowerCase();
     const title = norm(s.title);
+    const number = songNumber(s);
     let score = 0;
-    if (code && code === qCode) score = 100;
+    if (qNumber && number === qNumber) score = 100;
+    else if (qNumber && number && number.startsWith(qNumber)) score = 70;
+    else if (code && code === qCode) score = 100;
     else if (code && (code.startsWith(qCode) || code.replace(/-0*/, "-").startsWith(q))) score = 80;
     else if (title.startsWith(q)) score = 60;
     else if (title.includes(q)) score = 40;
@@ -177,19 +182,23 @@ export function renumber(items) {
   return items.map((it, i) => ({ ...it, position: i }));
 }
 
-// The label shown for a song everywhere: "CL-001 · Título" (avulso without code: just the title).
-export function songLabel(song) {
-  if (!song) return "";
-  return song.code ? `${song.code} · ${song.title}` : song.title;
+// The number of a song without its internal prefix: "CL-198" -> "198", "CIA-004" -> "4"; "" when it has none.
+// Prefixes (CL-, CIA-, ENG-, AVL-) are an internal detail: people only ever see and type the number.
+export function songNumber(song) {
+  const m = String(song?.code || "").match(/(\d+)$/);
+  return m ? String(Number(m[1])) : "";
 }
 
-// How a song reads inside a service list: "198 · Ele É a Minha Alegria" — only the number, no CL-/CIA- prefix.
-// Songs without a number (most Avulsos) show just the title.
-export function songListLabel(song) {
+// The label shown for a song everywhere: "198 · ELE É A MINHA ALEGRIA" (no number: just the title).
+export function songLabel(song) {
   if (!song) return "";
-  const m = String(song.code || "").match(/(\d+)$/);
-  return m ? `${Number(m[1])} · ${song.title}` : song.title;
+  const n = songNumber(song);
+  return n ? `${n} · ${song.title}` : song.title;
 }
+
+// Song titles are always stored in UPPERCASE (the house standard, as in the projection decks).
+export const upperTitle = (title) => String(title || "").toUpperCase();
+export const formatSongTitle = (title) => upperTitle(title).replace(/\s+/g, " ").trim();
 
 // "Cantado há 12 dias" in the current language (tt = STRINGS[lang]).
 export function sungText(tt, days) {

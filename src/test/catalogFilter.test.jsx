@@ -18,7 +18,7 @@ vi.mock("@/lib/praiseData", () => ({
 vi.mock("@/context/AppDataContext", () => ({ useAppDataContext: () => ({ user: { name: "Admin", sysRoles: ["admin"], teamLeads: [] }, notify: vi.fn() }) }));
 vi.mock("@/views/WorshipListPublicView", () => ({ ServiceListForm: () => null }));
 
-import PraiseListsTab from "@/sections/schedule/PraiseListsTab";
+import PraiseListsTab from "@/sections/worship/PraiseListsTab";
 
 const tt = STRINGS.pt;
 

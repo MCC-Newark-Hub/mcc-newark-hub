@@ -31,6 +31,7 @@ Notation: **[Button]** = click · → = next screen. Addresses are in `code`.
 | H2 | **Events**: one view per profile (see §3) | `/events` |
 | H3 | **Directory** | `/cms` |
 | H4 | **Schedules** | `/schedule` |
+| H4b | **Prophetic Service** (praise song lists, catalogue, history) | `/worship` |
 | H5 | **Settings** (administrator only) | `/settings` |
 | H6 | Apprentice (shown as "coming soon", no screen) | — |
 
@@ -74,7 +75,7 @@ Every PIN screen redirects to `/login` when the session has ended. Any unknown a
 1. Type the PIN (4 digits) → **[Sign in]**.
    - Wrong PIN: an error message and the field clears.
    - Maintenance mode: only the administrator (and Pr Nairon) get in; everyone else sees the notice.
-2. Goes to **H1** (or to the address that was being opened). The top bar shows the name, language, light/dark theme and **[Sign out]**.
+2. Always goes to **H1** (the Home with the cards of the person's profile). The top bar shows the name, language, light/dark theme and **[Sign out]**.
 3. Anyone with more than one profile sees **[Switch role]** and chooses which profile to use.
 
 ### 3.2 Home (H1)
@@ -85,6 +86,7 @@ Shows one card per module, depending on the profile:
 | Events | admin, secretary, pastor, GA leader, team leader, treasurer |
 | Directory | admin, secretary, pastor |
 | Schedules | all profiles |
+| Prophetic Service | all profiles (editing: administrators and the Praise Group leader) |
 | Apprentice (coming soon) | admin, secretary, pastor |
 | Settings | admin |
 
@@ -115,7 +117,10 @@ Shows one card per module, depending on the profile:
 - **Import:** upload the spreadsheet → review → confirm.
 
 ### 3.5 Schedules (H4), tabs
-**Door duty** (generate the month, adjust by hand, **[Publish]** → P6) · **Flowers** · **24h Prayer** (create a period, activate on the portal, import a spreadsheet, copy for WhatsApp) · **Praise Song List** (catalogue, approve songs, open and edit any list, **[Finalize]**).
+**Door duty** (generate the month, adjust by hand, **[Publish]** → P6) · **Flowers** · **24h Prayer** (create a period, activate on the portal, import a spreadsheet, copy for WhatsApp).
+
+### 3.5b Prophetic Service (H4b), tabs
+**Pending songs** · **Catalogue** (totals that double as category filters, search, edit the number, title and category) · **Lists** (every service list; open and edit any one, **[Finalize]**). Songs are shown by number only (`198 · TITLE`); the prefix is internal.
 
 ### 3.6 Settings (H5), tabs
 **Users & PINs** (create, **[Edit]**, **[Deactivate/Reactivate]**, choose profiles and churches) · **Lists** (immigration status, expense categories, income types, instruments, voices) · **Audit log** (who did what and when).

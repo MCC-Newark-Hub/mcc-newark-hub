@@ -1,15 +1,13 @@
 import { useState } from "react";
-import { DoorOpen, Flower2, Moon, Music } from "lucide-react";
+import { DoorOpen, Flower2, Moon } from "lucide-react";
 import RotationTab from "./RotationTab";
 import DoorTab from "./DoorTab";
 import OracaoTab from "./OracaoTab";
-import PraiseListsTab from "./PraiseListsTab";
 
 const TABS = [
   { id: "portaria", icon: DoorOpen, color: "#8B0000", pt: "Portaria",    en: "Door Duty"   },
   { id: "flores",   icon: Flower2,  color: "#065f46", pt: "Flores",      en: "Flowers"     },
   { id: "oracao",   icon: Moon,     color: "#1e40af", pt: "Oração 24h",  en: "24h Prayer"  },
-  { id: "musicas",  icon: Music,    color: "#7c3aed", pt: "Lista de Louvores", en: "Praise Song List" },
 ];
 
 export default function ScheduleSection({ lang }) {
@@ -49,7 +47,6 @@ export default function ScheduleSection({ lang }) {
         {tab === "portaria" && <DoorTab lang={lang} />}
         {tab === "flores"   && <RotationTab type="flores"   lang={lang} />}
         {tab === "oracao"   && <OracaoTab lang={lang} />}
-        {tab === "musicas"  && <PraiseListsTab lang={lang} />}
       </div>
     </div>
   );

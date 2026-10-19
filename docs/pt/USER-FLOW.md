@@ -31,6 +31,7 @@ Notação: **[Botão]** = clique · → = tela seguinte. Endereços entre `crase
 | H2 | **Eventos**: uma visão por perfil (ver §3) | `/events` |
 | H3 | **Diretório** | `/cms` |
 | H4 | **Escalas** | `/schedule` |
+| H4b | **Culto Profético** (lista de louvores, catálogo, histórico) | `/worship` |
 | H5 | **Configurações** (só administrador) | `/settings` |
 | H6 | Aprendiz (aparece como "em breve", sem tela) | — |
 
@@ -74,7 +75,7 @@ Todas as telas com PIN levam ao `/login` se a sessão acabou. Qualquer endereço
 1. Digita o PIN (4 dígitos) → **[Entrar]**.
    - PIN errado: mensagem de erro e o campo limpa.
    - Modo manutenção: só administrador (e o Pr Nairon) entram; os outros veem o aviso.
-2. Vai para **H1** (ou para o endereço que tentava abrir). O topo mostra o nome, o idioma, o tema claro/escuro e **[Sair]**.
+2. Vai sempre para **H1** (a Home com os cartões do perfil da pessoa). O topo mostra o nome, o idioma, o tema claro/escuro e **[Sair]**.
 3. Quem tem mais de um perfil vê **[Trocar função]** e escolhe com qual perfil entrar.
 
 ### 3.2 Início (H1)
@@ -85,6 +86,7 @@ Mostra um cartão por módulo, conforme o perfil:
 | Eventos | admin, secretaria, pastor, líder de GA, líder de equipe, tesoureiro |
 | Diretório | admin, secretaria, pastor |
 | Escalas | todos os perfis |
+| Culto Profético | todos os perfis (editar: administradores e líder do Grupo de Louvor) |
 | Aprendiz (em breve) | admin, secretaria, pastor |
 | Configurações | admin |
 
@@ -115,7 +117,10 @@ Mostra um cartão por módulo, conforme o perfil:
 - **Importar:** envia a planilha → revisa → confirma.
 
 ### 3.5 Escalas (H4), abas
-**Portaria** (gerar escala do mês, ajustar à mão, **[Publicar]** → P6) · **Flores** · **Oração 24h** (criar período, ativar no portal, importar planilha, copiar para o WhatsApp) · **Lista de Louvores** (catálogo, aprovar músicas, abrir e editar qualquer lista, **[Finalizar]**).
+**Portaria** (gerar escala do mês, ajustar à mão, **[Publicar]** → P6) · **Flores** · **Oração 24h** (criar período, ativar no portal, importar planilha, copiar para o WhatsApp).
+
+### 3.5b Culto Profético (H4b), abas
+**Pendentes** · **Catálogo** (totais que funcionam como filtros por categoria, busca, editar número, título e categoria) · **Listas** (todas as listas de culto; abrir e editar qualquer uma, **[Finalizar]**). Os louvores aparecem só com o número (`198 · TÍTULO`); o prefixo é interno.
 
 ### 3.6 Configurações (H5), abas
 **Usuários & PINs** (criar, **[Editar]**, **[Desativar/Reativar]**, escolher perfis e igrejas) · **Listas** (situação imigratória, categorias de despesa, tipos de entrada, instrumentos, vozes) · **Auditoria** (quem fez o quê e quando).

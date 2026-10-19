@@ -30,6 +30,7 @@ import PublicLayout from "@/hub/PublicLayout";
 import EventsSection from "@/sections/events/EventsSection";
 import CMSSection from "@/sections/cms/CMSSection";
 import ScheduleSection from "@/sections/schedule/ScheduleSection";
+import WorshipSection from "@/sections/worship/WorshipSection";
 import SettingsSection from "@/sections/settings/SettingsSection";
 
 // Public views
@@ -93,14 +94,9 @@ export default function App() {
     if (savedPin && !user && appData.dbUsers && appData.dbUsers.length > 0) {
       const mapped = authLogin(savedPin);
       if (mapped) {
-        // Only steer from the landing pages: deep links and public pages (/24h-prayers,
-        // /songs/:date, ...) must stay where they are for someone with a saved session.
-        if (location.pathname === "/login" || location.pathname === "/") {
-          const restoredView = localStorage.getItem("mcc_view");
-          const STAFF_VIEWS = Object.values(ROLES_SYS);
-          // Legacy mcc_view staff role strings → /events
-          navigate(restoredView && STAFF_VIEWS.includes(restoredView) ? "/events" : "/", { replace: true });
-        }
+        // Someone with a saved session who lands on the login page goes to the Home (the cards for their
+        // profile). Deep links and public pages (/24h-prayers, /songs/:date, ...) must stay where they are.
+        if (location.pathname === "/login") navigate("/", { replace: true });
       } else {
         // AuthGate sends gated routes to /login on its own; public pages stay put.
         clearSession();
@@ -229,6 +225,7 @@ export default function App() {
                   <Route path="/events" element={<EventsSection {...shared} />} />
                   <Route path="/cms" element={<CMSSection lang={lang} />} />
                   <Route path="/schedule" element={<ScheduleSection lang={lang} />} />
+                  <Route path="/worship" element={<WorshipSection lang={lang} />} />
                   <Route path="/settings" element={<SettingsSection lang={lang} />} />
                 </Route>
               </Route>

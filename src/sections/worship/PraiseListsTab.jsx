@@ -5,7 +5,7 @@ import { ServiceListForm } from "@/views/WorshipListPublicView";
 import { useAppDataContext } from "@/context/AppDataContext";
 import { STRINGS, fill } from "@/i18n/strings";
 import { fetchSongs, fetchRecentLists, updateSong, deleteSong, updateList, deleteList } from "@/lib/praiseData";
-import { CATEGORIES, THEMES, themeApplies, dateKey, isListLocked, songLabel, songListLabel, canManagePraise, listPath, hasNumberPrefix, songErrorText, catalogTotals, filterCatalog } from "@/lib/praiseLists";
+import { CATEGORIES, THEMES, themeApplies, dateKey, isListLocked, songLabel, songNumber, formatCode, canManagePraise, listPath, hasNumberPrefix, songErrorText, catalogTotals, filterCatalog, upperTitle } from "@/lib/praiseLists";
 
 const CAT_KEYS = { coletanea: "praiseCatColetanea", cia: "praiseCatCia", avulso: "praiseCatAvulso", english: "praiseCatEnglish" };
 const TYPE_KEYS = { ebd: "praiseTypeEbd", noite: "praiseTypeNoite", outro: "praiseTypeOutro" };
@@ -57,7 +57,7 @@ export default function PraiseListsTab({ lang }) {
 
   const saveEdit = async (patch) => {
     const { data, error } = await updateSong(editing.id, patch);
-    if (error) return songErrorText(tt, error, patch.code);
+    if (error) return songErrorText(tt, error, songNumber({ code: patch.code }));
     setSongs((prev) => prev.map((s) => (s.id === editing.id ? { ...s, ...data } : s)));
     setEditing(null);
     return "";
@@ -228,7 +228,7 @@ export default function PraiseListsTab({ lang }) {
                     )}
                   </div>
                   <ol style={{ margin: "8px 0 0", paddingLeft: 20, fontSize: 14 }}>
-                    {l.items.map((i) => <li key={i.id}>{songListLabel(songsById.get(i.song_id)) || "…"}</li>)}
+                    {l.items.map((i) => <li key={i.id}>{songLabel(songsById.get(i.song_id)) || "…"}</li>)}
                   </ol>
                 </div>
               );
@@ -282,21 +282,21 @@ function SongRow({ song, tt, children }) {
 }
 
 function EditSongModal({ song, tt, canDelete, onClose, onSave, onDelete }) {
-  const [form, setForm] = useState({ title: song.title, code: song.code || "", category: song.category, theme: song.theme || "", language: song.language || "pt", status: song.status });
+  const [form, setForm] = useState({ title: upperTitle(song.title), number: songNumber(song), category: song.category, theme: song.theme || "", language: song.language || "pt", status: song.status });
   const [error, setError] = useState("");
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const numberInTitle = hasNumberPrefix(form.title);
 
   const submit = async () => {
     if (!form.title.trim() || numberInTitle) return;
-    setError(await onSave({ title: form.title, code: form.code.trim(), category: form.category, theme: themeApplies(form.category) ? form.theme || null : null, language: form.language, status: form.status }));
+    setError(await onSave({ title: form.title, code: form.number ? formatCode(form.category, form.number) : "", category: form.category, theme: themeApplies(form.category) ? form.theme || null : null, language: form.language, status: form.status }));
   };
 
   return (
     <div className="modal-bg" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal" style={{ maxWidth: 440 }}>
         <div style={{ display: "grid", gap: 10 }}>
-          <div><label style={labelStyle}>{tt.praiseSongTitle}</label><input value={form.title} onChange={set("title")} style={inputStyle} maxLength={200} />{numberInTitle && <p style={{ fontSize: 12, color: "#b91c1c", marginTop: 4 }}>{tt.praiseTitleNoNumber}</p>}</div>
+          <div><label style={labelStyle}>{tt.praiseSongTitle}</label><input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: upperTitle(e.target.value) }))} style={inputStyle} maxLength={200} />{numberInTitle && <p style={{ fontSize: 12, color: "#b91c1c", marginTop: 4 }}>{tt.praiseTitleNoNumber}</p>}</div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <div style={{ flex: "1 1 140px" }}>
               <label style={labelStyle}>{tt.praiseCategory}</label>
@@ -304,7 +304,7 @@ function EditSongModal({ song, tt, canDelete, onClose, onSave, onDelete }) {
             </div>
             <div style={{ flex: "1 1 140px" }}>
               <label style={labelStyle}>{tt.praiseCode}</label>
-              <input value={form.code} onChange={set("code")} placeholder={tt.praiseCodeHint} style={inputStyle} maxLength={20} />
+              <input value={form.number} onChange={(e) => setForm((f) => ({ ...f, number: e.target.value.replace(/\D/g, "").slice(0, 4) }))} inputMode="numeric" placeholder={tt.praiseCodeHint} style={inputStyle} maxLength={4} />
             </div>
           </div>
           {themeApplies(form.category) && (

@@ -130,9 +130,12 @@ describe("list ordering", () => {
 });
 
 describe("songLabel", () => {
-  it("shows code and title, or only the title for avulsos", () => {
-    expect(songLabel(SONGS[0])).toBe("CL-001 · Grandioso És Tu");
+  it("shows only the number (no CL-/CIA- prefix) and the title, or just the title for avulsos", () => {
+    expect(songLabel(SONGS[0])).toBe("1 · Grandioso És Tu");
+    expect(songLabel(SONGS[2])).toBe("12 · Cristo Vem");
+    expect(songLabel(SONGS[3])).toBe("31 · Amazing Grace");
     expect(songLabel(SONGS[4])).toBe("Vem Espírito Santo");
+    expect(songLabel(undefined)).toBe("");
   });
 });
 
