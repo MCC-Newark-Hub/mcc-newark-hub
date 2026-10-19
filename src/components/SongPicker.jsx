@@ -4,6 +4,7 @@ import { fill } from "@/i18n/strings";
 import { createSong } from "@/lib/praiseData";
 import {
   CATEGORIES, THEMES, themeApplies, searchSongs, findSimilarSongs, categoryFromCode, normalizeCode, recency, songLabel, sungText,
+  hasNumberPrefix, songErrorText,
 } from "@/lib/praiseLists";
 
 const inputStyle = { width: "100%", padding: "9px 12px", borderRadius: 8, border: "1.5px solid var(--border)", fontSize: 14, background: "var(--card)", color: "var(--text)", fontFamily: "'Montserrat',sans-serif", boxSizing: "border-box" };
@@ -96,6 +97,7 @@ function NewSongForm({ initial, songs, tt, createdBy, autoApprove, onCancel, onC
   const similar = useMemo(() => findSimilarSongs(title, songs), [title, songs]);
   const normalizedCode = code.trim() ? normalizeCode(code) : "";
   const taken = normalizedCode ? songs.find((s) => s.code === normalizedCode) : null;
+  const numberInTitle = hasNumberPrefix(title);
 
   const onCodeChange = (v) => {
     setCode(v);
@@ -104,14 +106,14 @@ function NewSongForm({ initial, songs, tt, createdBy, autoApprove, onCancel, onC
   };
 
   const submit = async () => {
-    if (!title.trim() || taken || busy) return;
+    if (!title.trim() || taken || numberInTitle || busy) return;
     setBusy(true);
     setError("");
     const { data, error: err } = await createSong({
       code: normalizedCode, title, category, theme: themeApplies(category) ? theme : "", language: category === "cia" ? language : "pt", status: autoApprove ? "active" : "pending", createdBy,
     });
     setBusy(false);
-    if (err) { setError(err.code === "duplicate_code" ? fill(tt.praiseCodeTaken, { label: normalizedCode }) : tt.praiseSaveFailed); return; }
+    if (err) { setError(songErrorText(tt, err, normalizedCode)); return; }
     onCreated(data);
   };
 
@@ -122,6 +124,7 @@ function NewSongForm({ initial, songs, tt, createdBy, autoApprove, onCancel, onC
         <div>
           <label style={labelStyle}>{tt.praiseSongTitle}</label>
           <input value={title} onChange={(e) => setTitle(e.target.value)} style={inputStyle} maxLength={200} autoFocus />
+          {numberInTitle && <p style={{ fontSize: 12, color: "#b91c1c", marginTop: 4 }}>{tt.praiseTitleNoNumber}</p>}
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <div style={{ flex: "1 1 140px" }}>
@@ -163,7 +166,7 @@ function NewSongForm({ initial, songs, tt, createdBy, autoApprove, onCancel, onC
         {!autoApprove && <p style={{ fontSize: 12, color: "var(--muted)" }}>{tt.praiseSongPendingNote}</p>}
         {error && <p style={{ color: "#b91c1c", fontSize: 13 }}>{error}</p>}
         <div style={{ display: "flex", gap: 8 }}>
-          <button type="button" className="btn btn-primary" onClick={submit} disabled={!title.trim() || !!taken || busy}>{tt.praiseCreate}</button>
+          <button type="button" className="btn btn-primary" onClick={submit} disabled={!title.trim() || !!taken || numberInTitle || busy}>{tt.praiseCreate}</button>
           <button type="button" className="btn btn-ghost" onClick={onCancel}>{tt.praiseCancel}</button>
         </div>
       </div>

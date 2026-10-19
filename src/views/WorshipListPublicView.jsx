@@ -10,7 +10,7 @@ import { STRINGS, fill } from "@/i18n/strings";
 import {
   fetchSongs, fetchListsByDate, fetchRecentLists, createList, updateList, addListItem, removeListItem, saveItemPositions,
 } from "@/lib/praiseData";
-import { SERVICE_TYPES, dateKey, isListLocked, isFinalizeEnabled, moveItem, renumber, songLabel, listPath } from "@/lib/praiseLists";
+import { SERVICE_TYPES, dateKey, isListLocked, isFinalizeEnabled, moveItem, renumber, songListLabel, listPath } from "@/lib/praiseLists";
 
 const NAME_KEY = "mcc_worship_name";
 const CHURCH_KEY = "mcc_worship_church"; // last church chosen on this device
@@ -329,7 +329,7 @@ export function SongRows({ items, songsById, tt, canEdit, onMove, onRemove }) {
       {items.map((item, idx) => (
         <li key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: "1px solid var(--border)" }}>
           <span style={{ width: 24, fontWeight: 700, color: "var(--muted)", fontSize: 14 }}>{idx + 1}</span>
-          <span style={{ flex: 1, fontSize: 15, fontWeight: 500 }}>{songLabel(songsById.get(item.song_id)) || "…"}</span>
+          <span style={{ flex: 1, fontSize: 15, fontWeight: 500 }}>{songListLabel(songsById.get(item.song_id)) || "…"}</span>
           {canEdit && (
             <span style={{ display: "flex", gap: 2 }}>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => onMove(idx, -1)} disabled={idx === 0} title={tt.praiseMoveUp} aria-label={tt.praiseMoveUp}><ArrowUp size={14} /></button>

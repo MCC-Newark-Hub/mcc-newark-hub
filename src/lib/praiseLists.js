@@ -49,6 +49,41 @@ export function normalizeCode(input) {
   return `${m[1]}-${m[2].padStart(3, "0")}`;
 }
 
+// A code is empty (songs without a number) or PREFIX-NNN, e.g. "CL-001". Expects an already normalized code.
+export const isValidCode = (code) => !code || /^[A-Z]{2,4}-\d{1,4}$/.test(code);
+
+// "04 - Quando te prostrares", "198. Ele é…" — the number belongs in the code field, never in the title.
+export const hasNumberPrefix = (title) => /^\s*\d+\s*[-–—]|^\s*\d+\s*[.):]\s/.test(String(title || ""));
+
+// How many songs the catalogue holds, overall and per category (every category is present, even with 0).
+export function catalogTotals(songs) {
+  const byCategory = Object.fromEntries(CATEGORIES.map((c) => [c, 0]));
+  let total = 0;
+  for (const s of songs || []) {
+    total += 1;
+    if (s.category in byCategory) byCategory[s.category] += 1;
+  }
+  return { total, byCategory };
+}
+
+// Catalogue list for the admin tab: optionally one category ("all" = no category filter), then the search box
+// (accent-insensitive, on title, code and theme).
+export function filterCatalog(songs, query, category = "all") {
+  const q = norm(query);
+  return (songs || []).filter((s) => {
+    if (category !== "all" && s.category !== category) return false;
+    return !q || norm(s.title).includes(q) || norm(s.code || "").includes(q) || norm(s.theme || "").includes(q);
+  });
+}
+
+// Message for an error returned by createSong / updateSong (tt = STRINGS[lang]; label = the code that was typed).
+export function songErrorText(tt, error, label) {
+  if (error?.code === "duplicate_code") return fill(tt.praiseCodeTaken, { label });
+  if (error?.code === "number_in_title") return tt.praiseTitleNoNumber;
+  if (error?.code === "invalid_code") return tt.praiseCodeInvalid;
+  return tt.praiseSaveFailed;
+}
+
 export function formatCode(category, n) {
   const prefix = CODE_PREFIX[category];
   if (!prefix || String(n ?? "").trim() === "" || !Number.isFinite(Number(n))) return "";
@@ -146,6 +181,14 @@ export function renumber(items) {
 export function songLabel(song) {
   if (!song) return "";
   return song.code ? `${song.code} · ${song.title}` : song.title;
+}
+
+// How a song reads inside a service list: "198 · Ele É a Minha Alegria" — only the number, no CL-/CIA- prefix.
+// Songs without a number (most Avulsos) show just the title.
+export function songListLabel(song) {
+  if (!song) return "";
+  const m = String(song.code || "").match(/(\d+)$/);
+  return m ? `${Number(m[1])} · ${song.title}` : song.title;
 }
 
 // "Cantado há 12 dias" in the current language (tt = STRINGS[lang]).

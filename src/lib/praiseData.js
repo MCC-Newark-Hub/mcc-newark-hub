@@ -1,14 +1,27 @@
 // Supabase access for the Lista de Louvores. Every function resolves to { data, error } and never throws.
 import { sb } from "@/lib/supabase";
-import { normalizeCode } from "@/lib/praiseLists";
+import { normalizeCode, isValidCode, hasNumberPrefix } from "@/lib/praiseLists";
 
 const UNIQUE_VIOLATION = "23505";
+
+// The API returns at most 1000 rows per request, so read a table page by page (stable order
+// is required for the pages not to overlap or skip rows).
+const PAGE_SIZE = 1000;
+export async function fetchAllRows(buildQuery) {
+  const rows = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await buildQuery().range(from, from + PAGE_SIZE - 1);
+    if (error) return { data: [], error };
+    rows.push(...(data || []));
+    if (!data || data.length < PAGE_SIZE) return { data: rows, error: null };
+  }
+}
 
 // Whole catalogue, each song with last_sung_on / times_sung merged in from the praise_song_last_sung view.
 export async function fetchSongs() {
   const [songsRes, lastRes] = await Promise.all([
-    sb.from("praise_songs").select("*").order("title"),
-    sb.from("praise_song_last_sung").select("*"),
+    fetchAllRows(() => sb.from("praise_songs").select("*").order("title").order("id")),
+    fetchAllRows(() => sb.from("praise_song_last_sung").select("*").order("song_id")),
   ]);
   if (songsRes.error) return { data: [], error: songsRes.error };
   const last = new Map((lastRes.data || []).map((r) => [r.song_id, r]));
@@ -20,14 +33,27 @@ export async function fetchSongs() {
   return { data, error: null };
 }
 
+// Rules every song must follow, whoever saves it: the title never carries the number, and the code (when
+// there is one) is PREFIX-NNN. Returns an error object ({ code: "number_in_title" | "invalid_code" }) or null.
+export function validateSong({ title, code }) {
+  if (hasNumberPrefix(title)) return { code: "number_in_title", message: "The title can't start with a number" };
+  if (!isValidCode(code ? normalizeCode(code) : "")) return { code: "invalid_code", message: "The code must look like CL-001" };
+  return null;
+}
+
+// English songs are always in English, whatever the form says.
+const withLanguage = (category, language) => (category === "english" ? "en" : language || "pt");
+
 // A duplicate code comes back as error.code === "duplicate_code".
 export async function createSong({ code, title, category, theme, language, status = "pending", createdBy }) {
+  const invalid = validateSong({ title, code });
+  if (invalid) return { data: null, error: invalid };
   const row = {
     code: code ? normalizeCode(code) : null,
     title: title.trim(),
     category,
     theme: theme || null,
-    language: language || "pt",
+    language: withLanguage(category, language),
     status,
     created_by: createdBy || null,
   };
@@ -37,7 +63,10 @@ export async function createSong({ code, title, category, theme, language, statu
 }
 
 export async function updateSong(id, patch) {
+  const invalid = validateSong({ title: "title" in patch ? patch.title : "", code: patch.code });
+  if (invalid) return { data: null, error: invalid };
   const clean = { ...patch };
+  if (clean.category === "english") clean.language = "en";
   if ("code" in clean) clean.code = clean.code ? normalizeCode(clean.code) : null;
   if ("title" in clean) clean.title = clean.title.trim();
   const { data, error } = await sb.from("praise_songs").update(clean).eq("id", id).select();
