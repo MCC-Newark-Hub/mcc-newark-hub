@@ -1,163 +1,164 @@
 # PRD — MCC Newark Hub
 
-**Versão:** 1.0 (a primeira versão é o que já está no ar) · **Data:** 17/10/2026 · **Dono do produto:** Leonard Alves
-**Endereço:** https://mcc-newark-hub.vercel.app
+**Version:** 1.0 (the first version is what is already live) · **Date:** 2026-10-17 · **Product owner:** Leonard Alves
+**Address:** https://mcc-newark-hub.vercel.app
+**Other languages:** [Português](pt/PRD.md)
 
-> Como ler: ✅ pronto e em uso · ⚠️ existe, mas incompleto · ❌ não existe. Itens marcados com **(proposta)** foram sugeridos por quem escreveu o documento e ainda precisam da sua validação.
-
----
-
-## 1. Resumo
-
-O MCC Newark Hub nasceu para **tirar as inscrições dos seminários das planilhas** e dar aos secretários das igrejas uma ferramenta única, confiável e rápida. Das inscrições ele cresceu para um portal da Área Newark, Texas e Costa Oeste, com cadastro de membros, escalas, lista de louvores e organograma.
-
-**O núcleo da v1 é Inscrições.** Tudo o mais é expansão que aproveita o mesmo cadastro.
+> How to read: ✅ done and in use · ⚠️ exists but incomplete · ❌ does not exist. Items marked **(proposal)** were suggested by the author and still need the owner's validation.
 
 ---
 
-## 2. Problema
+## 1. Summary
 
-As inscrições dos seminários eram feitas em **planilha**. O que dava errado:
+MCC Newark Hub was born to **take seminar registrations out of spreadsheets** and give church secretaries a single, reliable, fast tool. From registrations it grew into a portal for the Newark, Texas and West Coast Area, with a member directory, schedules, the praise-song list and an org chart.
 
-| Dor | Consequência |
+**The core of v1 is Registrations.** Everything else is an expansion that reuses the same directory.
+
+---
+
+## 2. Problem
+
+Seminar registrations were handled in a **spreadsheet**. What went wrong:
+
+| Pain | Consequence |
 |---|---|
-| Era difícil controlar o que foi atualizado | A quantidade de inscritos **não batia** |
-| Não havia como saber **quem** alterou a planilha | Erros sem responsável, sem como corrigir a causa |
-| No fechamento, o dinheiro arrecadado **não batia** com a planilha | Retrabalho e desconfiança nos números |
-| Quando o pastor perguntava, achar a resposta era difícil: quantos inscritos, quanto arrecadado, quantos pagaram e quantos faltam, quantos por igreja, por classe e por grupo | Demora e respostas diferentes para a mesma pergunta |
-| A planilha nem sempre estava atualizada e demorava a ser atualizada | Decisões com dado velho |
-| Só os secretários faziam inscrições | **Sobrecarga** nos secretários, que viravam o gargalo |
+| It was hard to control what had been updated | The number of registrants **did not add up** |
+| There was no way to know **who** changed the spreadsheet | Errors with no owner and no way to fix the cause |
+| At close-out, the money collected **did not match** the spreadsheet | Rework and distrust in the numbers |
+| When the pastor asked, finding the answer was hard: how many registered, how much was collected, how many paid and how many are missing, how many per church, class and group | Delay, and different answers to the same question |
+| The spreadsheet was not always up to date and was slow to update | Decisions made on stale data |
+| Only the secretaries could register people | **Overload** on the secretaries, who became the bottleneck |
 
-**Quem sofre mais:** os secretários de igreja. **Quem paga o preço:** os participantes (espera, erro de cobrança) e os pastores (sem número confiável).
+**Who suffers most:** church secretaries. **Who pays the price:** participants (waiting, billing mistakes) and pastors (no reliable number).
 
 ---
 
-## 3. Para quem é
+## 3. Who it is for
 
-| Perfil | Papel no produto | Prioridade |
+| Profile | Role in the product | Priority |
 |---|---|---|
-| **Secretário(a) de igreja** | Foco do produto: dar baixa em pagamentos, cancelar, reativar, corrigir dados, registrar quem não usou o portal. Vê só a sua igreja | **Foco** |
-| **Participante** (membro ou visitante, e a família) | Se inscreve sozinho no portal. Facilidade é o objetivo | **Prioridade da experiência** |
-| **Pastor** | Consulta os números sem precisar perguntar ao secretário (extra que alivia o secretário). Aprova exceções | Extra |
-| **Líder de grupo (GA) e de equipe** | Acompanha a sua gente e a sua equipe | Apoio |
-| **Tesoureiro(a)** | Fecha as contas do evento | Apoio |
-| **Administrador** | Configura eventos, usuários, listas e acessos | Apoio |
+| **Church secretary** | The focus of the product: record payments, cancel, reactivate, fix data, register people who did not use the portal. Sees only their own church | **Focus** |
+| **Participant** (member or visitor, and their family) | Registers on their own through the portal. Ease of use is the goal | **Experience priority** |
+| **Pastor** | Looks up the numbers without asking the secretary (an extra that relieves the secretary). Approves exceptions | Extra |
+| **Group (GA) and team leader** | Follows their people and their team | Support |
+| **Treasurer** | Closes the event's accounts | Support |
+| **Administrator** | Configures events, users, lists and access | Support |
 
 ---
 
-## 4. Objetivos e como saber que deu certo **(proposta)**
+## 4. Goals and how to tell it worked **(proposal)**
 
-1. **Os números batem.** O total arrecadado no sistema é igual ao caixa no fechamento, com zero divergência.
-2. **Cada alteração tem dono.** Toda mudança fica registrada com o **nome da pessoa** (auditoria).
-3. **O secretário deixa de ser o gargalo.** A maioria das inscrições é feita pelo próprio participante, e a pergunta do pastor se responde sozinha na tela.
-4. **Dar baixa leva segundos.** O secretário confirma um pagamento na hora, sem planilha.
-5. **Resposta rápida ao pastor:** inscritos, pagantes, pendentes, arrecadado e vagas, por igreja, classe e grupo, em uma tela.
+1. **The numbers add up.** The total collected in the system equals the cash at close-out, with zero discrepancy.
+2. **Every change has an owner.** Every change is recorded with the **person's name** (audit log).
+3. **The secretary stops being the bottleneck.** Most registrations are made by the participant, and the pastor's question answers itself on screen.
+4. **Recording a payment takes seconds.** The secretary confirms a payment on the spot, without a spreadsheet.
+5. **Fast answers for the pastor:** registered, paid, pending, collected and seats, by church, class and group, on one screen.
 
-*Ainda sem medição: hoje não há contador de tempo nem de origem da inscrição. Se esses números importam, precisam ser acrescentados.*
+*Not measured yet: there is no timer or registration-source counter today. If these numbers matter, they must be added.*
 
 ---
 
-## 5. Fluxo ideal × o que existe hoje
+## 5. Ideal flow × what exists today
 
-| # | Passo ideal | Hoje |
+| # | Ideal step | Today |
 |---|---|---|
-| 1 | O participante entra no portal e inicia a inscrição | ✅ Portal público (`/events/register`), em português e inglês, também no celular |
-| 2 | Preenche seus dados e os da família | ✅ Inscrição individual e por família, com busca de quem já está no cadastro |
-| 3 | Recebe o comprovante, de preferência por e-mail | ⚠️ O comprovante aparece **na tela**. O e-mail só sai quando o **secretário clica em "reenviar"**; não sai sozinho |
-| 4 | O portal diz que o pagamento é com o secretário, listando o da sua igreja | ⚠️ Diz que o pagamento é **presencial, com a equipe autorizada**, mas **não lista o secretário de cada igreja** |
-| 5 | O participante paga | ✅ Presencial (dinheiro ou transferência registrada pela equipe). Online: ❌ ainda não é possível |
-| 6 | O secretário atualiza na hora: pago | ✅ Dar baixa, marcar isento, cancelar, reativar |
-| 7 | O participante recebe o comprovante de pagamento por e-mail | ❌ Não existe. Só o reenvio manual da confirmação, que já mostra o status "Pago" |
+| 1 | The participant opens the portal and starts registering | ✅ Public portal (`/events/register`), in Portuguese and English, mobile-friendly |
+| 2 | Fills in their data and their family's | ✅ Individual and family registration, with search of people already in the directory |
+| 3 | Receives the receipt, preferably by email | ⚠️ The receipt is shown **on screen**. The email is only sent when the **secretary clicks "resend"**; it is not automatic |
+| 4 | The portal says payment is made with the secretary, listing the one for their church | ⚠️ It says payment is **in person, with authorized staff**, but **does not list each church's secretary** |
+| 5 | The participant pays | ✅ In person (cash or transfer recorded by staff). Online: ❌ not possible yet |
+| 6 | The secretary updates it on the spot: paid | ✅ Record payment, mark exempt, cancel, reactivate |
+| 7 | The participant receives a payment receipt by email | ❌ Does not exist. Only the manual resend of the confirmation, which already shows the "Paid" status |
 
 ---
 
-## 6. Funções da primeira versão (o que já está pronto)
+## 6. v1 features (what is already built)
 
-### 6.1 Núcleo: Inscrições ✅
+### 6.1 Core: Registrations ✅
 
-- **Portal do participante:** inscrição individual ou familiar, categorias por idade (0-3, Criança, Intermediário, Adolescente, Jovem, Adulto), taxa por categoria, aceite dos termos, número de inscrição, **consulta da própria inscrição** (`/events/lookup`).
-- **Painel do secretário:** lista de inscrições com filtros; registrar alguém que não usou o portal; **dar baixa** (pago/isento); **cancelar e reativar**; corrigir dados; reenviar a confirmação por e-mail; aba de atrasados.
-- **Regras do evento:** capacidade, **lista de espera** (promoção manual pelo secretário), **vaga excedente** com aprovação do pastor, prazo de pagamento com aviso e aceite, isenção automática de Pastor e Ungido, isenção de prazo para obreiros, equipes e suas famílias.
-- **Aprovações do pastor:** inscrição fora do prazo, evento lotado, isenção, reativação e prorrogação de prazo.
-- **Números:** resumo do evento (inscritos, pagantes, pendentes, arrecadado, espera), relatórios por igreja, classe e grupo, e painel de inscrições.
-- **Tesouraria:** balanço (previsto × arrecadado), despesas, outras entradas, com acesso restrito.
+- **Participant portal:** individual or family registration, age categories (0-3, Child, Intermediate, Teen, Youth, Adult), fee per category, terms acceptance, registration number, **lookup of one's own registration** (`/events/lookup`).
+- **Secretary panel:** registration list with filters; register someone who did not use the portal; **record payment** (paid/exempt); **cancel and reactivate**; fix data; resend the confirmation email; overdue tab.
+- **Event rules:** capacity, **waiting list** (manual promotion by the secretary), **over-capacity seat** with pastor approval, payment deadline with warning and acceptance, automatic exemption for Pastor and Anointed, deadline exemption for workers, teams and their families.
+- **Pastor approvals:** late registration, full event, exemption, reactivation and deadline extension.
+- **Numbers:** event summary (registered, paid, pending, collected, waiting list), reports by church, class and group, and a registrations dashboard.
+- **Treasury:** balance (expected × collected), expenses, other income, with restricted access.
 
-### 6.2 No dia do evento ✅
-Check-in por QR code (pelo atendente ou autoatendimento), crachás em PDF, planejamento da cozinha, equipes e escalas de trabalho.
+### 6.2 Event day ✅
+QR-code check-in (by an attendant or self-service), PDF badges, kitchen planning, teams and work schedules.
 
-### 6.3 Cadastro (Diretório) ✅
-Membros (com filtros, inclusive por gênero), famílias, igrejas, polos e áreas, grupos de assistência (agrupados por igreja), funções, instrumentos e vozes, **importação por planilha**, **Organograma** (Área › Polo › Igreja, com responsáveis, desenho e exportação em imagem e PDF) e **Visão Geral** do cadastro, com acesso limitado por igreja.
+### 6.3 Directory ✅
+Members (with filters, including gender), families, churches, hubs and areas, assistance groups (grouped by church), functions, instruments and voices, **spreadsheet import**, **Org chart** (Area › Hub › Church, with the people in charge, drawing and image/PDF export) and the directory **Overview**, with access limited by church.
 
-### 6.4 Escalas e louvores ✅
-Escala de portaria (calendário público por mês), agenda de oração 24h (pública, por lista) e **Lista de Louvores** do culto (catálogo, histórico, página pública para o Grupo de Louvor, exportação em imagem e PDF).
+### 6.4 Schedules and praise songs ✅
+Door-duty schedule (public monthly calendar), 24h prayer agenda (public, per list) and the service **Praise Song List** (catalogue, history, public page for the Praise Group, image and PDF export).
 
-### 6.5 Acesso e controle ✅
-- Login por **PIN de 4 dígitos**; perfis: administrador, secretaria, pastor, líder de GA, líder de equipe, tesoureiro; uma pessoa pode ter vários perfis.
-- **Escopo por igreja** (o secretário e alguns pastores veem só as suas).
-- **Auditoria:** toda alteração fica registrada com autor, ação e data; contas podem ser **desativadas** sem apagar o histórico.
-- **Backup diário automático** do banco e **modo manutenção** para mudanças maiores.
-
----
-
-## 7. O que fica de fora da v1
-
-**Decidido:**
-- ❌ **Pagamento online.** Hoje só presencial; é um desejo futuro, sem solução definida.
-
-**Existe parcialmente e fica para depois:**
-- ⚠️ **E-mail automático** de inscrição e de pagamento (hoje só o reenvio manual).
-- ⚠️ **Indicar o secretário da igreja** no comprovante e na tela de confirmação.
-- ⚠️ **Mudança automática para a lista de espera** quando o prazo vence. O código existe, mas **não está agendado**; hoje é manual.
-- ⚠️ **Login por pessoa em todo o sistema:** já existem contas nominais, mas ainda restam contas compartilhadas em aposentadoria.
-
-**Não existe e não é prioridade da v1:**
-- ❌ Aplicativo nativo de celular (o portal funciona no navegador).
-- ❌ Calendário de eventos e frequência de culto.
-- ❌ Programação/agenda do seminário.
-- ❌ Notificações por WhatsApp ou SMS.
-
-*(Itens de "fora" além do pagamento online são uma proposta; confirme ou ajuste.)*
+### 6.5 Access and control ✅
+- Login by **4-digit PIN**; profiles: administrator, secretary, pastor, GA leader, team leader, treasurer; one person can hold several profiles.
+- **Scope by church** (the secretary and some pastors see only their own).
+- **Audit log:** every change is recorded with author, action and date; accounts can be **deactivated** without erasing history.
+- **Automatic daily backup** of the database and a **maintenance mode** for larger changes.
 
 ---
 
-## 8. Requisitos não funcionais
+## 7. What stays out of v1
 
-- **Acessível em qualquer aparelho** (celular, tablet, computador), em **português e inglês**.
-- **Rápido para o secretário:** as ações gravam na hora e a tela responde sem esperar o servidor.
-- **Rastreável:** nenhuma alteração sem autor.
-- **Resiliente:** backup diário; migrações versionadas no repositório.
-- **Tecnologia:** React (Vite), Supabase (banco), Vercel (publicação e funções), e-mail pelo Resend.
+**Decided:**
+- ❌ **Online payment.** Today in person only; a future wish with no defined solution.
+
+**Partially exists and is deferred:**
+- ⚠️ **Automatic email** for registration and payment (today only the manual resend).
+- ⚠️ **Showing the church secretary** on the receipt and confirmation screen.
+- ⚠️ **Automatic move to the waiting list** when the deadline passes. The code exists but is **not scheduled**; today it is manual.
+- ⚠️ **Per-person login everywhere:** named accounts exist, but some shared accounts are still being retired.
+
+**Does not exist and is not a v1 priority:**
+- ❌ Native mobile app (the portal works in the browser).
+- ❌ Event calendar and service attendance.
+- ❌ Seminar programme/agenda.
+- ❌ WhatsApp or SMS notifications.
+
+*(Items under "out" other than online payment are a proposal; confirm or adjust.)*
 
 ---
 
-## 9. Riscos e dívidas conhecidas
+## 8. Non-functional requirements
 
-| Risco | Gravidade | Situação |
+- **Works on any device** (phone, tablet, computer), in **Portuguese and English**; every user-facing text is localizable.
+- **Fast for the secretary:** actions save immediately and the screen responds without waiting for the server.
+- **Traceable:** no change without an author.
+- **Resilient:** daily backup; versioned migrations in the repository.
+- **Technology:** React (Vite), Supabase (database), Vercel (hosting and functions), email through Resend.
+
+---
+
+## 9. Risks and known debts
+
+| Risk | Severity | Status |
 |---|---|---|
-| Os **PINs podem ser lidos** por quem tem a chave pública do site (a verificação é feita no navegador e o banco não restringe a leitura) | **Alta** | Aberto. Exige verificar o PIN no servidor |
-| O código-fonte (**repositório público**) contém **PINs de teste que ainda entram no sistema**, inclusive o de administrador | **Alta** | Aberto. Correção simples: desligar esse acesso de reserva fora do desenvolvimento |
-| Contas compartilhadas (Secretaria por igreja, Admin) tiram o nome da auditoria | Média | Em andamento: contas nominais criadas, aposentadoria em curso |
-| Modo manutenção ligado: só administrador e o Pr Nairon entram | Média | Precisa ser desligado para o lançamento |
-| Algumas tabelas e funções existiam só no código, sem migração (já corrigido para três listas e o escopo por igreja) | Baixa | Revisar o restante |
-| Dados incompletos (situação imigratória em 5 de 454 membros; 163 sem grupo) | Baixa | Acompanhar pela Visão Geral |
+| **PINs can be read** by anyone holding the site's public key (verification happens in the browser and the database does not restrict reads) | **High** | Open. Requires verifying the PIN on the server |
+| The source code (**public repository**) contains **test PINs that still sign in**, including the administrator's | **High** | Open. Simple fix: turn off this fallback outside development |
+| Shared accounts (per-church Secretary, Admin) remove the name from the audit log | Medium | In progress: named accounts created, retirement under way |
+| Maintenance mode is on: only the administrator and Pr Nairon can sign in | Medium | Must be turned off for launch |
+| Some tables and functions existed only in code, with no migration (already fixed for three lists and the church scope) | Low | Review the rest |
+| Incomplete data (immigration status on 5 of 454 members; 163 without a group) | Low | Track through the Overview |
 
 ---
 
-## 10. Próximos passos sugeridos **(proposta)**
+## 10. Suggested next steps **(proposal)**
 
-1. **Segurança do login:** desligar os PINs de reserva do código e planejar a verificação do PIN no servidor.
-2. **E-mail automático** de confirmação de inscrição e de confirmação de pagamento (passos 3 e 7 do fluxo ideal).
-3. **Mostrar o secretário da igreja** no comprovante (passo 4).
-4. **Concluir a troca para logins nominais** e desativar as contas compartilhadas.
-5. **Agendar a mudança automática para a lista de espera** após validar o modo de teste.
-6. **Desligar o modo manutenção** e abrir o app aos secretários.
-7. Estudar uma forma de **pagamento online** que atenda às igrejas.
+1. **Login security:** remove the fallback test PINs from the code and plan server-side PIN verification.
+2. **Automatic email** for registration and payment confirmation (steps 3 and 7 of the ideal flow).
+3. **Show the church secretary** on the receipt (step 4).
+4. **Finish the move to named logins** and deactivate the shared accounts.
+5. **Schedule the automatic waiting-list move** after validating it in dry-run mode.
+6. **Turn off maintenance mode** and open the app to the secretaries.
+7. Study a form of **online payment** that suits the churches.
 
 ---
 
-## 11. Perguntas em aberto
+## 11. Open questions
 
-- Como medir o sucesso (item 4)? Há uma meta de tempo ou de percentual de inscrições feitas pelo participante?
-- Quais itens da seção 7 realmente ficam fora da v1, além do pagamento online?
-- O comprovante de pagamento por e-mail deve incluir quem recebeu o pagamento?
-- O portal será usado também para eventos que não sejam seminários (batismo, retiros)?
+- How do we measure success (section 4)? Is there a time target or a target share of registrations made by participants?
+- Which items in section 7 really stay out of v1, besides online payment?
+- Should the payment receipt email include who received the payment?
+- Will the portal also be used for events that are not seminars (baptisms, retreats)?
