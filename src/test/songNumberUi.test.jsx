@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { STRINGS } from "@/i18n/strings";
 
 const SONGS = [
@@ -21,6 +21,9 @@ import PraiseListsTab from "@/sections/worship/PraiseListsTab";
 
 const tt = STRINGS.pt;
 
+// The pencil button of the catalogue row that shows `text` (rows are sorted by name, so never rely on position).
+const editButtonOf = (text) => within(screen.getByText(text).closest(".card")).getByLabelText(tt.praiseEdit);
+
 async function openCatalog() {
   render(<PraiseListsTab lang="pt" />);
   fireEvent.click(await screen.findByRole("button", { name: /cat[aá]logo/i }));
@@ -40,7 +43,7 @@ describe("Catálogo shows and edits only the number", () => {
 
   it("the edit form has a Number field (digits only) and saves the internal code from the category", async () => {
     await openCatalog();
-    fireEvent.click(screen.getAllByLabelText(tt.praiseEdit)[0]);
+    fireEvent.click(editButtonOf("198 · ELE É A MINHA ALEGRIA"));
     const input = screen.getByPlaceholderText(tt.praiseCodeHint);
     expect(input.value).toBe("198");
 
@@ -54,13 +57,13 @@ describe("Catálogo shows and edits only the number", () => {
 
   it("the prefix follows the category, and an empty number clears the code", async () => {
     await openCatalog();
-    fireEvent.click(screen.getAllByLabelText(tt.praiseEdit)[0]);
+    fireEvent.click(editButtonOf("198 · ELE É A MINHA ALEGRIA"));
     fireEvent.change(screen.getByDisplayValue(tt.praiseCatColetanea), { target: { value: "cia" } });
     fireEvent.click(screen.getByText(tt.praiseSaveChanges));
     await screen.findByText(/198 · ELE/);
     expect(updateSong).toHaveBeenLastCalledWith("1", expect.objectContaining({ code: "CIA-198", category: "cia" }));
 
-    fireEvent.click(screen.getAllByLabelText(tt.praiseEdit)[2]);
+    fireEvent.click(editButtonOf("A COLHEITA"));
     fireEvent.change(screen.getByPlaceholderText(tt.praiseCodeHint), { target: { value: "" } });
     fireEvent.click(screen.getByText(tt.praiseSaveChanges));
     await screen.findByText("A COLHEITA");
