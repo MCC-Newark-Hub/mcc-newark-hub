@@ -6,7 +6,7 @@ import { useAppDataContext } from "@/context/AppDataContext";
 import { STRINGS, fill } from "@/i18n/strings";
 import { logAuditEvent, staffActor } from "@/lib/auditEvent";
 import { fetchSongs, fetchRecentLists, updateSong, deleteSong, updateList, deleteList } from "@/lib/praiseData";
-import { CATEGORIES, THEMES, themeApplies, dateKey, isListLocked, songLabel, songNumber, formatCode, canManagePraise, listPath, hasNumberPrefix, songErrorText, catalogTotals, filterCatalog, upperTitle } from "@/lib/praiseLists";
+import { CATEGORIES, THEMES, themeApplies, dateKey, isListLocked, songLabel, songNumber, formatCode, canManagePraise, listPath, hasNumberPrefix, songErrorText, catalogTotals, filterCatalog, sortCatalog, upperTitle } from "@/lib/praiseLists";
 
 const CAT_KEYS = { coletanea: "praiseCatColetanea", cia: "praiseCatCia", avulso: "praiseCatAvulso", english: "praiseCatEnglish" };
 const TYPE_KEYS = { ebd: "praiseTypeEbd", noite: "praiseTypeNoite", outro: "praiseTypeOutro" };
@@ -27,6 +27,7 @@ export default function PraiseListsTab({ lang }) {
   const [editorFor, setEditorFor] = useState(null); // { key, date, type } while the list editor is open
   const [catQuery, setCatQuery] = useState("");
   const [catCategory, setCatCategory] = useState("all");
+  const [catSort, setCatSort] = useState("name");
   const [catPage, setCatPage] = useState(1);
   const [catPerPage, setCatPerPage] = useState(20);
 
@@ -133,7 +134,7 @@ export default function PraiseListsTab({ lang }) {
       )}
 
       {sub === "catalog" && (() => {
-        const filtered = filterCatalog(songs, catQuery, catCategory);
+        const filtered = sortCatalog(filterCatalog(songs, catQuery, catCategory), catSort);
         const totalPages = Math.max(1, Math.ceil(filtered.length / catPerPage));
         const safePage = Math.min(catPage, totalPages);
         const pageSongs = filtered.slice((safePage - 1) * catPerPage, safePage * catPerPage);
@@ -166,7 +167,10 @@ export default function PraiseListsTab({ lang }) {
                 placeholder={tt.praiseCatalogSearch}
                 style={{ ...inputStyle, flex: "1 1 220px", maxWidth: 360 }}
               />
-              <p style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>{fill(tt.praiseCatalogCount, { n: filtered.length })}</p>
+              <p style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>{fill(tt.praiseCatalogCount, { n: fmt(filtered.length) })}</p>
+              <select aria-label={tt.praiseSortBy} value={catSort} onChange={(e) => { setCatSort(e.target.value); setCatPage(1); }} style={{ ...inputStyle, width: "auto" }}>
+                {[["name", tt.praiseSortName], ["number", tt.praiseSortNumber], ["group", tt.praiseSortGroup]].map(([k, label]) => <option key={k} value={k}>{tt.praiseSortBy}: {label}</option>)}
+              </select>
               <select value={catPerPage} onChange={(e) => { setCatPerPage(Number(e.target.value)); setCatPage(1); }} style={{ ...inputStyle, width: "auto" }}>
                 {[10, 20, 50].map((n) => <option key={n} value={n}>{n} {tt.praiseCatalogPerPage}</option>)}
               </select>
@@ -282,7 +286,7 @@ function SongRow({ song, tt, children }) {
       <div style={{ flex: 1, minWidth: 180 }}>
         <p style={{ fontWeight: 600 }}>{songLabel(song)}{langTag && <span className="badge badge-blue" style={{ marginLeft: 6 }}>{langTag}</span>}</p>
         <p style={{ fontSize: 12, color: "var(--muted)" }}>
-          {[tt[CAT_KEYS[song.category]], song.theme, song.times_sung ? fill(tt.praiseTimesSung, { n: song.times_sung }) : null, song.created_by && fill(tt.praiseBy, { name: song.created_by })].filter(Boolean).join(" · ")}
+          {[tt[CAT_KEYS[song.category]], song.theme, song.times_sung ? fill(tt.praiseTimesSung, { n: song.times_sung }) : null, song.created_by && (song.created_by.startsWith("pptx-import") ? tt.praiseImported : fill(tt.praiseBy, { name: song.created_by }))].filter(Boolean).join(" · ")}
         </p>
       </div>
       {children}

@@ -7,7 +7,7 @@ const SONGS = [
   { id: "2", code: "CL-002", title: "Clamo a Ti", category: "coletanea", status: "active" },
   { id: "3", code: "CIA-004", title: "Clamo, Ó Senhor", category: "cia", status: "active" },
   { id: "4", code: null, title: "A Colheita", category: "avulso", status: "active" },
-  { id: "5", code: null, title: "Still", category: "english", status: "active", language: "en" },
+  { id: "5", code: null, title: "Still", category: "english", status: "active", language: "en", created_by: "pptx-import-2026-10-19" },
 ];
 
 vi.mock("@/lib/praiseData", () => ({
@@ -70,5 +70,31 @@ describe("Catálogo: totals and category filter", () => {
     fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${tt.praiseCatEnglish}`, "i") }));
     expect(screen.getByText(/Still/)).toBeTruthy();
     expect(screen.queryByText(/A Colheita/)).toBeNull();
+  });
+
+  it("sorts by name (default), number or group, together with the filter", async () => {
+    await openCatalog();
+    const order = () => Array.from(document.querySelectorAll("p")).map((p) => p.textContent)
+      .filter((x) => ["A Colheita", "Clamo a Ti", "Clamo, Ó Senhor", "O Sangue de Jesus", "Still"].some((n) => x.includes(n)));
+
+    expect(order()).toEqual(["A Colheita", "2 · Clamo a Ti", "4 · Clamo, Ó Senhor", "1 · O Sangue de Jesus", "Still"]);
+
+    const sort = screen.getByLabelText(tt.praiseSortBy);
+    fireEvent.change(sort, { target: { value: "number" } });
+    expect(order()).toEqual(["1 · O Sangue de Jesus", "2 · Clamo a Ti", "4 · Clamo, Ó Senhor", "A Colheita", "Still"]);
+
+    fireEvent.change(sort, { target: { value: "group" } });
+    expect(order()).toEqual(["1 · O Sangue de Jesus", "2 · Clamo a Ti", "4 · Clamo, Ó Senhor", "A Colheita", "Still"]);
+
+    // sort + filter: only the Coletânea, by name
+    fireEvent.change(sort, { target: { value: "name" } });
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${tt.praiseCatColetanea}`, "i") }));
+    expect(order()).toEqual(["2 · Clamo a Ti", "1 · O Sangue de Jesus"]);
+  });
+
+  it("shows thousands separators and 'imported' instead of the import marker", async () => {
+    await openCatalog();
+    expect(screen.getAllByText(/importado da projeção/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/pptx-import/)).toBeNull();
   });
 });
