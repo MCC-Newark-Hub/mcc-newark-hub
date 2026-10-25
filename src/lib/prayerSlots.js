@@ -210,8 +210,6 @@ export function churchBadge(church) {
   return { label, full: String(church), ...BADGE_PALETTE[idx] };
 }
 
-// First name on top, the rest of the name (smaller) below: keeps the first name and the church label
-// visible on one line without cutting anything.
 // What the board shows for a person: the member's badge name ("Gil Ricardo", "Laninha Amaral") when the entry is linked to the
 // directory (member_id) and the member has one, otherwise the name as it was typed. The full name stays saved in the entry.
 export function displayName(row, memberById) {
@@ -219,6 +217,20 @@ export function displayName(row, memberById) {
   return badge || String(row?.member_name || "");
 }
 
+// The entries of a list that belong to a person typed in a search box: every typed word must start a word of the name shown
+// (the badge name) or of the full name saved, ignoring accents and case. Needs at least two letters.
+export function findSlotsByName(slots, query, memberById) {
+  const strip = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9 ]+/g, " ").split(" ").filter(Boolean);
+  const words = strip(query);
+  if (String(query || "").trim().length < 2 || !words.length) return [];
+  return (slots || []).filter((s) => {
+    const have = [...strip(displayName(s, memberById)), ...strip(s.member_name)];
+    return words.every((w) => have.some((h) => h.startsWith(w)));
+  });
+}
+
+// First name on top, the rest of the name (smaller) below: keeps the first name and the church label
+// visible on one line without cutting anything.
 export function splitName(fullName) {
   const parts = String(fullName || "").trim().split(/\s+/).filter(Boolean);
   return { first: parts[0] || "", rest: parts.slice(1).join(" ") };

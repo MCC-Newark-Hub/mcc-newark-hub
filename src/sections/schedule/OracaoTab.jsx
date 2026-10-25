@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Circle, CircleCheck, X } from "lucide-react";
+import { Circle, CircleCheck, X, Pencil } from "lucide-react";
 import { sb } from "@/lib/supabase";
 import { useAppDataContext } from "@/context/AppDataContext";
 import PrayerChurchPicker from "@/components/PrayerChurchPicker";
@@ -9,7 +9,9 @@ import ReasonsImageButton from "@/components/ReasonsImageButton";
 import { kindLabel, scopeLabel, periodTabLabel } from "@/lib/churchGroups";
 import ChurchLabel from "@/components/ChurchLabel";
 import PrayerImportModal from "@/components/PrayerImportModal";
-import { STRINGS } from "@/i18n/strings";
+import PrayerEntryModal from "@/components/PrayerEntryModal";
+import { logPrayerAudit, staffActor, slotDetails } from "@/lib/prayerAudit";
+import { STRINGS, fill } from "@/i18n/strings";
 import {
   SLOT_COUNT, HALVES, HALF_SIZE, groupBySlot, slotCapacity, slotStats, slotTime, slotRange, splitName, displayName,
   todayLocal, formatDate, formatPeriodRange, formatCircular, parseReasons, periodSlug, pickPeriod, buildShareText, nextPeriodId,
@@ -27,7 +29,8 @@ const labelStyle = { fontSize: 12, fontWeight: 600, color: "var(--muted)", displ
 
 export default function OracaoTab({ lang }) {
   const pt = lang !== "en";
-  const { members = [], churches = [] } = useAppDataContext() || {};
+  const { members = [], churches = [], user } = useAppDataContext() || {};
+  const actor = staffActor(user); // who is doing it, for the audit log
   const memberById = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]); // badge names of the people linked to the directory
   const today = todayLocal();
 
@@ -54,6 +57,7 @@ export default function OracaoTab({ lang }) {
   const [importFrom, setImportFrom] = useState("");
   const [importing, setImporting] = useState(false);
   const [showSheetImport, setShowSheetImport] = useState(false);
+  const [editingRow, setEditingRow] = useState(null); // the person being edited (name, church, time slot)
 
   const period = periods.find((c) => c.id === periodId) || null;
   const loadingSlots = !!periodId && slotsFor !== periodId;
@@ -179,6 +183,10 @@ export default function OracaoTab({ lang }) {
       setFormError(pt ? "Não foi possível salvar. Tente novamente." : "Could not save. Try again.");
       return;
     }
+    logPrayerAudit({
+      actor, action: form.id ? "prayer_period_updated" : "prayer_period_created", entityType: "prayer_period", entityId: data.id, entityLabel: data.list_name || data.title,
+      details: { title: data.title, circular: data.circular, from: data.start_date, to: data.end_date, capacity: data.slot_capacity ?? 1 },
+    });
     setForm(null);
     setPeriodId(data.id);
     setTick((t) => t + 1);
@@ -247,6 +255,7 @@ export default function OracaoTab({ lang }) {
       imported = res.count;
     }
     const skipped = (src || []).length - imported;
+    logPrayerAudit({ actor, action: "prayer_slots_copied", entityType: "prayer_period", entityId: period.id, entityLabel: period.list_name || period.title, details: { copied_from: importFrom, imported, kept: skipped } });
     setImporting(false);
     setShowImport(false);
     setInfo(
@@ -267,6 +276,7 @@ export default function OracaoTab({ lang }) {
       setError(pt ? "Não foi possível alterar o status do período." : "Could not change the period status.");
       return;
     }
+    logPrayerAudit({ actor, action: activate ? "prayer_period_activated" : "prayer_period_deactivated", entityType: "prayer_period", entityId: period.id, entityLabel: period.list_name || period.title });
     setTick((t) => t + 1);
   };
 
@@ -281,6 +291,7 @@ export default function OracaoTab({ lang }) {
       setError(pt ? "Não foi possível excluir o período." : "Could not delete the period.");
       return;
     }
+    logPrayerAudit({ actor, action: "prayer_period_deleted", entityType: "prayer_period", entityId: period.id, entityLabel: period.list_name || period.title, details: { title: period.title, names_deleted: slots.length } });
     setError("");
     setPeriodId(null);
     setSlots([]);
@@ -317,6 +328,7 @@ export default function OracaoTab({ lang }) {
       return;
     }
     setSlots((prev) => [...prev, data]);
+    logPrayerAudit({ actor, action: "prayer_slot_added", entityId: data.id, entityLabel: data.member_name, details: slotDetails(period, data, { via: "admin" }) });
     setActiveSlot(null);
     setQuery("");
     setManualName("");
@@ -331,7 +343,9 @@ export default function OracaoTab({ lang }) {
       console.error("schedule_oracao delete error:", err);
       setSlots((prev) => [...prev, row]);
       setError(pt ? "Não foi possível remover este horário. Tente novamente." : "Could not remove this slot. Try again.");
+      return;
     }
+    logPrayerAudit({ actor, action: "prayer_slot_removed", entityId: row.id, entityLabel: row.member_name, details: slotDetails(period, row, { via: "admin" }) });
   };
 
   const legend = (icon, label) => (
@@ -505,6 +519,13 @@ export default function OracaoTab({ lang }) {
                                   )}
                                 </div>
                                 <button
+                                  onClick={(e) => { e.stopPropagation(); setEditingRow(row); }}
+                                  aria-label={fill(STRINGS[pt ? "pt" : "en"].prayerEditAria, { name: row.member_name })}
+                                  style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted)", padding: 0, lineHeight: 1, marginTop: 1 }}
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                                <button
                                   onClick={(e) => { e.stopPropagation(); clearSlot(row); }}
                                   aria-label={pt ? "Remover" : "Remove"}
                                   style={{ background: "none", border: "none", cursor: "pointer", color: "#dc2626", padding: 0, lineHeight: 1, marginTop: 1 }}
@@ -661,6 +682,27 @@ export default function OracaoTab({ lang }) {
         </div>
       )}
 
+      {editingRow && period && (
+        <PrayerEntryModal
+          row={editingRow}
+          period={period}
+          slots={slots}
+          members={members}
+          churches={churches}
+          lang={lang}
+          onClose={() => setEditingRow(null)}
+          onSaved={(updated) => {
+            logPrayerAudit({
+              actor, action: "prayer_slot_updated", entityId: updated.id, entityLabel: updated.member_name,
+              details: { list: period.list_name || period.title, period_id: period.id, slot: { from: slotRange(editingRow.slot_index), to: slotRange(updated.slot_index) }, person: { from: editingRow.member_name, to: updated.member_name }, church: { from: editingRow.church || null, to: updated.church || null }, via: "admin" },
+            });
+            setSlots((prev) => prev.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)));
+            setEditingRow(null);
+            setInfo(STRINGS[pt ? "pt" : "en"].prayerEditDone);
+          }}
+        />
+      )}
+
       {showSheetImport && period && (
         <PrayerImportModal
           period={period}
@@ -670,7 +712,10 @@ export default function OracaoTab({ lang }) {
           members={members}
           lang={lang}
           onClose={() => setShowSheetImport(false)}
-          onDone={(msg) => { setShowSheetImport(false); setInfo(msg); setTick((t) => t + 1); }}
+          onDone={(msg, result) => {
+            logPrayerAudit({ actor, action: "prayer_slots_imported", entityType: "prayer_period", entityId: period.id, entityLabel: period.list_name || period.title, details: { via: "spreadsheet", saved: result?.saved ?? null, old_slots_replaced: result?.replaced ?? 0 } });
+            setShowSheetImport(false); setInfo(msg); setTick((t) => t + 1);
+          }}
         />
       )}
 

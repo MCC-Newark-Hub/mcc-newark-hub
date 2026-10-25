@@ -153,7 +153,7 @@ export default function PrayerImportModal({ period, slots, churches, groups, mem
       else replaced = (del.data || []).length;
     }
     setSaving(false);
-    onDone(fill(tt.prayerImportDone, { n, skipped: rows.length - n }) + (replaced ? ` ${fill(tt.prayerImportDoneReplaced, { n: replaced })}` : "") + note);
+    onDone(fill(tt.prayerImportDone, { n, skipped: rows.length - n }) + (replaced ? ` ${fill(tt.prayerImportDoneReplaced, { n: replaced })}` : "") + note, { saved: n, replaced });
   };
 
   const th = { textAlign: "left", fontSize: 11, fontWeight: 700, color: "var(--muted)", padding: "6px 8px", borderBottom: "1px solid var(--border)", whiteSpace: "nowrap" };

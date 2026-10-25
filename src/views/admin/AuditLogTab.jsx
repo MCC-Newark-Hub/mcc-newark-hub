@@ -32,6 +32,17 @@ const ACTION_LABELS = {
   churches_created: "Igreja criada",
   churches_updated: "Igreja atualizada",
   churches_deleted: "Igreja excluída",
+  prayer_slot_added: "Oração 24h: pessoa adicionada (admin)",
+  prayer_slot_booked: "Oração 24h: horário marcado (link público)",
+  prayer_slot_removed: "Oração 24h: horário removido",
+  prayer_slot_updated: "Oração 24h: horário editado",
+  prayer_slots_imported: "Oração 24h: planilha importada",
+  prayer_slots_copied: "Oração 24h: nomes copiados de outro período",
+  prayer_period_created: "Oração 24h: lista criada",
+  prayer_period_updated: "Oração 24h: lista editada",
+  prayer_period_activated: "Oração 24h: lista ativada",
+  prayer_period_deactivated: "Oração 24h: lista desativada",
+  prayer_period_deleted: "Oração 24h: lista excluída",
 };
 
 const ENTITY_LABELS = {
@@ -44,6 +55,8 @@ const ENTITY_LABELS = {
   assistance_groups: "Grupo",
   rosters: "Roster",
   churches: "Igreja",
+  prayer_slot: "Oração 24h (horário)",
+  prayer_period: "Oração 24h (lista)",
 };
 
 const PAGE_SIZE = 50;

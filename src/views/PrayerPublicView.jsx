@@ -8,7 +8,8 @@ import ReasonsMarkdown from "@/components/ReasonsMarkdown";
 import ReasonsImageButton from "@/components/ReasonsImageButton";
 import { useAppDataContext } from "@/context/AppDataContext";
 import { sb } from "@/lib/supabase";
-import { SLOT_COUNT, HALVES, HALF_SIZE, groupBySlot, slotCapacity, slotStats, slotTime, slotRange, splitName, todayLocal, periodText, pickByParam, formatPeriodRange, formatCircular, pickActivePeriods, displayName } from "@/lib/prayerSlots";
+import { SLOT_COUNT, HALVES, HALF_SIZE, groupBySlot, slotCapacity, slotStats, slotTime, slotRange, splitName, todayLocal, periodText, pickByParam, formatPeriodRange, formatCircular, pickActivePeriods, displayName, findSlotsByName } from "@/lib/prayerSlots";
+import { logPrayerAudit, publicActor, slotDetails, deviceInfo } from "@/lib/prayerAudit";
 import { resolveScopeChurches, scopeLabel, joinList } from "@/lib/churchGroups";
 import { STRINGS, fill } from "@/i18n/strings";
 import PrayerLanding from "@/components/PrayerLanding";
@@ -63,6 +64,7 @@ function PrayerBoard({ lang, setLang }) {
   const fieldsRef = useRef(null);
   const [name, setName] = useState("");
   const [church, setChurch] = useState("");
+  const [search, setSearch] = useState(""); // "is my name in this list?": filters the board to the matching people
   const [formKey, setFormKey] = useState(0); // bumped after a booking so the church picker starts empty again
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
@@ -183,6 +185,13 @@ function PrayerBoard({ lang, setLang }) {
     ? (allowed.length === 1 ? allowed[0] : allowed.includes(church) ? church : "")
     : church;
   const boardReady = slotsFor === periodId;
+  const searchTerm = search.trim();
+  const found = useMemo(() => findSlotsByName(slots, searchTerm, memberById), [slots, searchTerm, memberById]);
+  // Removing someone found by searching needs a first name AND a last name (a bare "Tatiana" matches several people);
+  // slots booked from this device can always be removed.
+  const fullNameTyped = searchTerm.split(/\s+/).filter(Boolean).length >= 2;
+  const canRemove = (s) => mine.includes(s.id) || (fullNameTyped && found.some((f) => f.id === s.id));
+  const foundSlots = useMemo(() => new Set(found.map((s) => s.slot_index)), [found]);
 
   const bySlot = useMemo(() => groupBySlot(slots), [slots]);
   const capacity = slotCapacity(period);
@@ -246,6 +255,10 @@ function PrayerBoard({ lang, setLang }) {
       fieldsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
+    rows.forEach((r, k) => logPrayerAudit({
+      actor: publicActor(cleanName), action: "prayer_slot_booked", entityId: data?.[k]?.id ?? null, entityLabel: cleanName,
+      details: slotDetails(period, { slot_index: r.slot_index, member_name: r.member_name, church: r.church }, { via: "public link", device: deviceInfo() }),
+    }));
     const nextMine = [...mine, ...(data || []).map((r) => r.id)].slice(-200);
     setMine(nextMine);
     writeJSON(MINE_KEY, nextMine);
@@ -266,7 +279,9 @@ function PrayerBoard({ lang, setLang }) {
   };
 
   const removeMine = async (slot) => {
-    if (!window.confirm(fill(tt.prayerRemoveSlotConfirm, { range: slotRange(slot.slot_index) }))) return;
+    const own = mine.includes(slot.id); // booked from this device, or found by searching a name
+    const confirmText = own ? fill(tt.prayerRemoveSlotConfirm, { range: slotRange(slot.slot_index) }) : fill(tt.prayerRemoveFoundConfirm, { name: displayName(slot, memberById), range: slotRange(slot.slot_index) });
+    if (!window.confirm(confirmText)) return;
     const { data, error } = await sb.from("schedule_oracao").delete().eq("id", slot.id).select("id");
     if (error || !data || data.length === 0) {
       console.error("schedule_oracao delete error:", error);
@@ -277,6 +292,10 @@ function PrayerBoard({ lang, setLang }) {
     setMine(nextMine);
     writeJSON(MINE_KEY, nextMine);
     setSlots((prev) => prev.filter((s) => s.id !== slot.id));
+    logPrayerAudit({
+      actor: publicActor(searchTerm || slot.member_name), action: "prayer_slot_removed", entityId: slot.id, entityLabel: slot.member_name,
+      details: slotDetails(period, slot, { via: "public link", from_this_device: own, searched_for: searchTerm || null, device: deviceInfo() }),
+    });
     setNotice({ type: "ok", text: tt.prayerSlotRemoved });
   };
 
@@ -339,7 +358,7 @@ function PrayerBoard({ lang, setLang }) {
                   </span>
                   <ChurchLabel church={s.church} />
                   {isMine && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#2d8a4e" }}>{tt.prayerYou}</span>}
-                  {isMine && (
+                  {canRemove(s) && (
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); removeMine(s); }}
@@ -452,6 +471,34 @@ function PrayerBoard({ lang, setLang }) {
           )}
         </div>
 
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "12px 16px", marginBottom: 12 }}>
+          <label htmlFor="prayer-search" style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>{tt.prayerSearchLabel}</label>
+          <input id="prayer-search" type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={tt.prayerSearchPlaceholder} autoComplete="off" style={inputStyle} />
+          {searchTerm.length >= 2 && found.length > 0 && (
+            <div role="status" style={{ marginTop: 10, background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "#14532d" }}>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>{fill(found.length === 1 ? tt.prayerSearchFoundOne : tt.prayerSearchFoundMany, { n: found.length, name: searchTerm })}</div>
+              <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+                {found.map((s) => (
+                  <li key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "4px 0" }}>
+                    <span style={{ fontWeight: 700 }}>{slotRange(s.slot_index)}</span>
+                    <span>{displayName(s, memberById)}</span>
+                    <ChurchLabel church={s.church} />
+                    <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: "auto" }} disabled={!canRemove(s)} onClick={() => removeMine(s)} aria-label={fill(tt.prayerSearchRemoveAria, { range: slotRange(s.slot_index) })}>{tt.prayerSearchRemove}</button>
+                  </li>
+                ))}
+              </ul>
+              <p style={{ margin: "6px 0 0", fontSize: 12 }}>{fullNameTyped || found.every((s) => mine.includes(s.id)) ? tt.prayerSearchChangeHint : tt.prayerSearchFullNameHint}</p>
+              <button type="button" onClick={() => setSearch("")} style={{ marginTop: 6, background: "none", border: "none", padding: 0, cursor: "pointer", color: "#166534", fontWeight: 700, fontSize: 12, textDecoration: "underline" }}>{tt.prayerSearchShowAll}</button>
+            </div>
+          )}
+          {searchTerm.length >= 2 && found.length === 0 && boardReady && (
+            <div role="status" style={{ marginTop: 10, background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "#92400e" }}>
+              <div style={{ fontWeight: 700 }}>{fill(tt.prayerSearchNotFound, { name: searchTerm })}</div>
+              <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => { setName(searchTerm); setSearch(""); fieldsRef.current?.scrollIntoView?.({ behavior: "smooth", block: "center" }); }}>{tt.prayerSearchUseName}</button>
+            </div>
+          )}
+        </div>
+
         <div ref={fieldsRef} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
             <div>
@@ -512,7 +559,7 @@ function PrayerBoard({ lang, setLang }) {
             {HALVES.map((h) => (
               <div key={h.start} className="prayer-col">
                 <div style={{ fontSize: 13, fontWeight: 800, color: "#03223f", padding: "2px 2px 4px", letterSpacing: 0.3 }}>{h.label}</div>
-                {Array.from({ length: HALF_SIZE }, (_, k) => renderRow(h.start + k))}
+                {Array.from({ length: HALF_SIZE }, (_, k) => (found.length > 0 && !foundSlots.has(h.start + k) ? null : renderRow(h.start + k)))}
               </div>
             ))}
           </div>
