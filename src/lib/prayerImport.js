@@ -122,3 +122,13 @@ export function searchMembers(members, query, { allowed = null, limit = 6 } = {}
     .sort((a, b) => String(a.name).localeCompare(String(b.name), "pt"))
     .slice(0, limit);
 }
+
+// The same person already saved in this list at ANOTHER time slot (the same slot is a duplicate, handled by the
+// validation). Same person = same member (member_id) or the same name and church. `saved` = the list's current rows.
+export function findOtherSlots(row, saved) {
+  return (saved || []).filter((s) => {
+    if (s.slot_index === row.slot) return false;
+    if (row.memberId && s.member_id && s.member_id === row.memberId) return true;
+    return norm(s.member_name) === norm(row.name) && norm(s.church) === norm(row.church);
+  });
+}

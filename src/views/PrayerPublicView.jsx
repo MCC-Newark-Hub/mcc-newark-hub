@@ -14,7 +14,7 @@ import { STRINGS, fill } from "@/i18n/strings";
 import PrayerLanding from "@/components/PrayerLanding";
 
 const MINE_KEY = "mcc_prayer_mine";
-const PROFILE_KEY = "mcc_prayer_profile";
+const PROFILE_KEY = "mcc_prayer_profile"; // an old version remembered the name and church; it no longer does (see confirm)
 const POLL_MS = 20000;
 
 function readJSON(key, fallback) {
@@ -60,8 +60,9 @@ function PrayerBoard({ lang, setLang }) {
   const [selected, setSelected] = useState([]);
   const [mine, setMine] = useState(() => readJSON(MINE_KEY, []));
   const fieldsRef = useRef(null);
-  const [name, setName] = useState(() => readJSON(PROFILE_KEY, {}).name || "");
-  const [church, setChurch] = useState(() => readJSON(PROFILE_KEY, {}).church || "");
+  const [name, setName] = useState("");
+  const [church, setChurch] = useState("");
+  const [formKey, setFormKey] = useState(0); // bumped after a booking so the church picker starts empty again
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [notice, setNotice] = useState(null); // { type: "ok" | "error", text }
@@ -247,8 +248,12 @@ function PrayerBoard({ lang, setLang }) {
     const nextMine = [...mine, ...(data || []).map((r) => r.id)].slice(-200);
     setMine(nextMine);
     writeJSON(MINE_KEY, nextMine);
-    writeJSON(PROFILE_KEY, { name: cleanName, church: churchValue });
-    setName(cleanName);
+    // The form starts clean for the next person (the same device is often used for several people, and one booking can
+    // already include several time slots). The slots just booked stay listed as "yours" and can still be removed.
+    try { localStorage.removeItem(PROFILE_KEY); } catch { /* storage unavailable */ }
+    setName("");
+    setChurch("");
+    setFormKey((k) => k + 1);
     setFormError("");
     setSelected([]);
     const first = cleanName.split(" ")[0];
@@ -463,7 +468,7 @@ function PrayerBoard({ lang, setLang }) {
               <div style={{ fontSize: 13, color: "#6b7280", alignSelf: "end", paddingBottom: 10 }}>{tt.prayerLoadingChurches}</div>
             ) : (
             <PrayerChurchPicker
-              key={`${period.id}-${churches.some((c) => "is_hub" in c) ? "directory" : "fallback"}`}
+              key={`${period.id}-${formKey}-${churches.some((c) => "is_hub" in c) ? "directory" : "fallback"}`}
               restrictTo={Array.isArray(allowed) ? allowed : undefined}
               value={churchValue}
               onChange={(v) => { setChurch(v); setFormError(""); }}
