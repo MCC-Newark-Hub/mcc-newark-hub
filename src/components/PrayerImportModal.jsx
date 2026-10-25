@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { sb } from "@/lib/supabase";
 import { STRINGS, fill } from "@/i18n/strings";
-import { slotTime, slotCapacity, groupBySlot } from "@/lib/prayerSlots";
+import { slotTime, slotRange, slotCapacity, groupBySlot } from "@/lib/prayerSlots";
 import { resolveScopeChurches, periodTabLabel } from "@/lib/churchGroups";
-import { readImportRows, validateImportRows, suggestMembers, searchMembers } from "@/lib/prayerImport";
+import { readImportRows, validateImportRows, suggestMembers, searchMembers, findOtherSlots } from "@/lib/prayerImport";
 
 const TEMPLATE_URL = "/modelos/modelo-importacao-oracao.xlsx";
 const COLORS = { ok: "#166534", warn: "#92400e", error: "#991b1b" };
@@ -18,6 +18,8 @@ export default function PrayerImportModal({ period, slots, churches, groups, mem
   const [reading, setReading] = useState(false);
   const [defaultChurch, setDefaultChurch] = useState("");
   const [picks, setPicks] = useState(() => new Map()); // line -> member id ("" = keep the name as typed); no entry = the automatic suggestion
+  const [skipped, setSkipped] = useState(() => new Set()); // lines the admin chose not to import (left the church, went back to Brazil…)
+  const [dupChoice, setDupChoice] = useState(() => new Map()); // line -> "both" (default) | "keep" | "replace" when the person is already in the list at another time
   const [searching, setSearching] = useState(null);     // line whose "someone else" search is open
   const [searchText, setSearchText] = useState("");
   const [saving, setSaving] = useState(false);
@@ -56,10 +58,34 @@ export default function PrayerImportModal({ period, slots, churches, groups, mem
     }),
     [rawRows, picks, suggestions, memberById]
   );
-  const rows = useMemo(
-    () => (rawRows ? validateImportRows(linkedRaw, { allowed, existing, capacity, defaultChurch, directory }) : []),
-    [rawRows, linkedRaw, allowed, existing, capacity, defaultChurch, directory]
+  // Skipped lines are left out before checking, so they take no slot and cannot clash with anyone.
+  const validated = useMemo(
+    () => (rawRows ? validateImportRows(linkedRaw.filter((r) => !skipped.has(r.line)), { allowed, existing, capacity, defaultChurch, directory }) : []),
+    [rawRows, linkedRaw, skipped, allowed, existing, capacity, defaultChurch, directory]
   );
+  // People who are already in this list at another time: the admin decides what to do with each one.
+  const elsewhere = useMemo(() => {
+    const map = new Map();
+    validated.forEach((r) => {
+      if (r.status === "error") return;
+      const others = findOtherSlots(r, slots);
+      if (others.length) map.set(r.line, others);
+    });
+    return map;
+  }, [validated, slots]);
+  const choiceOf = (line) => dupChoice.get(line) || "both";
+  const keepLines = new Set([...elsewhere.keys()].filter((line) => choiceOf(line) === "keep"));
+  // "Keep what was already there" takes the row out of the import (and out of the capacity checks).
+  const rows = useMemo(
+    () => (keepLines.size ? validateImportRows(linkedRaw.filter((r) => !skipped.has(r.line) && !keepLines.has(r.line)), { allowed, existing, capacity, defaultChurch, directory }) : validated),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [validated, linkedRaw, skipped, dupChoice, allowed, existing, capacity, defaultChurch, directory]
+  );
+  const rowByLine = useMemo(() => new Map(rows.map((r) => [r.line, r])), [rows]);
+  const validatedByLine = useMemo(() => new Map(validated.map((r) => [r.line, r])), [validated]);
+  const shownRows = linkedRaw.map((r) => rowByLine.get(r.line) || (keepLines.has(r.line) ? { ...validatedByLine.get(r.line), kept: true } : { ...r, skipped: true }));
+  const rangesOf = (line) => (elsewhere.get(line) || []).map((s) => slotRange(s.slot_index)).join(", ");
+  const toggleSkip = (line) => setSkipped((prev) => { const next = new Set(prev); if (next.has(line)) next.delete(line); else next.add(line); return next; });
   const choose = (line, id) => { setPicks((prev) => new Map(prev).set(line, id)); setSearching(null); setSearchText(""); };
   const counts = { ok: 0, warn: 0, error: 0 };
   rows.forEach((r) => { counts[r.status] += 1; });
@@ -71,6 +97,8 @@ export default function PrayerImportModal({ period, slots, churches, groups, mem
     setReading(true);
     setError("");
     setRawRows(null);
+    setSkipped(new Set());
+    setDupChoice(new Map());
     setPicks(new Map());
     setSearching(null);
     try {
@@ -92,23 +120,21 @@ export default function PrayerImportModal({ period, slots, churches, groups, mem
   const run = async () => {
     setSaving(true);
     setError("");
-    const payload = importable.map((r) => ({
-      period_id: period.id,
-      slot_index: r.slot,
-      slot_time: slotTime(r.slot),
-      member_id: r.memberId || null,
-      member_name: r.name,
-      church: r.church,
+    const toSave = importable.map((r) => ({
+      r,
+      row: { period_id: period.id, slot_index: r.slot, slot_time: slotTime(r.slot), member_id: r.memberId || null, member_name: r.name, church: r.church },
     }));
     // A slot may have filled up since the file was checked: the database refuses those rows, so retry one by one.
     let n = 0;
-    const batch = await sb.from("schedule_oracao").insert(payload).select("id");
+    const saved = [];
+    const batch = await sb.from("schedule_oracao").insert(toSave.map((x) => x.row)).select("id");
     if (!batch.error) {
       n = (batch.data || []).length;
+      saved.push(...toSave);
     } else if (batch.error.code === "23505") {
-      for (const row of payload) {
-        const one = await sb.from("schedule_oracao").insert(row).select("id");
-        if (!one.error) n += 1;
+      for (const x of toSave) {
+        const one = await sb.from("schedule_oracao").insert(x.row).select("id");
+        if (!one.error) { n += 1; saved.push(x); }
         else if (one.error.code !== "23505") { console.error("prayer import write error:", one.error); setSaving(false); setError(tt.prayerImportFail); return; }
       }
     } else {
@@ -117,8 +143,17 @@ export default function PrayerImportModal({ period, slots, churches, groups, mem
       setError(tt.prayerImportFail);
       return;
     }
+    // "Use the sheet's": the older entry of the same person is removed, but only once the new one is really saved.
+    const replaceIds = [...new Set(saved.filter((x) => choiceOf(x.r.line) === "replace").flatMap((x) => (elsewhere.get(x.r.line) || []).map((o) => o.id)))];
+    let replaced = 0;
+    let note = "";
+    if (replaceIds.length) {
+      const del = await sb.from("schedule_oracao").delete().in("id", replaceIds).select("id");
+      if (del.error) { console.error("prayer import replace error:", del.error); note = ` ${tt.prayerImportReplaceFail}`; }
+      else replaced = (del.data || []).length;
+    }
     setSaving(false);
-    onDone(fill(tt.prayerImportDone, { n, skipped: rows.length - n }));
+    onDone(fill(tt.prayerImportDone, { n, skipped: rows.length - n }) + (replaced ? ` ${fill(tt.prayerImportDoneReplaced, { n: replaced })}` : "") + note);
   };
 
   const th = { textAlign: "left", fontSize: 11, fontWeight: 700, color: "var(--muted)", padding: "6px 8px", borderBottom: "1px solid var(--border)", whiteSpace: "nowrap" };
@@ -159,19 +194,32 @@ export default function PrayerImportModal({ period, slots, churches, groups, mem
         {reading && <p style={{ color: "var(--muted)", fontSize: 13 }}>{tt.prayerImportReading}</p>}
         {error && <div role="alert" style={{ background: "#fef2f2", border: "1px solid #fca5a5", color: "#991b1b", borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 12 }}>{error}</div>}
 
-        {rows.length > 0 && (
+        {shownRows.length > 0 && (
           <>
-            <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{fill(tt.prayerImportSummary, { ok: counts.ok, warn: counts.warn, err: counts.error })}</p>
+            <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
+              {fill(tt.prayerImportSummary, { ok: counts.ok, warn: counts.warn, err: counts.error })}
+              {skipped.size > 0 && <span style={{ color: "var(--muted)", fontWeight: 600 }}> · {fill(tt.prayerImportSkippedCount, { n: skipped.size })}</span>}
+            </p>
             <div style={{ overflow: "auto", border: "1px solid var(--border)", borderRadius: 8, marginBottom: 14, minHeight: 80 }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr>
                     <th style={th}>{tt.prayerImportColLine}</th><th style={th}>{tt.prayerImportColTime}</th><th style={th}>{tt.prayerImportColName}</th>
-                    <th style={th}>{tt.prayerImportColMember}</th><th style={th}>{tt.prayerImportColChurch}</th><th style={th}>{tt.prayerImportColStatus}</th>
+                    <th style={th}>{tt.prayerImportColMember}</th><th style={th}>{tt.prayerImportColChurch}</th><th style={th}>{tt.prayerImportColStatus}</th><th style={th} />
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((r) => (
+                  {shownRows.map((r) => (r.skipped ? (
+                    <tr key={r.line} style={{ opacity: 0.55 }}>
+                      <td style={td}>{r.line}</td>
+                      <td style={{ ...td, whiteSpace: "nowrap" }}>{r.slot !== null && r.slot !== undefined ? slotRange(r.slot) : String(r.rawTime ?? "")}</td>
+                      <td style={{ ...td, textDecoration: "line-through" }} colSpan={3}>{r.typedName || r.name}</td>
+                      <td style={{ ...td, color: "var(--muted)", fontWeight: 600 }}>{tt.prayerImportSkippedRow}</td>
+                      <td style={td}>
+                        <button type="button" className="btn btn-ghost btn-xs" disabled={saving} onClick={() => toggleSkip(r.line)} aria-label={fill(tt.prayerImportRestoreRow, { name: r.name })}>{tt.prayerImportRestore}</button>
+                      </td>
+                    </tr>
+                  ) : (
                     <tr key={r.line}>
                       <td style={td}>{r.line}</td>
                       <td style={{ ...td, whiteSpace: "nowrap" }}>{r.range || String(r.rawTime ?? "")}</td>
@@ -215,9 +263,32 @@ export default function PrayerImportModal({ period, slots, churches, groups, mem
                         </div>
                       </td>
                       <td style={td}>{r.church}</td>
-                      <td style={{ ...td, color: COLORS[r.status], fontWeight: 600 }}>{message(r)}</td>
+                      <td style={{ ...td, color: r.kept ? "var(--muted)" : COLORS[r.status], fontWeight: 600 }}>
+                        {r.kept ? tt.prayerImportKeptRow : message(r)}
+                        {elsewhere.has(r.line) && (
+                          <div style={{ marginTop: 4, fontWeight: 500 }}>
+                            <div style={{ fontSize: 11.5, color: COLORS.warn, marginBottom: 3 }}>{fill(tt.prayerImportElsewhere, { ranges: rangesOf(r.line) })}</div>
+                            <select
+                              aria-label={fill(tt.prayerImportElsewhereChoice, { name: r.name })}
+                              value={choiceOf(r.line)}
+                              onChange={(e) => setDupChoice((prev) => new Map(prev).set(r.line, e.target.value))}
+                              disabled={saving}
+                              style={{ ...inputStyle, padding: "4px 8px", fontSize: 12 }}
+                            >
+                              <option value="both">{tt.prayerImportBoth}</option>
+                              <option value="keep">{tt.prayerImportKeepExisting}</option>
+                              <option value="replace">{fill(tt.prayerImportUseSheet, { ranges: rangesOf(r.line) })}</option>
+                            </select>
+                          </div>
+                        )}
+                      </td>
+                      <td style={td}>
+                        <button type="button" className="btn btn-ghost btn-xs" disabled={saving} onClick={() => toggleSkip(r.line)} aria-label={fill(tt.prayerImportSkipRow, { name: r.name })} style={{ whiteSpace: "nowrap" }}>
+                          <X size={12} /> {tt.prayerImportSkip}
+                        </button>
+                      </td>
                     </tr>
-                  ))}
+                  )))}
                 </tbody>
               </table>
             </div>
