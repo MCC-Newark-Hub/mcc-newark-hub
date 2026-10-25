@@ -126,7 +126,7 @@ export function formatCircular(circular, lang = "pt") {
 export function parseReasons(text) {
   return String(text || "")
     .split("\n")
-    .map((l) => l.replace(/^\s*[-•*]\s*/, "").trim())
+    .map((l) => l.replace(/^\s*[-•*]\s+/, "").trim())
     .filter(Boolean);
 }
 
@@ -178,7 +178,7 @@ export function buildShareText(period, slots, lang = "pt") {
     ...(circular ? [circular] : []),
     formatPeriodRange(period, lang),
     "",
-    ...(reasons.length ? [pt ? "Motivos de Oração:" : "Prayer intentions:", ...reasons.map((r) => `- ${markdownToWhatsApp(r)}`), ""] : []),
+    ...(reasons.length ? [pt ? "Motivos de Oração:" : "Prayer intentions:", ...reasonsToWhatsApp(reasons), ""] : []),
     pt ? "Períodos" : "Time slots",
     ...lines,
   ].join("\n");
@@ -219,7 +219,7 @@ export function splitName(fullName) {
 
 // Inline markdown for the prayer intentions: **bold**, *italic* / _italic_ and [text](https://link).
 // Returns tokens; the UI renders them as React elements (no raw HTML is ever injected).
-const INLINE = /(\*\*[^*\n]+\*\*|\*[^*\s][^*\n]*\*|(?<![\w])_[^_\s][^_\n]*_(?![\w])|\[[^\]\n]+\]\((?:https?:\/\/|mailto:)[^\s)]+\))/g;
+const INLINE = /(~~[^~\n]+~~|`[^`\n]+`|\*\*[^*\n]+\*\*|\*[^*\s][^*\n]*\*|(?<![\w])_[^_\s][^_\n]*_(?![\w])|\[[^\]\n]+\]\((?:https?:\/\/|mailto:)[^\s)]+\))/g;
 
 export function parseInlineMarkdown(text) {
   const out = [];
@@ -229,6 +229,8 @@ export function parseInlineMarkdown(text) {
     if (m.index > last) out.push({ type: "text", text: src.slice(last, m.index) });
     const t = m[0];
     if (t.startsWith("**")) out.push({ type: "bold", text: t.slice(2, -2) });
+    else if (t.startsWith("~~")) out.push({ type: "strike", text: t.slice(2, -2) });
+    else if (t.startsWith("`")) out.push({ type: "code", text: t.slice(1, -1) });
     else if (t.startsWith("[")) {
       const close = t.indexOf("](");
       out.push({ type: "link", text: t.slice(1, close), href: t.slice(close + 2, -1) });
@@ -242,8 +244,51 @@ export function parseInlineMarkdown(text) {
 // WhatsApp's own syntax: *bold*, _italic_, links as plain "text (url)".
 export function markdownToWhatsApp(text) {
   return parseInlineMarkdown(text)
-    .map((t) => (t.type === "bold" ? `*${t.text}*` : t.type === "italic" ? `_${t.text}_` : t.type === "link" ? `${t.text} (${t.href})` : t.text))
+    .map((t) => (t.type === "bold" ? `*${t.text}*` : t.type === "italic" ? `_${t.text}_` : t.type === "strike" ? `~${t.text}~` : t.type === "code" ? `\`\`\`${t.text}\`\`\`` : t.type === "link" ? `${t.text} (${t.href})` : t.text))
     .join("");
+}
+
+// ---- Block markdown for the "reasons" text ---------------------------------------------------------
+// The admin writes one line per reason. A line can also be a block: "# Title" … "###### Title" (heading),
+// "> quote", "---" (divider), "1. item" (numbered); anything else is a list item. Consecutive items/quotes are
+// grouped. Nothing is ever treated as HTML.
+const HEADING = /^(#{1,6})\s+(.+)$/;
+const RULE = /^(?:-{3,}|\*{3,}|_{3,})$/;
+const QUOTE = /^>\s?(.*)$/;
+const NUMBERED = /^\d+[.)]\s+(.+)$/;
+
+export function parseReasonBlocks(lines) {
+  const blocks = [];
+  for (const raw of lines || []) {
+    const line = String(raw || "").trim();
+    if (!line) continue;
+    let m;
+    if ((m = line.match(HEADING))) { blocks.push({ type: "heading", level: m[1].length, text: m[2].trim() }); continue; }
+    if (RULE.test(line)) { blocks.push({ type: "rule" }); continue; }
+    if ((m = line.match(QUOTE))) {
+      const last = blocks[blocks.length - 1];
+      if (last?.type === "quote") last.lines.push(m[1].trim()); else blocks.push({ type: "quote", lines: [m[1].trim()] });
+      continue;
+    }
+    const numbered = line.match(NUMBERED);
+    const ordered = !!numbered;
+    const text = numbered ? numbered[1].trim() : line;
+    const last = blocks[blocks.length - 1];
+    if (last?.type === "list" && last.ordered === ordered) last.items.push(text); else blocks.push({ type: "list", ordered, items: [text] });
+  }
+  return blocks;
+}
+
+// The same blocks as WhatsApp text: headings in bold, lists with "-" / "1.", quotes with ">".
+export function reasonsToWhatsApp(lines) {
+  const out = [];
+  for (const b of parseReasonBlocks(lines)) {
+    if (b.type === "heading") out.push("", `*${markdownToWhatsApp(b.text).replace(/\*/g, "")}*`);
+    else if (b.type === "rule") out.push("———");
+    else if (b.type === "quote") b.lines.forEach((l) => out.push(`> ${markdownToWhatsApp(l)}`));
+    else b.items.forEach((it, i) => out.push(`${b.ordered ? `${i + 1}.` : "-"} ${markdownToWhatsApp(it)}`));
+  }
+  return out;
 }
 
 // Friendly link segment from a list name: "Costa Oeste" -> "costa-oeste", "São Paulo" -> "sao-paulo".

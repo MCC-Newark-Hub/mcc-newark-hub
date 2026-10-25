@@ -4,7 +4,8 @@ import { sb } from "@/lib/supabase";
 import { useAppDataContext } from "@/context/AppDataContext";
 import PrayerChurchPicker from "@/components/PrayerChurchPicker";
 import MultiCheckList from "@/components/MultiCheckList";
-import InlineMarkdown from "@/components/InlineMarkdown";
+import ReasonsMarkdown from "@/components/ReasonsMarkdown";
+import ReasonsImageButton from "@/components/ReasonsImageButton";
 import { kindLabel, scopeLabel, periodTabLabel } from "@/lib/churchGroups";
 import ChurchLabel from "@/components/ChurchLabel";
 import PrayerImportModal from "@/components/PrayerImportModal";
@@ -427,6 +428,7 @@ export default function OracaoTab({ lang }) {
             <button className="btn btn-ghost" onClick={() => copy("list", buildShareText(period, slots, lang))} disabled={loadingSlots}>
               {copied === "list" ? (pt ? "Lista copiada!" : "List copied!") : (pt ? "Copiar lista (WhatsApp)" : "Copy list (WhatsApp)")}
             </button>
+            <ReasonsImageButton period={period} lang={lang} className="btn btn-ghost" />
             <div style={{ flex: 1, minWidth: 200 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>
                 <span>{capacity > 1
@@ -631,7 +633,7 @@ export default function OracaoTab({ lang }) {
               style={{ ...inputStyle, marginBottom: 6, resize: "vertical", fontFamily: "inherit" }}
             />
             <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 12, lineHeight: 1.5 }}>
-              {pt ? "Aceita **negrito**, *itálico* e [texto do link](https://endereço)." : "Supports **bold**, *italic* and [link text](https://address)."}
+              {STRINGS[pt ? "pt" : "en"].prayerReasonsHint}
             </div>
             <label style={labelStyle}>{pt ? "Motivos de Oração em inglês (um por linha, opcional)" : "Prayer intentions in English (one per line, optional)"}</label>
             <textarea
@@ -644,9 +646,7 @@ export default function OracaoTab({ lang }) {
             {parseReasons(form.reasonsText).length > 0 && (
               <div style={{ background: "var(--bg2)", borderRadius: 8, padding: "10px 14px", marginBottom: 12 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", marginBottom: 4 }}>{pt ? "PRÉ-VISUALIZAÇÃO" : "PREVIEW"}</div>
-                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
-                  {parseReasons(form.reasonsText).map((r, i) => <li key={i}><InlineMarkdown text={r} /></li>)}
-                </ul>
+                <ReasonsMarkdown reasons={parseReasons(form.reasonsText)} color="var(--text)" headingColor="var(--text)" />
               </div>
             )}
             {formError && <div style={{ color: "#991b1b", fontSize: 13, marginBottom: 12 }}>{formError}</div>}
@@ -666,6 +666,7 @@ export default function OracaoTab({ lang }) {
           slots={slots}
           churches={churches}
           groups={groups}
+          members={members}
           lang={lang}
           onClose={() => setShowSheetImport(false)}
           onDone={(msg) => { setShowSheetImport(false); setInfo(msg); setTick((t) => t + 1); }}

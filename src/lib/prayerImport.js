@@ -76,3 +76,49 @@ export function validateImportRows(rows, { allowed = null, existing = new Map(),
     return res;
   });
 }
+
+// ---- Matching the names of a spreadsheet against the member directory ---------------------------------------------
+// A name such as "Mara N." or "Tatiana" is looked up among the members (restricted to the churches the list accepts), so
+// the admin can confirm who it is before importing. Scores: 100 same full name · 85 first name + the other parts (a lone
+// letter is an initial: "Mara N." = Mara N…) · 50 first name only.
+const TITLES = new Set(["pr", "pra", "pastor", "pastora", "ir", "irma", "irmao"]); // "Pr Nairon" is Nairon
+const tokens = (s) => norm(String(s || "").replace(/[.,;:()]/g, " ")).split(" ").filter((t, i, all) => t && !(i === 0 && all.length > 1 && TITLES.has(t)));
+
+export function suggestMembers(name, members, { allowed = null, churchHint = "", limit = 5 } = {}) {
+  const want = tokens(name);
+  if (!want.length) return { candidates: [], auto: null };
+  const allowedSet = allowed ? new Set(allowed.map(norm)) : null;
+  const scored = [];
+  for (const m of members || []) {
+    if (allowedSet && !allowedSet.has(norm(m.church))) continue;
+    const have = tokens(m.name);
+    if (!have.length || have[0] !== want[0]) continue;
+    let score;
+    if (want.length === 1) score = 50;
+    else if (want.join(" ") === have.join(" ")) score = 100;
+    else {
+      const rest = have.slice(1);
+      score = want.slice(1).every((w) => rest.some((h) => h.startsWith(w))) ? 85 : 0;
+    }
+    if (!score) continue;
+    if (want.length > 1 && churchHint && norm(m.church) === norm(churchHint)) score += 3; // only to tell namesakes apart
+    scored.push({ member: m, score });
+  }
+  scored.sort((a, b) => b.score - a.score || String(a.member.name).localeCompare(String(b.member.name), "pt"));
+  const [top, second] = scored;
+  // a clear suggestion: a single candidate, or one that scores strictly higher than the next (an exact name beats a
+  // partial one, and the church written in the sheet breaks a tie between namesakes)
+  const auto = top && (!second || top.score > second.score) ? { member: top.member, exact: top.score >= 100 } : null;
+  return { candidates: scored.slice(0, limit).map((s) => s.member), auto };
+}
+
+// Free search of the directory (for "someone else"): every word must start a word of the name.
+export function searchMembers(members, query, { allowed = null, limit = 6 } = {}) {
+  const words = tokens(query);
+  if (!words.length) return [];
+  const allowedSet = allowed ? new Set(allowed.map(norm)) : null;
+  return (members || [])
+    .filter((m) => (!allowedSet || allowedSet.has(norm(m.church))) && words.every((w) => tokens(m.name).some((h) => h.startsWith(w))))
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), "pt"))
+    .slice(0, limit);
+}
