@@ -4,7 +4,8 @@ import { Circle, CircleCheck, CircleDot, X } from "lucide-react";
 import ICMLogo from "@/components/ICMLogo";
 import PrayerChurchPicker from "@/components/PrayerChurchPicker";
 import ChurchLabel from "@/components/ChurchLabel";
-import InlineMarkdown from "@/components/InlineMarkdown";
+import ReasonsMarkdown from "@/components/ReasonsMarkdown";
+import ReasonsImageButton from "@/components/ReasonsImageButton";
 import { useAppDataContext } from "@/context/AppDataContext";
 import { sb } from "@/lib/supabase";
 import { SLOT_COUNT, HALVES, HALF_SIZE, groupBySlot, slotCapacity, slotStats, slotTime, slotRange, splitName, todayLocal, periodText, pickByParam, formatPeriodRange, formatCircular, pickActivePeriods } from "@/lib/prayerSlots";
@@ -413,12 +414,11 @@ function PrayerBoard({ lang, setLang }) {
 
         {periodText(period, lang).reasons.length > 0 && (
           <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: "12px 16px", marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#03223f", marginBottom: 6 }}>
-              {tt.prayerPrayerIntentions}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#03223f" }}>{tt.prayerPrayerIntentions}</div>
+              <ReasonsImageButton period={period} lang={lang} />
             </div>
-            <ul style={{ margin: 0, paddingLeft: 18, color: "#374151", fontSize: 13, lineHeight: 1.6 }}>
-              {periodText(period, lang).reasons.map((r, i) => <li key={i}><InlineMarkdown text={r} /></li>)}
-            </ul>
+            <ReasonsMarkdown reasons={periodText(period, lang).reasons} />
           </div>
         )}
 
