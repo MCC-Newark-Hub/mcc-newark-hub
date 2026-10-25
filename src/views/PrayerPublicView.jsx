@@ -8,7 +8,7 @@ import ReasonsMarkdown from "@/components/ReasonsMarkdown";
 import ReasonsImageButton from "@/components/ReasonsImageButton";
 import { useAppDataContext } from "@/context/AppDataContext";
 import { sb } from "@/lib/supabase";
-import { SLOT_COUNT, HALVES, HALF_SIZE, groupBySlot, slotCapacity, slotStats, slotTime, slotRange, splitName, todayLocal, periodText, pickByParam, formatPeriodRange, formatCircular, pickActivePeriods } from "@/lib/prayerSlots";
+import { SLOT_COUNT, HALVES, HALF_SIZE, groupBySlot, slotCapacity, slotStats, slotTime, slotRange, splitName, todayLocal, periodText, pickByParam, formatPeriodRange, formatCircular, pickActivePeriods, displayName } from "@/lib/prayerSlots";
 import { resolveScopeChurches, scopeLabel, joinList } from "@/lib/churchGroups";
 import { STRINGS, fill } from "@/i18n/strings";
 import PrayerLanding from "@/components/PrayerLanding";
@@ -44,7 +44,8 @@ function PrayerBoard({ lang, setLang }) {
   const pt = lang !== "en";
   const tt = STRINGS[pt ? "pt" : "en"];
   const { id: idParam } = useParams();
-  const { churches = [] } = useAppDataContext() || {};
+  const { churches = [], members = [] } = useAppDataContext() || {};
+  const memberById = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]); // badge names of the people linked to the directory
 
   const [periods, setPeriods] = useState([]); // every active list (one period per list)
   const [groups, setGroups] = useState([]);
@@ -150,7 +151,7 @@ function PrayerBoard({ lang, setLang }) {
     const run = async () => {
       const { data, error: e2 } = await sb
         .from("schedule_oracao")
-        .select("id,slot_index,member_name,church")
+        .select("id,slot_index,member_id,member_name,church")
         .eq("period_id", periodId)
         .order("created_at");
       if (cancelled) return;
@@ -325,7 +326,7 @@ function PrayerBoard({ lang, setLang }) {
           <span style={{ display: "flex", flexDirection: "column", marginLeft: 28 }}>
             {people.map((s, k) => {
               const isMine = mine.includes(s.id);
-              const nm = splitName(s.member_name);
+              const nm = splitName(displayName(s, memberById));
               return (
                 <span
                   key={s.id}

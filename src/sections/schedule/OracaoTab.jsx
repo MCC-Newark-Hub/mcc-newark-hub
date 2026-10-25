@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Circle, CircleCheck, X } from "lucide-react";
 import { sb } from "@/lib/supabase";
 import { useAppDataContext } from "@/context/AppDataContext";
@@ -11,7 +11,7 @@ import ChurchLabel from "@/components/ChurchLabel";
 import PrayerImportModal from "@/components/PrayerImportModal";
 import { STRINGS } from "@/i18n/strings";
 import {
-  SLOT_COUNT, HALVES, HALF_SIZE, groupBySlot, slotCapacity, slotStats, slotTime, slotRange, splitName,
+  SLOT_COUNT, HALVES, HALF_SIZE, groupBySlot, slotCapacity, slotStats, slotTime, slotRange, splitName, displayName,
   todayLocal, formatDate, formatPeriodRange, formatCircular, parseReasons, periodSlug, pickPeriod, buildShareText, nextPeriodId,
 } from "@/lib/prayerSlots";
 
@@ -28,6 +28,7 @@ const labelStyle = { fontSize: 12, fontWeight: 600, color: "var(--muted)", displ
 export default function OracaoTab({ lang }) {
   const pt = lang !== "en";
   const { members = [], churches = [] } = useAppDataContext() || {};
+  const memberById = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]); // badge names of the people linked to the directory
   const today = todayLocal();
 
   const [periods, setPeriods] = useState([]);
@@ -425,7 +426,7 @@ export default function OracaoTab({ lang }) {
             <button className="btn btn-ghost" disabled={!period.is_active} onClick={() => copy("link1", publicLink())}>
               {copied === "link1" ? (pt ? "Link copiado!" : "Link copied!") : (pt ? "Copiar link de todas as listas" : "Copy link to all lists")}
             </button>
-            <button className="btn btn-ghost" onClick={() => copy("list", buildShareText(period, slots, lang))} disabled={loadingSlots}>
+            <button className="btn btn-ghost" onClick={() => copy("list", buildShareText(period, slots, lang, (r) => displayName(r, memberById)))} disabled={loadingSlots}>
               {copied === "list" ? (pt ? "Lista copiada!" : "List copied!") : (pt ? "Copiar lista (WhatsApp)" : "Copy list (WhatsApp)")}
             </button>
             <ReasonsImageButton period={period} lang={lang} className="btn btn-ghost" />
@@ -493,13 +494,13 @@ export default function OracaoTab({ lang }) {
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                   <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "1px 5px" }}>
                                     <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", overflowWrap: "anywhere" }}>
-                                      {splitName(row.member_name).first}
+                                      {splitName(displayName(row, memberById)).first}
                                     </span>
                                     <ChurchLabel church={row.church} />
                                   </div>
-                                  {splitName(row.member_name).rest && (
+                                  {splitName(displayName(row, memberById)).rest && (
                                     <div style={{ fontSize: 10.5, color: "var(--muted)", textTransform: "uppercase", lineHeight: 1.3, overflowWrap: "anywhere" }}>
-                                      {splitName(row.member_name).rest}
+                                      {splitName(displayName(row, memberById)).rest}
                                     </div>
                                   )}
                                 </div>

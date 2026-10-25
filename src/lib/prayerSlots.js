@@ -165,11 +165,11 @@ export function slotStats(slots, capacity) {
 //   Períodos
 //   00:00-00:15 - LIVRE
 //   00:15-00:30 - LEONARD
-export function buildShareText(period, slots, lang = "pt") {
+export function buildShareText(period, slots, lang = "pt", nameOf = (s) => s.member_name) {
   const pt = lang !== "en";
   const bySlot = groupBySlot(slots);
   const free = pt ? "LIVRE" : "FREE";
-  const lines = Array.from({ length: SLOT_COUNT }, (_, i) => `${slotRange(i)} - ${(bySlot.get(i) || []).map((s) => s.member_name).join(" / ").toUpperCase() || free}`);
+  const lines = Array.from({ length: SLOT_COUNT }, (_, i) => `${slotRange(i)} - ${(bySlot.get(i) || []).map((s) => nameOf(s)).join(" / ").toUpperCase() || free}`);
   const { title, reasons } = periodText(period, lang);
   const circular = formatCircular(period.circular, lang);
   return [
@@ -212,6 +212,13 @@ export function churchBadge(church) {
 
 // First name on top, the rest of the name (smaller) below: keeps the first name and the church label
 // visible on one line without cutting anything.
+// What the board shows for a person: the member's badge name ("Gil Ricardo", "Laninha Amaral") when the entry is linked to the
+// directory (member_id) and the member has one, otherwise the name as it was typed. The full name stays saved in the entry.
+export function displayName(row, memberById) {
+  const badge = String((row?.member_id && memberById?.get(row.member_id)?.badgeName) || "").trim();
+  return badge || String(row?.member_name || "");
+}
+
 export function splitName(fullName) {
   const parts = String(fullName || "").trim().split(/\s+/).filter(Boolean);
   return { first: parts[0] || "", rest: parts.slice(1).join(" ") };
