@@ -43,6 +43,19 @@ const ACTION_LABELS = {
   prayer_period_activated: "Oração 24h: lista ativada",
   prayer_period_deactivated: "Oração 24h: lista desativada",
   prayer_period_deleted: "Oração 24h: lista excluída",
+  worship_list_created: "Lista de Louvores: criada",
+  worship_list_updated: "Lista de Louvores: dados editados",
+  worship_list_song_added: "Lista de Louvores: louvor adicionado",
+  worship_list_song_removed: "Lista de Louvores: louvor removido",
+  worship_list_reordered: "Lista de Louvores: ordem alterada",
+  worship_list_published: "Lista de Louvores: link publicado",
+  worship_list_finalized: "Lista de Louvores: finalizada",
+  worship_list_reopened: "Lista de Louvores: reaberta",
+  worship_list_deleted: "Lista de Louvores: excluída",
+  praise_song_created: "Louvor criado",
+  praise_song_updated: "Louvor editado",
+  praise_song_approved: "Louvor aprovado",
+  praise_song_deleted: "Louvor excluído",
 };
 
 const ENTITY_LABELS = {
@@ -57,6 +70,8 @@ const ENTITY_LABELS = {
   churches: "Igreja",
   prayer_slot: "Oração 24h (horário)",
   prayer_period: "Oração 24h (lista)",
+  worship_list: "Lista de Louvores",
+  praise_song: "Louvor",
 };
 
 const PAGE_SIZE = 50;

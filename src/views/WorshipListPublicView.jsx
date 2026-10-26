@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useAppDataContext } from "@/context/AppDataContext";
 import { splitChurches } from "@/lib/prayerSlots";
@@ -6,6 +6,7 @@ import { ArrowUp, ArrowDown, X, Link as LinkIcon } from "lucide-react";
 import ICMLogo from "@/components/ICMLogo";
 import SongPicker from "@/components/SongPicker";
 import WorshipListSharedView from "@/views/WorshipListSharedView";
+import { logAuditEvent, publicActor, deviceInfo } from "@/lib/auditEvent";
 import { STRINGS, fill } from "@/i18n/strings";
 import {
   fetchSongs, fetchListsByDate, fetchRecentLists, createList, updateList, addListItem, removeListItem, saveItemPositions,
@@ -98,6 +99,7 @@ export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreat
   const [loadedKey, setLoadedKey] = useState(null); // "date|type" of the list currently shown
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null); // { kind: "ok" | "error" | "info", text }
+  const nameRef = useRef(null);
 
   const locked = list ? isListLocked(list) : false;
   // Anyone with the link can edit until the list is published (or locks by itself the next morning).
@@ -122,12 +124,19 @@ export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreat
   const fail = (text = tt.praiseSaveFailed) => setNotice({ kind: "error", text });
   const rememberName = (v) => { setEnteredBy(v); if (!admin) writeJSON(NAME_KEY, v); };
 
+  // Everything done on a list goes to the audit log: the actor is the typed name (role "public" on the shared link, "staff" in the admin).
+  const audit = (action, entityId, extra = {}) => logAuditEvent({
+    actor: { ...publicActor(enteredBy), role: admin ? "staff" : "public" }, action, entityType: "worship_list", entityId,
+    entityLabel: `${date} · ${type}`, details: { church: header.church || null, via: admin ? "admin" : "public link", device: admin ? null : deviceInfo(), ...extra },
+  });
+
   const addSong = async (song) => {
     if (!canEdit || items.some((i) => i.song_id === song.id)) return;
     const position = items.length;
     if (!list) { setItems((prev) => [...prev, { id: `tmp-${song.id}`, song_id: song.id, position }]); return; }
     const { data, error } = await addListItem(list.id, song.id, position);
     if (error) { fail(); return; }
+    audit("worship_list_song_added", list.id, { song: song.title, number: song.code || null });
     setItems((prev) => [...prev, data]);
   };
 
@@ -138,6 +147,7 @@ export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreat
     if (!list) return;
     const { error } = await removeListItem(item.id);
     if (error) { fail(); return; }
+    audit("worship_list_song_removed", list.id, { song: songsById.get(item.song_id)?.title || null });
     const { error: posError } = await saveItemPositions(list.id, next);
     if (posError) fail();
   };
@@ -148,24 +158,35 @@ export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreat
     setItems(next);
     if (!list) return;
     const { error } = await saveItemPositions(list.id, next);
-    if (error) fail();
+    if (error) { fail(); return; }
+    audit("worship_list_reordered", list.id, { song: songsById.get(items[index]?.song_id)?.title || null, from: index + 1, to: index + dir + 1 });
   };
 
   const save = async () => {
     const name = enteredBy.trim();
-    if (!name) { setNotice({ kind: "error", text: tt.praiseNameRequired }); return; }
-    setBusy(true);
+    if (!name) {
+      // the name is asked on every save (also of a list already saved): take the person to the field
+      setNotice({ kind: "error", text: tt.praiseNameRequired });
+      nameRef.current?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+      nameRef.current?.focus?.();
+      return;
+    }
     if (!header.church && !list) { setNotice({ kind: "error", text: tt.praiseChurchRequired }); return; }
+    setBusy(true);
     const fields = { church: header.church || null, group_name: header.group_name.trim() || null, leader: header.leader.trim() || null, preacher: header.preacher.trim() || null };
     if (list) {
       const { data, error } = await updateList(list.id, fields);
       setBusy(false);
       if (error) { fail(); return; }
+      const changes = {};
+      for (const k of Object.keys(fields)) if ((list[k] || null) !== (data[k] || null)) changes[k] = { from: list[k] || null, to: data[k] || null };
+      if (Object.keys(changes).length) audit("worship_list_updated", list.id, changes);
       setList((prev) => ({ ...prev, ...data }));
     } else {
       const { data, error } = await createList({ service_date: date, service_type: type, entered_by: name, ...fields }, items.map((i) => i.song_id));
       setBusy(false);
       if (error) { fail(); return; }
+      audit("worship_list_created", data.id, { group: fields.group_name, leader: fields.leader, preacher: fields.preacher, songs: data.items.length });
       setList(data);
       setItems(data.items);
     }
@@ -180,6 +201,7 @@ export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreat
     const { data, error } = await updateList(list.id, { published_at: new Date().toISOString() });
     setBusy(false);
     if (error) { fail(); return; }
+    audit("worship_list_published", list.id);
     setList((prev) => ({ ...prev, ...data }));
     setNotice({ kind: "ok", text: tt.praisePublished });
   };
@@ -191,6 +213,7 @@ export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreat
     const { data, error } = await updateList(list.id, { locked: true });
     setBusy(false);
     if (error) { fail(); return; }
+    audit("worship_list_finalized", list.id);
     setList((prev) => ({ ...prev, ...data }));
     setNotice({ kind: "ok", text: tt.praiseFinalized });
   };
@@ -202,12 +225,12 @@ export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreat
     <div style={{ display: "grid", gap: 14 }}>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 150px" }}>
-          <label style={labelStyle}>{tt.praiseDate}</label>
-          <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} style={inputStyle} />
+          <label style={labelStyle} htmlFor="worship-date">{tt.praiseDate}</label>
+          <input id="worship-date" type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} style={inputStyle} />
         </div>
         <div style={{ flex: "1 1 150px" }}>
-          <label style={labelStyle}>{tt.praiseServiceType}</label>
-          <select value={type} onChange={(e) => setType(e.target.value)} style={inputStyle}>
+          <label style={labelStyle} htmlFor="worship-type">{tt.praiseServiceType}</label>
+          <select id="worship-type" value={type} onChange={(e) => setType(e.target.value)} style={inputStyle}>
             {SERVICE_TYPES.map((t) => <option key={t} value={t}>{tt[TYPE_KEYS[t]]}</option>)}
           </select>
         </div>
@@ -226,17 +249,17 @@ export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreat
             <ChurchSelect value={header.church} onChange={(v) => { setHeader((h) => ({ ...h, church: v })); if (!admin) writeJSON(CHURCH_KEY, v); }} disabled={!canEdit} tt={tt} />
           </div>
           <div>
-            <label style={labelStyle}>{tt.praiseGroup}</label>
-            <input value={header.group_name} onChange={setField("group_name")} style={inputStyle} disabled={!canEdit} maxLength={120} />
+            <label style={labelStyle} htmlFor="worship-group">{tt.praiseGroup}</label>
+            <input id="worship-group" value={header.group_name} onChange={setField("group_name")} style={inputStyle} disabled={!canEdit} maxLength={120} />
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <div style={{ flex: "1 1 200px" }}>
-              <label style={labelStyle}>{tt.praiseLeader}</label>
-              <input value={header.leader} onChange={setField("leader")} style={inputStyle} disabled={!canEdit} maxLength={120} />
+              <label style={labelStyle} htmlFor="worship-leader">{tt.praiseLeader}</label>
+              <input id="worship-leader" value={header.leader} onChange={setField("leader")} style={inputStyle} disabled={!canEdit} maxLength={120} />
             </div>
             <div style={{ flex: "1 1 200px" }}>
-              <label style={labelStyle}>{tt.praisePreacher}</label>
-              <input value={header.preacher} onChange={setField("preacher")} style={inputStyle} disabled={!canEdit} maxLength={120} />
+              <label style={labelStyle} htmlFor="worship-preacher">{tt.praisePreacher}</label>
+              <input id="worship-preacher" value={header.preacher} onChange={setField("preacher")} style={inputStyle} disabled={!canEdit} maxLength={120} />
             </div>
           </div>
 
@@ -250,12 +273,10 @@ export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreat
 
           {canEdit && (
             <>
-              {!list && (
-                <div>
-                  <label style={labelStyle}>{tt.praiseEnteredBy}</label>
-                  <input value={enteredBy} onChange={(e) => rememberName(e.target.value)} style={inputStyle} maxLength={120} />
-                </div>
-              )}
+              <div>
+                <label style={labelStyle} htmlFor="worship-entered-by">{list ? tt.praiseEditedBy : tt.praiseEnteredBy}</label>
+                <input id="worship-entered-by" ref={nameRef} value={enteredBy} onChange={(e) => rememberName(e.target.value)} style={inputStyle} maxLength={120} autoComplete="name" />
+              </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button className="btn btn-primary" onClick={save} disabled={busy}>
                   {busy ? tt.praiseSaving : tt.praiseSave}
