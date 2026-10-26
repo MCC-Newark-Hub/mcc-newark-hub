@@ -4,6 +4,7 @@ import SongPicker from "@/components/SongPicker";
 import { ServiceListForm } from "@/views/WorshipListPublicView";
 import { useAppDataContext } from "@/context/AppDataContext";
 import { STRINGS, fill } from "@/i18n/strings";
+import { logAuditEvent, staffActor } from "@/lib/auditEvent";
 import { fetchSongs, fetchRecentLists, updateSong, deleteSong, updateList, deleteList } from "@/lib/praiseData";
 import { CATEGORIES, THEMES, themeApplies, dateKey, isListLocked, songLabel, songNumber, formatCode, canManagePraise, listPath, hasNumberPrefix, songErrorText, catalogTotals, filterCatalog, upperTitle } from "@/lib/praiseLists";
 
@@ -15,6 +16,7 @@ const labelStyle = { fontSize: 11, fontWeight: 600, color: "var(--muted)", displ
 export default function PraiseListsTab({ lang }) {
   const tt = STRINGS[lang === "en" ? "en" : "pt"];
   const { user, notify } = useAppDataContext() || {};
+  const actor = staffActor(user); // who is doing it, for the audit log
   const canManage = canManagePraise(user);
   const today = dateKey();
 
@@ -45,6 +47,7 @@ export default function PraiseListsTab({ lang }) {
   const approve = async (song) => {
     const { data, error } = await updateSong(song.id, { status: "active" });
     if (error) { say(tt.praiseSaveFailed); return; }
+    logAuditEvent({ actor, action: "praise_song_approved", entityType: "praise_song", entityId: song.id, entityLabel: song.title, details: { code: song.code } });
     setSongs((prev) => prev.map((s) => (s.id === song.id ? { ...s, ...data } : s)));
   };
 
@@ -52,12 +55,16 @@ export default function PraiseListsTab({ lang }) {
     if (!window.confirm(tt.praiseDeleteSongConfirm)) return;
     const { error } = await deleteSong(song.id);
     if (error) { say(error.code === "23503" ? tt.praiseDeleteSongInUse : tt.praiseSaveFailed); return; }
+    logAuditEvent({ actor, action: "praise_song_deleted", entityType: "praise_song", entityId: song.id, entityLabel: song.title, details: { code: song.code, category: song.category } });
     setSongs((prev) => prev.filter((s) => s.id !== song.id));
   };
 
   const saveEdit = async (patch) => {
     const { data, error } = await updateSong(editing.id, patch);
     if (error) return songErrorText(tt, error, songNumber({ code: patch.code }));
+    const changes = {};
+    for (const k of ["title", "code", "category", "theme", "language", "status"]) if ((editing[k] || null) !== (data[k] || null)) changes[k] = { from: editing[k] ?? null, to: data[k] ?? null };
+    if (Object.keys(changes).length) logAuditEvent({ actor, action: "praise_song_updated", entityType: "praise_song", entityId: editing.id, entityLabel: data.title, details: changes });
     setSongs((prev) => prev.map((s) => (s.id === editing.id ? { ...s, ...data } : s)));
     setEditing(null);
     return "";
@@ -68,6 +75,7 @@ export default function PraiseListsTab({ lang }) {
   const toggleLock = async (list) => {
     const { data, error } = await updateList(list.id, { locked: !list.locked });
     if (error) { say(tt.praiseSaveFailed); return; }
+    logAuditEvent({ actor, action: list.locked ? "worship_list_reopened" : "worship_list_finalized", entityType: "worship_list", entityId: list.id, entityLabel: `${list.service_date} · ${list.service_type}`, details: { church: list.church, via: "admin" } });
     setLists((prev) => prev.map((l) => (l.id === list.id ? { ...l, ...data } : l)));
   };
 
@@ -79,6 +87,7 @@ export default function PraiseListsTab({ lang }) {
     if (!window.confirm(tt.praiseDeleteListConfirm)) return;
     const { error } = await deleteList(list.id);
     if (error) { say(tt.praiseSaveFailed); return; }
+    logAuditEvent({ actor, action: "worship_list_deleted", entityType: "worship_list", entityId: list.id, entityLabel: `${list.service_date} · ${list.service_type}`, details: { church: list.church, songs: (list.items || []).length, entered_by: list.entered_by } });
     setLists((prev) => prev.filter((l) => l.id !== list.id));
   };
 

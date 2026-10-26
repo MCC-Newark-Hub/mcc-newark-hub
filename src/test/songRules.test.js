@@ -175,7 +175,7 @@ describe("titles are always UPPERCASE", () => {
   });
   it("createSong saves the title in uppercase whatever was typed", async () => {
     await createSong({ title: "Teus Sonhos", category: "avulso" });
-    expect(insert).toHaveBeenLastCalledWith(expect.objectContaining({ title: "TEUS SONHOS" }));
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ title: "TEUS SONHOS" }));
   });
   it("updateSong saves the title in uppercase too", async () => {
     await updateSong("s1", { title: "supremo Deus (digno de louvor)" });

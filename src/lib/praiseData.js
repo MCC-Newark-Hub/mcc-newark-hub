@@ -1,6 +1,7 @@
 // Supabase access for the Lista de Louvores. Every function resolves to { data, error } and never throws.
 import { sb } from "@/lib/supabase";
 import { normalizeCode, isValidCode, hasNumberPrefix, formatSongTitle } from "@/lib/praiseLists";
+import { logAuditEvent, publicActor, deviceInfo } from "@/lib/auditEvent";
 
 const UNIQUE_VIOLATION = "23505";
 
@@ -59,6 +60,11 @@ export async function createSong({ code, title, category, theme, language, statu
   };
   const { data, error } = await sb.from("praise_songs").insert(row).select().single();
   if (error) return { data: null, error: error.code === UNIQUE_VIOLATION ? { ...error, code: "duplicate_code" } : error };
+  // an admin's songs are approved at once ("active"); anyone else's wait for approval ("pending")
+  logAuditEvent({
+    actor: { ...publicActor(createdBy), role: status === "active" ? "staff" : "public" }, action: "praise_song_created", entityType: "praise_song", entityId: data.id, entityLabel: data.title,
+    details: { code: data.code, category: data.category, status: data.status, device: deviceInfo() },
+  });
   return { data: { ...data, last_sung_on: null, times_sung: 0 }, error: null };
 }
 
