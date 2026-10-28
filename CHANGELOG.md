@@ -115,6 +115,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Balanço's "Arrecadado" total excluded paid registrations that were later cancelled, undercounting real revenue (cancellation doesn't refund a payment already collected) — `paid` in `TreasurerView.jsx`'s `BalanceTab` no longer filters out cancelled rows.
 - Escalas › Portaria: worker names and section titles were unreadable in dark mode (`DoorTab.jsx`/`DoorCalendar.jsx` left `color` unset on several elements, so they inherited `<body>`'s light-mode color instead of the theme's — dark mode is applied on a div below `<body>`, so anything that doesn't explicitly redeclare `color: var(--text)` keeps the light value). Also replaced its local, non-dismissing success/error banner with the shared `notify()` toast (matching `PraiseListsTab.jsx`'s convention) so messages read the same as the rest of the app and disappear on their own.
 
+### Security
+- **Seed users can no longer sign in on production** — when a PIN did not match any `app_users` row, `useAuth` fell back to the test users in `src/dev/seeds.js`, whose PINs are public in the repo, so the seed admin PIN gave full admin access on the live site. The fallback now only runs in local dev (`import.meta.env.DEV`); production builds drop the branch and the seed list from the bundle entirely. Tests in `src/test/seedLoginDevOnly.test.jsx`.
+
 ### In progress
 - Password reset flow for internal users
 - **CMS section** (`/cms`) — church/member management (Phase 4, placeholder live)
