@@ -76,6 +76,23 @@ export function filterCatalog(songs, query, category = "all") {
   });
 }
 
+// Catalogue ordering: "name" (title A-Z, accent-insensitive), "number" (1, 2, 3… across groups; songs without a
+// number last) or "group" (Coletânea, CIA, Avulso, English — then by number, then by name).
+export const SORT_KEYS = ["name", "number", "group"];
+export function sortCatalog(songs, key = "name") {
+  const byName = (a, b) => norm(a.title).localeCompare(norm(b.title), "pt");
+  const numOf = (s) => (songNumber(s) === "" ? Infinity : Number(songNumber(s)));
+  const byNumber = (a, b) => { const x = numOf(a), y = numOf(b); return x === y ? 0 : x < y ? -1 : 1; };
+  const groupOf = (s) => { const i = CATEGORIES.indexOf(s.category); return i < 0 ? CATEGORIES.length : i; };
+  const byGroup = (a, b) => groupOf(a) - groupOf(b);
+  const order = {
+    name: byName,
+    number: (a, b) => byNumber(a, b) || byGroup(a, b) || byName(a, b),
+    group: (a, b) => byGroup(a, b) || byNumber(a, b) || byName(a, b),
+  }[key] || byName;
+  return [...(songs || [])].sort(order);
+}
+
 // Message for an error returned by createSong / updateSong (tt = STRINGS[lang]; label = the code that was typed).
 export function songErrorText(tt, error, label) {
   if (error?.code === "duplicate_code") return fill(tt.praiseCodeTaken, { label });

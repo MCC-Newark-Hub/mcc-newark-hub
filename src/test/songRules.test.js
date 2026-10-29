@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { hasNumberPrefix, isValidCode, songErrorText, catalogTotals, filterCatalog, songLabel, songNumber, searchSongs, formatSongTitle, upperTitle } from "@/lib/praiseLists";
+import { hasNumberPrefix, isValidCode, songErrorText, catalogTotals, filterCatalog, songLabel, songNumber, searchSongs, sortCatalog, formatSongTitle, upperTitle } from "@/lib/praiseLists";
 import { STRINGS } from "@/i18n/strings";
 
 const insert = vi.fn();
@@ -180,5 +180,34 @@ describe("titles are always UPPERCASE", () => {
   it("updateSong saves the title in uppercase too", async () => {
     await updateSong("s1", { title: "supremo Deus (digno de louvor)" });
     expect(update).toHaveBeenLastCalledWith(expect.objectContaining({ title: "SUPREMO DEUS (DIGNO DE LOUVOR)" }));
+  });
+});
+
+describe("sortCatalog", () => {
+  const songs = [
+    { title: "ÓTIMO", code: "CL-002", category: "coletanea" },
+    { title: "BELO", code: "CIA-001", category: "cia" },
+    { title: "ÁGUAS", code: null, category: "avulso" },
+    { title: "STILL", code: null, category: "english" },
+    { title: "CLAMOR", code: "CL-010", category: "coletanea" },
+    { title: "AMOR", code: "ENG-003", category: "english" },
+  ];
+  const titles = (arr) => arr.map((s) => s.title);
+
+  it("by name: A-Z, ignoring accents", () => {
+    expect(titles(sortCatalog(songs, "name"))).toEqual(["ÁGUAS", "AMOR", "BELO", "CLAMOR", "ÓTIMO", "STILL"]);
+  });
+  it("by number: 1, 2, 3, 10 across groups, songs without a number last", () => {
+    expect(titles(sortCatalog(songs, "number"))).toEqual(["BELO", "ÓTIMO", "AMOR", "CLAMOR", "ÁGUAS", "STILL"]);
+  });
+  it("by group: Coletânea, CIA, Avulso, English — then by number and name", () => {
+    expect(titles(sortCatalog(songs, "group"))).toEqual(["ÓTIMO", "CLAMOR", "BELO", "ÁGUAS", "AMOR", "STILL"]);
+  });
+  it("does not change the list it was given, and falls back to name for an unknown key", () => {
+    const copy = [...songs];
+    sortCatalog(songs, "number");
+    expect(songs).toEqual(copy);
+    expect(titles(sortCatalog(songs, "nonsense"))[0]).toBe("ÁGUAS");
+    expect(sortCatalog(undefined)).toEqual([]);
   });
 });
