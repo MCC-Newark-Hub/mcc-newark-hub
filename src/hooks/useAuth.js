@@ -10,10 +10,12 @@ export function useAuth(dbUsers) {
     var u = dbUsers.find(function (x) {
       return x.pin === pin && x.active !== false;
     });
-    if (!u)
+    // seed users are for local dev only: their PINs are public in the repo, so a
+    // production build must never accept them (Vite strips this branch and the seeds)
+    if (!u && import.meta.env.DEV)
       u = INIT_USERS.find(function (x) {
         return x.pin === pin;
-      }); // fallback to seed
+      });
     if (u) {
       var mapped = {
         id: u.id,
