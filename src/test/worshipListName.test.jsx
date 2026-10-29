@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ServiceListForm } from "@/views/WorshipListPublicView";
 import { fetchListsByDate, updateList } from "@/lib/praiseData";
@@ -30,9 +30,12 @@ const renderForm = () => render(
 describe("a list that is already saved can be completed by someone else", () => {
   beforeEach(() => {
     vi.clearAllMocks(); memory.clear();
+    // the evening of the service: the list auto-locks at midnight, so a real clock would lock it once the date passes
+    vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date(2026, 9, 25, 20, 0));
     fetchListsByDate.mockResolvedValue({ data: [SAVED], error: null });
     updateList.mockImplementation(async (id, fields) => ({ data: { ...SAVED, ...fields }, error: null }));
   });
+  afterEach(() => vi.useRealTimers());
 
   it("shows the name field on a saved list too, labelled as the person editing", async () => {
     renderForm();
