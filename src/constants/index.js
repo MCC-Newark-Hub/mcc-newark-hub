@@ -20,6 +20,8 @@ export const ORG_CHART_USER_IDS = [
 // ── Categories, Roles, Teams, Churches ────────────────────────────────────────
 
 export const CATEGORIES = ["0-3", "Criança", "Intermediário", "Adolescente", "Jovem", "Adulto"];
+// The CIA classes (children's church), babies included.
+export const CIA_CATEGORIES = ["0-3", "Criança", "Intermediário", "Adolescente"];
 
 export const ROLE_OPTIONS = [
   "",

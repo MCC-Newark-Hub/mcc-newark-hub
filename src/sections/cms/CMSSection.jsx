@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { BookOpen, Building2, Star, Upload, LayoutDashboard } from "lucide-react";
+import { BookOpen, Building2, Star, Upload, LayoutDashboard, FileSpreadsheet } from "lucide-react";
 import { useAppDataContext } from "@/context/AppDataContext";
 import { useTopbarContent } from "@/context/TopbarContext";
 import Sidebar from "@/components/Sidebar";
 import FuncoesTab from "@/views/admin/FuncoesTab";
 import OverviewPanel from "@/components/directory/OverviewPanel";
+import ReportsPanel from "@/components/directory/ReportsPanel";
 import { AdminDirectory, AdminGA, AdminImport } from "@/views/AdminView";
 
 // Diretório: members, families, groups and functions — the tools that used to sit in the Eventos menu.
@@ -34,6 +35,7 @@ function CMSAdmin({ props, lang }) {
   const navItems = [
     { id: "overview", icon: <LayoutDashboard size={16} />, label: pt ? "Visão Geral" : "Overview" },
     { id: "directory", icon: <BookOpen size={16} />, label: pt ? "Diretório" : "Directory" },
+    { id: "reports", icon: <FileSpreadsheet size={16} />, label: pt ? "Relatórios" : "Reports" },
     { id: "ga", icon: <Building2 size={16} />, label: pt ? "Grupos de Assistência" : "Assistance groups" },
     { id: "funcoes", icon: <Star size={16} />, label: pt ? "Funções" : "Functions" },
     { id: "import", icon: <Upload size={16} />, label: pt ? "Importar" : "Import" },
@@ -46,6 +48,7 @@ function CMSAdmin({ props, lang }) {
           <div className="page-pad">
             {sec === "overview" && <OverviewPanel />}
             {sec === "directory" && <AdminDirectory {...props} />}
+            {sec === "reports" && <ReportsPanel />}
             {sec === "ga" && <AdminGA {...props} />}
             {sec === "funcoes" && <FuncoesTab members={props.members} setMembers={props.setMembers} gas={props.gas} notify={props.notify} logAudit={props.logAudit} />}
             {sec === "import" && <AdminImport members={props.members} setMembers={props.setMembers} families={props.families} setFamilies={props.setFamilies} gas={props.gas} setGas={props.setGas} rosters={props.rosters} setRosters={props.setRosters} churches={props.churches} setChurches={props.setChurches} notify={props.notify} />}
