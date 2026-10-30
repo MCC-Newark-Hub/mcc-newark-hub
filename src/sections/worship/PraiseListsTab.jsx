@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo } from "react";
-import { Link as LinkIcon, Lock, LockOpen, Trash2, Check, Pencil, Plus, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Link as LinkIcon, Lock, LockOpen, Trash2, Check, Pencil, Plus, X, ChevronLeft, ChevronRight, GitMerge } from "lucide-react";
 import SongPicker from "@/components/SongPicker";
 import { ServiceListForm } from "@/views/WorshipListPublicView";
+import { MergeSongModal, MergeListsModal } from "@/sections/worship/PraiseMergeModals";
 import { useAppDataContext } from "@/context/AppDataContext";
 import { STRINGS, fill } from "@/i18n/strings";
 import { logAuditEvent, staffActor } from "@/lib/auditEvent";
 import { fetchSongs, fetchRecentLists, updateSong, deleteSong, updateList, deleteList } from "@/lib/praiseData";
-import { CATEGORIES, THEMES, themeApplies, dateKey, isListLocked, songLabel, songNumber, formatCode, canManagePraise, listPath, hasNumberPrefix, songErrorText, catalogTotals, filterCatalog, sortCatalog, upperTitle } from "@/lib/praiseLists";
+import { CATEGORIES, THEMES, themeApplies, dateKey, isListLocked, songLabel, songNumber, formatCode, canManagePraise, listPath, hasNumberPrefix, songErrorText, catalogTotals, filterCatalog, sortCatalog, upperTitle, duplicateServices, songHistory } from "@/lib/praiseLists";
 
 const CAT_KEYS = { coletanea: "praiseCatColetanea", cia: "praiseCatCia", avulso: "praiseCatAvulso", english: "praiseCatEnglish" };
 const TYPE_KEYS = { ebd: "praiseTypeEbd", noite: "praiseTypeNoite", outro: "praiseTypeOutro" };
@@ -27,9 +28,12 @@ export default function PraiseListsTab({ lang }) {
   const [editorFor, setEditorFor] = useState(null); // { key, date, type } while the list editor is open
   const [catQuery, setCatQuery] = useState("");
   const [catCategory, setCatCategory] = useState("all");
-  const [catSort, setCatSort] = useState("name");
+  const [catSort, setCatSort] = useState("number");
   const [catPage, setCatPage] = useState(1);
   const [catPerPage, setCatPerPage] = useState(20);
+  const [catChurch, setCatChurch] = useState(""); // whose history "cantado N vezes" shows ("" = every church)
+  const [mergingSong, setMergingSong] = useState(null); // the copy being merged into the right song
+  const [mergingGroup, setMergingGroup] = useState(null); // duplicate lists of one service being merged
 
   const reload = () => {
     fetchSongs().then(({ data }) => setSongs(data));
@@ -39,6 +43,9 @@ export default function PraiseListsTab({ lang }) {
 
   const songsById = useMemo(() => new Map(songs.map((s) => [s.id, s])), [songs]);
   const pending = songs.filter((s) => s.status === "pending");
+  const duplicates = useMemo(() => duplicateServices(lists), [lists]);
+  const duplicateIds = useMemo(() => new Map(duplicates.flatMap((g) => g.map((l) => [l.id, g]))), [duplicates]);
+  const listChurches = useMemo(() => [...new Set(lists.map((l) => l.church).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt")), [lists]);
   const say = (text) => notify && notify(text);
 
   const copyLink = () => {
@@ -58,6 +65,28 @@ export default function PraiseListsTab({ lang }) {
     if (error) { say(error.code === "23503" ? tt.praiseDeleteSongInUse : tt.praiseSaveFailed); return; }
     logAuditEvent({ actor, action: "praise_song_deleted", entityType: "praise_song", entityId: song.id, entityLabel: song.title, details: { code: song.code, category: song.category } });
     setSongs((prev) => prev.filter((s) => s.id !== song.id));
+  };
+
+  // The copy is gone and its lists now use the right song: the audit log keeps both, so nothing is lost.
+  const onSongMerged = ({ from, into, result }) => {
+    logAuditEvent({
+      actor, action: "praise_song_merged", entityType: "praise_song", entityId: into.id, entityLabel: into.title,
+      details: { from: result?.from || { id: from.id, code: from.code, title: from.title }, into: { id: into.id, code: into.code }, lists_moved: result?.moved ?? null, already_there: result?.already_there ?? null },
+    });
+    setMergingSong(null);
+    say(fill(tt.praiseMergeSongDone, { song: songLabel(into) }));
+    reload();
+  };
+
+  const onListsMerged = ({ keep, results, partial }) => {
+    for (const { drop, result } of results) {
+      logAuditEvent({
+        actor, action: "worship_list_merged", entityType: "worship_list", entityId: keep.id, entityLabel: `${keep.service_date} · ${keep.service_type}`,
+        details: { church: keep.church, kept_by: keep.entered_by, dropped: result?.dropped || { id: drop.id, entered_by: drop.entered_by }, songs_added: result?.songs_added ?? null },
+      });
+    }
+    if (!partial) { setMergingGroup(null); say(tt.praiseMergeListsDone); }
+    reload();
   };
 
   const saveEdit = async (patch) => {
@@ -92,7 +121,7 @@ export default function PraiseListsTab({ lang }) {
     setLists((prev) => prev.filter((l) => l.id !== list.id));
   };
 
-  const openEditor = (list) => setEditorFor(list ? { key: list.id, date: list.service_date, type: list.service_type } : { key: `new-${Date.now()}`, date: today, type: undefined });
+  const openEditor = (list) => setEditorFor(list ? { key: list.id, date: list.service_date, type: list.service_type, church: list.church || "" } : { key: `new-${Date.now()}`, date: today, type: undefined, church: undefined });
   const closeEditor = () => { setEditorFor(null); reload(); };
 
   const SUBS = [["pending", `${tt.praiseAdminPending}${pending.length ? ` (${pending.length})` : ""}`], ["catalog", tt.praiseAdminCatalog], ["lists", tt.praiseAdminLists]];
@@ -123,6 +152,7 @@ export default function PraiseListsTab({ lang }) {
                 {canManage && (
                   <>
                     <button className="btn btn-ok btn-sm" onClick={() => approve(s)}><Check size={14} /> {tt.praiseApprove}</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setMergingSong(s)} title={tt.praiseMergeHint}><GitMerge size={14} /> {tt.praiseMerge}</button>
                     <button className="btn btn-ghost btn-sm" onClick={() => setEditing(s)} aria-label={tt.praiseEdit}><Pencil size={14} /></button>
                     <button className="btn btn-danger btn-sm" onClick={() => removeSong(s)} aria-label={tt.praiseDeleteAction}><Trash2 size={14} /></button>
                   </>
@@ -169,20 +199,27 @@ export default function PraiseListsTab({ lang }) {
               />
               <p style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>{fill(tt.praiseCatalogCount, { n: fmt(filtered.length) })}</p>
               <select aria-label={tt.praiseSortBy} value={catSort} onChange={(e) => { setCatSort(e.target.value); setCatPage(1); }} style={{ ...inputStyle, width: "auto" }}>
-                {[["name", tt.praiseSortName], ["number", tt.praiseSortNumber], ["group", tt.praiseSortGroup]].map(([k, label]) => <option key={k} value={k}>{tt.praiseSortBy}: {label}</option>)}
+                {[["number", tt.praiseSortNumber], ["name", tt.praiseSortName], ["group", tt.praiseSortGroup]].map(([k, label]) => <option key={k} value={k}>{tt.praiseSortBy}: {label}</option>)}
               </select>
               <select value={catPerPage} onChange={(e) => { setCatPerPage(Number(e.target.value)); setCatPage(1); }} style={{ ...inputStyle, width: "auto" }}>
                 {[10, 20, 50].map((n) => <option key={n} value={n}>{n} {tt.praiseCatalogPerPage}</option>)}
               </select>
+              {listChurches.length > 1 && (
+                <select aria-label={tt.praiseHistoryOf} value={catChurch} onChange={(e) => setCatChurch(e.target.value)} style={{ ...inputStyle, width: "auto" }}>
+                  <option value="">{tt.praiseHistoryOf}: {tt.praiseAllChurches}</option>
+                  {listChurches.map((c) => <option key={c} value={c}>{tt.praiseHistoryOf}: {c}</option>)}
+                </select>
+              )}
             </div>
             {canManage && (
               <SongPicker songs={songs} onPick={(s) => setEditing(s)} onCreated={(s) => setSongs((prev) => [...prev, s])} tt={tt} enteredBy={user?.name} today={today} autoApprove />
             )}
             <div style={{ display: "grid", gap: 6, marginTop: 10 }}>
               {pageSongs.map((s) => (
-                <SongRow key={s.id} song={s} tt={tt}>
+                <SongRow key={s.id} song={s} tt={tt} church={catChurch}>
                   {canManage && (
                     <>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setMergingSong(s)} aria-label={tt.praiseMerge} title={tt.praiseMergeHint}><GitMerge size={14} /></button>
                       <button className="btn btn-ghost btn-sm" onClick={() => setEditing(s)} aria-label={tt.praiseEdit}><Pencil size={14} /></button>
                       <button className="btn btn-danger btn-sm" onClick={() => removeSong(s)} aria-label={tt.praiseDeleteAction}><Trash2 size={14} /></button>
                     </>
@@ -212,6 +249,11 @@ export default function PraiseListsTab({ lang }) {
       {sub === "lists" && (
         <>
           {canManage && <button className="btn btn-primary btn-sm" style={{ marginBottom: 12 }} onClick={() => openEditor(null)}><Plus size={14} /> {tt.praiseNewList}</button>}
+          {duplicates.length > 0 && (
+            <div role="status" style={{ background: "#fef3c7", color: "#78350f", padding: "9px 12px", borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
+              {fill(tt.praiseDuplicateListsBanner, { n: duplicates.length })}
+            </div>
+          )}
           {lists.length === 0 ? <p style={{ color: "var(--muted)", fontSize: 14 }}>{tt.praiseNoListForDay}</p> : (
           <div style={{ display: "grid", gap: 10 }}>
             {lists.map((l) => {
@@ -223,7 +265,8 @@ export default function PraiseListsTab({ lang }) {
                       <p style={{ fontWeight: 700 }}>
                         {l.service_date.split("-").reverse().join("/")} · {tt[TYPE_KEYS[l.service_type]]}{" "}
                         {l.published_at && <span className="badge badge-green">{tt.praisePublishedBadge}</span>}{" "}
-                        {locked && <span className="badge badge-gray">{tt.praiseLockedBadge}</span>}
+                        {locked && <span className="badge badge-gray">{tt.praiseLockedBadge}</span>}{" "}
+                        {duplicateIds.has(l.id) && <span className="badge badge-yellow">{tt.praiseDuplicateBadge}</span>}
                       </p>
                       <p style={{ fontSize: 12, color: "var(--muted)" }}>
                         {[l.church, l.group_name, l.leader && `${tt.praiseLeader}: ${l.leader}`, l.preacher && `${tt.praisePreacher}: ${l.preacher}`, fill(tt.praiseBy, { name: l.entered_by })].filter(Boolean).join(" · ")}
@@ -231,6 +274,7 @@ export default function PraiseListsTab({ lang }) {
                     </div>
                     {canManage && (
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {duplicateIds.has(l.id) && <button className="btn btn-primary btn-sm" onClick={() => setMergingGroup(duplicateIds.get(l.id))}><GitMerge size={14} /> {tt.praiseMergeLists}</button>}
                         {l.published_at && <button className="btn btn-ghost btn-sm" onClick={() => copyListLink(l)}><LinkIcon size={14} /> {tt.praiseCopyListLink}</button>}
                         <button className="btn btn-ghost btn-sm" onClick={() => toggleLock(l)}>
                           {locked ? <LockOpen size={14} /> : <Lock size={14} />} {locked ? tt.praiseReopen : tt.praiseFinalize}
@@ -268,25 +312,29 @@ export default function PraiseListsTab({ lang }) {
               onSongCreated={(s) => setSongs((prev) => [...prev, s])}
               initialDate={editorFor.date}
               initialType={editorFor.type}
+              initialChurch={editorFor.church}
               defaultName={user?.name || ""}
             />
           </div>
         </div>
       )}
 
+      {mergingSong && <MergeSongModal song={mergingSong} songs={songs} lists={lists} tt={tt} onClose={() => setMergingSong(null)} onMerged={onSongMerged} />}
+      {mergingGroup && <MergeListsModal group={mergingGroup} songsById={songsById} tt={tt} onClose={() => setMergingGroup(null)} onMerged={onListsMerged} />}
       {editing && <EditSongModal song={editing} tt={tt} canDelete={canManage} onClose={() => setEditing(null)} onSave={saveEdit} onDelete={() => { removeSong(editing); setEditing(null); }} />}
     </div>
   );
 }
 
-function SongRow({ song, tt, children }) {
+function SongRow({ song, tt, church = "", children }) {
+  const timesSung = songHistory(song, church).times_sung;
   const langTag = song.category === "cia" && song.language === "en" ? tt.praiseLangEn : null;
   return (
     <div className="card" style={{ padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
       <div style={{ flex: 1, minWidth: 180 }}>
         <p style={{ fontWeight: 600 }}>{songLabel(song)}{langTag && <span className="badge badge-blue" style={{ marginLeft: 6 }}>{langTag}</span>}</p>
         <p style={{ fontSize: 12, color: "var(--muted)" }}>
-          {[tt[CAT_KEYS[song.category]], song.theme, song.times_sung ? fill(tt.praiseTimesSung, { n: song.times_sung }) : null, song.created_by && (song.created_by.startsWith("pptx-import") ? tt.praiseImported : fill(tt.praiseBy, { name: song.created_by }))].filter(Boolean).join(" · ")}
+          {[tt[CAT_KEYS[song.category]], song.theme, timesSung ? fill(tt.praiseTimesSung, { n: timesSung }) : null, song.created_by && (song.created_by.startsWith("pptx-import") ? tt.praiseImported : fill(tt.praiseBy, { name: song.created_by }))].filter(Boolean).join(" · ")}
         </p>
       </div>
       {children}

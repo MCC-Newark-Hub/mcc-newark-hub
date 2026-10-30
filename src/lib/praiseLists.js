@@ -24,6 +24,14 @@ export const THEMES = [
 
 export const SERVICE_TYPES = ["ebd", "noite", "outro"];
 
+// Which services can have a list on a date: each church has one list per day, except Sunday, which has the EBD
+// (morning) and the Noite. "outro" stays valid in the database for old data but is no longer offered.
+export function serviceTypesFor(date) {
+  const [y, m, d] = String(date).split("-").map(Number);
+  if (!y || !m || !d) return ["noite"];
+  return new Date(y, m - 1, d).getDay() === 0 ? ["ebd", "noite"] : ["noite"];
+}
+
 // A list locks by itself at midnight (00:00) at the end of the service day.
 export const AUTO_LOCK_HOUR = 0;
 
@@ -184,6 +192,47 @@ export function recency(lastSungOn, today = dateKey()) {
   const days = daysBetween(lastSungOn, today);
   if (days < 0 || days > RECENT_DAYS) return null;
   return { days, date: lastSungOn };
+}
+
+// A song's history for one church ("cantado há X dias", "cantado N vezes"): each church has its own. Without a
+// church, the total of every church (each service of each church counts once).
+export function songHistory(song, church) {
+  if (!song) return { last_sung_on: null, times_sung: 0 };
+  if (church) return song.sung_by_church?.[church] || { last_sung_on: null, times_sung: 0 };
+  return { last_sung_on: song.last_sung_on || null, times_sung: song.times_sung || 0 };
+}
+
+// Lists that are the same service (church + date + service) — duplicates to merge. Newest service first.
+export function duplicateServices(lists) {
+  const groups = new Map();
+  for (const l of lists || []) {
+    const key = `${l.church || ""}|${l.service_date}|${l.service_type}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(l);
+  }
+  return [...groups.values()].filter((g) => g.length > 1)
+    .sort((a, b) => String(b[0].service_date).localeCompare(String(a[0].service_date)));
+}
+
+// What merging song `fromId` into `intoId` does to the lists: how many lists change, and in how many the right
+// song was already there (the duplicate's entry just goes away).
+export function songMergePreview(fromId, intoId, lists) {
+  let moved = 0, alreadyThere = 0;
+  for (const l of lists || []) {
+    const ids = (l.items || []).map((i) => i.song_id);
+    if (!ids.includes(fromId)) continue;
+    if (ids.includes(intoId)) alreadyThere++; else moved++;
+  }
+  return { moved, alreadyThere };
+}
+
+// What merging list `drop` into `keep` does: the details `keep` lacks that `drop` has, and the songs added at the end.
+export const LIST_DETAILS = ["church", "group_name", "leader", "preacher"];
+export function listMergePreview(keep, drop) {
+  const filled = LIST_DETAILS.filter((k) => !keep?.[k] && drop?.[k]).map((k) => ({ field: k, value: drop[k] }));
+  const have = new Set((keep?.items || []).map((i) => i.song_id));
+  const songsAdded = (drop?.items || []).filter((i) => !have.has(i.song_id)).map((i) => i.song_id);
+  return { filled, songsAdded, publishes: !keep?.published_at && !!drop?.published_at };
 }
 
 // Moves an item and renumbers positions 0..n-1 (used by reorder and by removal).

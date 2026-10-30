@@ -94,6 +94,7 @@ body{font-family:'Montserrat','Segoe UI',sans-serif;background:var(--bg);color:v
 /* Press feedback: every .btn variant, on click or tap — this rule must stay after the
    :hover rules above so it wins the specificity tie when a mouse press happens mid-hover. */
 .btn:active{transform:scale(.97);}
+.btn:disabled,.btn:disabled:hover,.btn:disabled:active{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none;}
 
 /* ── CARDS ── */
 .card{background:var(--card);border-radius:var(--r);border:1px solid var(--border);padding:20px;box-shadow:var(--shadow);transition:background .25s,border-color .25s;}

@@ -72,16 +72,17 @@ describe("Catálogo: totals and category filter", () => {
     expect(screen.queryByText(/A Colheita/)).toBeNull();
   });
 
-  it("sorts by name (default), number or group, together with the filter", async () => {
+  it("sorts by number (default), name or group, together with the filter", async () => {
     await openCatalog();
     const order = () => Array.from(document.querySelectorAll("p")).map((p) => p.textContent)
       .filter((x) => ["A Colheita", "Clamo a Ti", "Clamo, Ó Senhor", "O Sangue de Jesus", "Still"].some((n) => x.includes(n)));
 
-    expect(order()).toEqual(["A Colheita", "2 · Clamo a Ti", "4 · Clamo, Ó Senhor", "1 · O Sangue de Jesus", "Still"]);
-
     const sort = screen.getByLabelText(tt.praiseSortBy);
-    fireEvent.change(sort, { target: { value: "number" } });
+    expect(sort.value).toBe("number");
     expect(order()).toEqual(["1 · O Sangue de Jesus", "2 · Clamo a Ti", "4 · Clamo, Ó Senhor", "A Colheita", "Still"]);
+
+    fireEvent.change(sort, { target: { value: "name" } });
+    expect(order()).toEqual(["A Colheita", "2 · Clamo a Ti", "4 · Clamo, Ó Senhor", "1 · O Sangue de Jesus", "Still"]);
 
     fireEvent.change(sort, { target: { value: "group" } });
     expect(order()).toEqual(["1 · O Sangue de Jesus", "2 · Clamo a Ti", "4 · Clamo, Ó Senhor", "A Colheita", "Still"]);
