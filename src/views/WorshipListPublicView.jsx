@@ -9,9 +9,9 @@ import WorshipListSharedView from "@/views/WorshipListSharedView";
 import { logAuditEvent, publicActor, deviceInfo } from "@/lib/auditEvent";
 import { STRINGS, fill } from "@/i18n/strings";
 import {
-  fetchSongs, fetchListsByDate, fetchRecentLists, createList, updateList, addListItem, removeListItem, saveItemPositions,
+  fetchSongs, fetchListsByDate, fetchListFor, fetchRecentLists, createList, updateList, addListItem, removeListItem, saveItemPositions,
 } from "@/lib/praiseData";
-import { SERVICE_TYPES, dateKey, isListLocked, isFinalizeEnabled, moveItem, renumber, songLabel, listPath } from "@/lib/praiseLists";
+import { serviceTypesFor, dateKey, isListLocked, isFinalizeEnabled, moveItem, renumber, songLabel, listPath } from "@/lib/praiseLists";
 
 const NAME_KEY = "mcc_worship_name";
 const CHURCH_KEY = "mcc_worship_church"; // last church chosen on this device
@@ -27,10 +27,9 @@ function writeJSON(key, val) {
   try { localStorage.setItem(key, JSON.stringify(val)); } catch { /* storage unavailable: the page works without memory */ }
 }
 
-// Sunday morning is the EBD; every other time defaults to the evening service.
+// Sunday morning is the EBD; every other time defaults to the evening service (the only one on weekdays).
 function defaultType(date) {
-  const [y, m, d] = date.split("-").map(Number);
-  return new Date(y, m - 1, d).getDay() === 0 && new Date().getHours() < 14 ? "ebd" : "noite";
+  return serviceTypesFor(date).includes("ebd") && new Date().getHours() < 14 ? "ebd" : "noite";
 }
 
 const formatLongDate = (date, lang) =>
@@ -89,12 +88,12 @@ function WorshipListEditor({ lang = "pt", setLang }) {
 }
 
 // admin: the staff editing from Escalas — may open, edit and create any list, locked or not, and its songs are approved.
-export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreated, admin = false, initialDate, initialType, defaultName = "" }) {
+export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreated, admin = false, initialDate, initialType, initialChurch, defaultName = "" }) {
   const [date, setDate] = useState(initialDate || today);
   const [type, setType] = useState(() => initialType || defaultType(initialDate || today));
-  const [list, setList] = useState(null); // saved list row for this date + service, or null
+  const [list, setList] = useState(null); // saved list row for this church + date + service, or null
   const [items, setItems] = useState([]); // [{ id, song_id, position }]
-  const [header, setHeader] = useState(() => ({ church: readJSON(CHURCH_KEY, ""), group_name: "", leader: "", preacher: "" }));
+  const [header, setHeader] = useState(() => ({ church: initialChurch ?? readJSON(CHURCH_KEY, ""), group_name: "", leader: "", preacher: "" }));
   const [enteredBy, setEnteredBy] = useState(() => (admin && defaultName) || readJSON(NAME_KEY, ""));
   const [loadedKey, setLoadedKey] = useState(null); // "date|type" of the list currently shown
   const [busy, setBusy] = useState(false);
@@ -104,22 +103,33 @@ export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreat
   const locked = list ? isListLocked(list) : false;
   // Anyone with the link can edit until the list is published (or locks by itself the next morning).
   const canEdit = admin || !list || !locked;
-  const key = `${date}|${type}`;
+  const church = header.church;
+  const key = `${date}|${type}|${church}`;
   const loading = loadedKey !== key;
+  // Weekdays have only the Noite; Sunday the EBD and the Noite. An old list keeps its own service in the menu.
+  const typeOptions = serviceTypesFor(date).includes(type) ? serviceTypesFor(date) : [...serviceTypesFor(date), type];
 
+  // Each church has its own list of each service. Without a church chosen yet, the only list of that service (if
+  // there is exactly one) is opened, and its church fills in.
   useEffect(() => {
     let cancelled = false;
+    const wasSaved = !!list; // the items on screen belong to a saved list (vs. a list being typed)
     fetchListsByDate(date).then(({ data, error }) => {
       if (cancelled) return;
-      const found = (data || []).find((l) => l.service_type === type) || null;
+      const sameService = (data || []).filter((l) => l.service_type === type);
+      const found = church ? sameService.find((l) => l.church === church) || null : sameService.length === 1 ? sameService[0] : null;
+      // what was typed for a list not saved yet stays when only the church or the date changes
+      const keepTyped = !found && !wasSaved;
       setList(found);
-      setItems(found ? found.items : []);
-      setHeader((h) => ({ church: found ? found.church || "" : h.church, group_name: found?.group_name || "", leader: found?.leader || "", preacher: found?.preacher || "" }));
+      setItems((prev) => (found ? found.items : keepTyped ? prev : []));
+      setHeader((h) => (found
+        ? { church: found.church || h.church, group_name: found.group_name || "", leader: found.leader || "", preacher: found.preacher || "" }
+        : keepTyped ? h : { ...h, group_name: "", leader: "", preacher: "" }));
       setNotice(error ? { kind: "error", text: tt.praiseLoadFailed } : found ? { kind: "info", text: tt.praiseExisting } : null);
-      setLoadedKey(`${date}|${type}`);
+      setLoadedKey(`${date}|${type}|${found ? found.church || church : church}`);
     });
     return () => { cancelled = true; };
-  }, [date, type]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [date, type, church]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fail = (text = tt.praiseSaveFailed) => setNotice({ kind: "error", text });
   const rememberName = (v) => { setEnteredBy(v); if (!admin) writeJSON(NAME_KEY, v); };
@@ -184,6 +194,7 @@ export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreat
       setList((prev) => ({ ...prev, ...data }));
     } else {
       const { data, error } = await createList({ service_date: date, service_type: type, entered_by: name, ...fields }, items.map((i) => i.song_id));
+      if (error?.code === "list_exists") { await joinExisting(fields); setBusy(false); return; }
       setBusy(false);
       if (error) { fail(); return; }
       audit("worship_list_created", data.id, { group: fields.group_name, leader: fields.leader, preacher: fields.preacher, songs: data.items.length });
@@ -191,6 +202,32 @@ export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreat
       setItems(data.items);
     }
     setNotice({ kind: "ok", text: tt.praiseSaved });
+  };
+
+  // Someone else saved the list of this service a moment earlier (each service has one list): open theirs,
+  // add the songs typed here that it does not have, and fill in the details it lacks.
+  const joinExisting = async (fields) => {
+    const { data: existing, error } = await fetchListFor(date, type, fields.church);
+    if (error || !existing) { fail(); return; }
+    const have = new Set(existing.items.map((i) => i.song_id));
+    const next = [...existing.items];
+    for (const it of items) {
+      if (have.has(it.song_id)) continue;
+      const { data: added } = await addListItem(existing.id, it.song_id, next.length);
+      if (added) next.push(added);
+    }
+    const missing = Object.fromEntries(Object.entries(fields).filter(([k, v]) => v && !existing[k]));
+    let merged = existing;
+    if (Object.keys(missing).length) {
+      const { data } = await updateList(existing.id, missing);
+      if (data) merged = { ...existing, ...data };
+    }
+    audit("worship_list_joined_existing", existing.id, { songs_added: next.length - existing.items.length, filled: Object.keys(missing), list_by: existing.entered_by });
+    setList(merged);
+    setItems(next);
+    setHeader((h) => ({ ...h, church: merged.church || h.church, group_name: merged.group_name || "", leader: merged.leader || "", preacher: merged.preacher || "" }));
+    setLoadedKey(`${date}|${type}|${merged.church || fields.church || ""}`);
+    setNotice({ kind: "info", text: fill(tt.praiseListExistsJoined, { name: existing.entered_by }) });
   };
 
   // Publishing only opens the read-only link for the Grupo de Louvor — the list stays editable
@@ -226,12 +263,12 @@ export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreat
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 150px" }}>
           <label style={labelStyle} htmlFor="worship-date">{tt.praiseDate}</label>
-          <input id="worship-date" type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} style={inputStyle} />
+          <input id="worship-date" type="date" value={date} onChange={(e) => { const d = e.target.value; if (!d) return; setDate(d); if (!serviceTypesFor(d).includes(type)) setType(defaultType(d)); }} style={inputStyle} />
         </div>
         <div style={{ flex: "1 1 150px" }}>
           <label style={labelStyle} htmlFor="worship-type">{tt.praiseServiceType}</label>
           <select id="worship-type" value={type} onChange={(e) => setType(e.target.value)} style={inputStyle}>
-            {SERVICE_TYPES.map((t) => <option key={t} value={t}>{tt[TYPE_KEYS[t]]}</option>)}
+            {typeOptions.map((t) => <option key={t} value={t}>{tt[TYPE_KEYS[t]]}</option>)}
           </select>
         </div>
       </div>
@@ -266,7 +303,7 @@ export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreat
           <div>
             <p style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>{tt.praiseSongsHeading}</p>
             {canEdit && (
-              <SongPicker songs={songs} excludeIds={items.map((i) => i.song_id)} onPick={addSong} onCreated={(s) => { onSongCreated(s); addSong(s); }} tt={tt} enteredBy={enteredBy.trim()} today={today} autoApprove={admin} />
+              <SongPicker songs={songs} church={header.church} excludeIds={items.map((i) => i.song_id)} onPick={addSong} onCreated={(s) => { onSongCreated(s); addSong(s); }} tt={tt} enteredBy={enteredBy.trim()} today={today} autoApprove={admin} />
             )}
             <SongRows items={items} songsById={songsById} tt={tt} canEdit={canEdit} onMove={move} onRemove={removeItem} />
           </div>

@@ -52,10 +52,13 @@ const ACTION_LABELS = {
   worship_list_finalized: "Lista de Louvores: finalizada",
   worship_list_reopened: "Lista de Louvores: reaberta",
   worship_list_deleted: "Lista de Louvores: excluída",
+  worship_list_merged: "Lista de Louvores: listas repetidas juntadas",
+  worship_list_joined_existing: "Lista de Louvores: músicas somadas à lista que já existia",
   praise_song_created: "Louvor criado",
   praise_song_updated: "Louvor editado",
   praise_song_approved: "Louvor aprovado",
   praise_song_deleted: "Louvor excluído",
+  praise_song_merged: "Louvor juntado com outro (cópia apagada)",
 };
 
 const ENTITY_LABELS = {

@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 import { fill } from "@/i18n/strings";
 import { createSong } from "@/lib/praiseData";
 import {
-  CATEGORIES, THEMES, themeApplies, searchSongs, findSimilarSongs, categoryFromCode, normalizeCode, formatCode, recency, songLabel, sungText,
+  CATEGORIES, THEMES, themeApplies, searchSongs, findSimilarSongs, categoryFromCode, normalizeCode, formatCode, recency, songLabel, sungText, songHistory,
   hasNumberPrefix, songErrorText, upperTitle,
 } from "@/lib/praiseLists";
 
@@ -13,7 +13,8 @@ const CAT_KEYS = { coletanea: "praiseCatColetanea", cia: "praiseCatCia", avulso:
 
 // One search box for number and title. Picking a result calls onPick(song); typing something that
 // does not exist offers to create it (pending until an admin / the Grupo de Louvor leader approves).
-export default function SongPicker({ songs, excludeIds = [], onPick, onCreated, tt, enteredBy, today, autoApprove = false }) {
+// "Cantado há X dias" uses the history of `church` (each church has its own); without one, every church.
+export default function SongPicker({ songs, church = "", excludeIds = [], onPick, onCreated, tt, enteredBy, today, autoApprove = false }) {
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
   const results = useMemo(() => searchSongs(songs, query), [songs, query]);
@@ -39,7 +40,7 @@ export default function SongPicker({ songs, excludeIds = [], onPick, onCreated, 
         <div style={{ border: "1.5px solid var(--border)", borderRadius: 8, marginTop: 6, background: "var(--card)", overflow: "hidden" }}>
           {results.map((s) => {
             const inList = excludeIds.includes(s.id);
-            const r = recency(s.last_sung_on, today);
+            const r = recency(songHistory(s, church).last_sung_on, today);
             return (
               <button
                 key={s.id}
