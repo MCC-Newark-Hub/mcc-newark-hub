@@ -15,7 +15,7 @@
 // a cron schedule in vercel.json.
 
 import { remainingDeadlineDays } from "../src/constants/index.js";
-import { fmt, extractEmail, sendEmail } from "./_lib/email.js";
+import { fmt, extractEmail, sendEmail, escapeHtml } from "./_lib/email.js";
 
 // Days past the stated deadline before actually cancelling — gives staff time to log
 // an in-person/cash payment (which this church accepts) before this acts on it.
@@ -51,11 +51,11 @@ function mapReg(r) {
 function buildWaitlistEmailHtml(reg, event) {
   return `
     <div style="font-family: Georgia, 'Times New Roman', serif; max-width: 480px; margin: 0 auto; color: #1a1e2e;">
-      <h2 style="color:#8B0000; font-size: 20px; margin-bottom: 4px;">${event?.name || "Lista de Espera"}</h2>
-      <p style="color:#6b7280; font-size: 13px; margin-top: 0;">${event?.date || ""} ${event?.time ? "· " + event.time : ""} ${event?.location ? "· " + event.location : ""}</p>
-      <p>Olá <strong>${reg.badgeName || reg.memberName}</strong>,</p>
+      <h2 style="color:#8B0000; font-size: 20px; margin-bottom: 4px;">${escapeHtml(event?.name || "Lista de Espera")}</h2>
+      <p style="color:#6b7280; font-size: 13px; margin-top: 0;">${escapeHtml(event?.date)} ${event?.time ? "· " + escapeHtml(event.time) : ""} ${event?.location ? "· " + escapeHtml(event.location) : ""}</p>
+      <p>Olá <strong>${escapeHtml(reg.badgeName || reg.memberName)}</strong>,</p>
       <p style="font-size: 14px;">
-        Sua inscrição <strong style="font-family: monospace;">${reg.regNumber}</strong> foi movida para a
+        Sua inscrição <strong style="font-family: monospace;">${escapeHtml(reg.regNumber)}</strong> foi movida para a
         <strong>lista de espera</strong> por falta de pagamento dentro do prazo estabelecido.
       </p>
       <div style="margin-top:12px; padding:12px 14px; background:#fff7ea; border:1px solid #e3a94c; border-radius:8px; font-size:13px; color:#7a4a08;">
@@ -70,7 +70,8 @@ function buildWaitlistEmailHtml(reg, event) {
 
 export default async function handler(req, res) {
   const CRON_SECRET = process.env.CRON_SECRET;
-  if (CRON_SECRET && req.headers.authorization !== `Bearer ${CRON_SECRET}`) {
+  // Fail closed: a deployment without CRON_SECRET must refuse every caller, not accept all of them.
+  if (!CRON_SECRET || req.headers.authorization !== `Bearer ${CRON_SECRET}`) {
     res.status(401).json({ error: "unauthorized" });
     return;
   }
