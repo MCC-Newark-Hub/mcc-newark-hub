@@ -3,7 +3,7 @@
 // email or message body — so this can only ever email an address already on
 // file for a real registration, not act as an open mail relay.
 
-import { fmt, extractEmail, sendEmail } from "./_lib/email.js";
+import { fmt, extractEmail, sendEmail, escapeHtml } from "./_lib/email.js";
 
 function buildEmailHtml(reg, event) {
   const statusLabel = reg.cancelled
@@ -20,13 +20,13 @@ function buildEmailHtml(reg, event) {
 
   return `
     <div style="font-family: Georgia, 'Times New Roman', serif; max-width: 480px; margin: 0 auto; color: #1a1e2e;">
-      <h2 style="color:#8B0000; font-size: 20px; margin-bottom: 4px;">${event?.name || "Confirmação de Inscrição"}</h2>
-      <p style="color:#6b7280; font-size: 13px; margin-top: 0;">${event?.date || ""} ${event?.time ? "· " + event.time : ""} ${event?.location ? "· " + event.location : ""}</p>
-      <p>Olá <strong>${reg.badge_name || reg.member_name}</strong>,</p>
+      <h2 style="color:#8B0000; font-size: 20px; margin-bottom: 4px;">${escapeHtml(event?.name || "Confirmação de Inscrição")}</h2>
+      <p style="color:#6b7280; font-size: 13px; margin-top: 0;">${escapeHtml(event?.date)} ${event?.time ? "· " + escapeHtml(event.time) : ""} ${event?.location ? "· " + escapeHtml(event.location) : ""}</p>
+      <p>Olá <strong>${escapeHtml(reg.badge_name || reg.member_name)}</strong>,</p>
       <p style="font-size: 14px;">Aqui estão os detalhes da sua inscrição:</p>
       <table style="width:100%; border-collapse: collapse; font-size: 14px; margin: 12px 0;">
-        <tr><td style="padding:6px 0; color:#6b7280; width:40%;">Número</td><td style="padding:6px 0; font-weight:bold; font-family: monospace;">${reg.reg_number}</td></tr>
-        <tr><td style="padding:6px 0; color:#6b7280;">Categoria</td><td style="padding:6px 0;">${reg.category || "-"}</td></tr>
+        <tr><td style="padding:6px 0; color:#6b7280; width:40%;">Número</td><td style="padding:6px 0; font-weight:bold; font-family: monospace;">${escapeHtml(reg.reg_number)}</td></tr>
+        <tr><td style="padding:6px 0; color:#6b7280;">Categoria</td><td style="padding:6px 0;">${escapeHtml(reg.category || "-")}</td></tr>
         <tr><td style="padding:6px 0; color:#6b7280;">Status</td><td style="padding:6px 0; font-weight:bold;">${statusLabel}</td></tr>
         <tr><td style="padding:6px 0; color:#6b7280;">Taxa</td><td style="padding:6px 0;">${feeText}</td></tr>
       </table>

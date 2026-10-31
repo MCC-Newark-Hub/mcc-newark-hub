@@ -13,18 +13,45 @@
 // Supports ?dryRun=true, which reports what would be backed up (row counts, size)
 // without uploading or pruning anything.
 
-const TABLES = [
-  "members", "registrations", "families", "assistance_groups", "churches",
-  "events", "approvals", "rosters", "teams", "app_users", "categories",
-  "functions", "app_settings", "audit_log",
-];
+// The table list comes from PostgREST's own schema description, not a hard-coded
+// array: a fixed list went stale (it covered 14 of 34 tables) every time a feature
+// added a table. Only paths that accept POST are taken, which keeps read-only views
+// (aggregates rebuilt from the tables anyway) out of the snapshot.
+async function listTables(baseUrl, headers) {
+  const r = await fetch(`${baseUrl}/rest/v1/`, { headers });
+  if (!r.ok) throw new Error(`schema_fetch_failed:${r.status}`);
+  const spec = await r.json();
+  return Object.entries(spec.paths || {})
+    .filter(([path, ops]) => path !== "/" && !path.startsWith("/rpc/") && ops.post)
+    .map(([path]) => ({
+      name: path.slice(1),
+      hasId: !!spec.definitions?.[path.slice(1)]?.properties?.id,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// PostgREST caps every response (1000 rows on Supabase), so a plain select=* quietly
+// truncates large tables such as praise_songs. Page through until a short page.
+const PAGE = 1000;
+async function fetchAllRows(baseUrl, headers, { name, hasId }) {
+  const rows = [];
+  for (let offset = 0; ; offset += PAGE) {
+    const order = hasId ? "&order=id.asc" : "";
+    const r = await fetch(`${baseUrl}/rest/v1/${name}?select=*${order}&limit=${PAGE}&offset=${offset}`, { headers });
+    if (!r.ok) return { error: r.status };
+    const page = await r.json();
+    rows.push(...page);
+    if (page.length < PAGE) return { rows };
+  }
+}
 
 const BUCKET = "db-backups";
 const RETENTION_DAYS = 30;
 
 export default async function handler(req, res) {
   const CRON_SECRET = process.env.CRON_SECRET;
-  if (CRON_SECRET && req.headers.authorization !== `Bearer ${CRON_SECRET}`) {
+  // Fail closed: a deployment without CRON_SECRET must refuse every caller, not accept all of them.
+  if (!CRON_SECRET || req.headers.authorization !== `Bearer ${CRON_SECRET}`) {
     res.status(401).json({ error: "unauthorized" });
     return;
   }
@@ -45,15 +72,14 @@ export default async function handler(req, res) {
     const counts = {};
     const failures = [];
 
-    for (const table of TABLES) {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*`, { headers });
-      if (!r.ok) {
-        failures.push({ table, status: r.status });
+    for (const table of await listTables(SUPABASE_URL, headers)) {
+      const { rows, error } = await fetchAllRows(SUPABASE_URL, headers, table);
+      if (error) {
+        failures.push({ table: table.name, status: error });
         continue;
       }
-      const rows = await r.json();
-      snapshot.tables[table] = rows;
-      counts[table] = rows.length;
+      snapshot.tables[table.name] = rows;
+      counts[table.name] = rows.length;
     }
 
     const body = JSON.stringify(snapshot);
