@@ -23,6 +23,7 @@ import { newMemberForm, memberToForm } from "@/lib/memberForm";
 import { resendConfirmation } from "@/lib/resendConfirmation";
 import { useSortable } from "@/hooks/useSortable";
 import { groupByFamily, familyIdOf } from "@/lib/family";
+import { matchesRegNumber } from "@/lib/regNumber";
 
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 const statusSortOf = (r) => r.cancelled ? "cancelado" : r.waitlisted ? "lista de espera" : r.excedente ? "excedente" : r.exempt ? "isento" : r.paid ? "pago" : "pendente";
@@ -139,7 +140,7 @@ function ClerkView(props) {
     : regs.filter((r) => r.eventId === event?.id && r.cancelled && cityOf(r.church) === myCity)
   ).filter((r) => {
     const q = norm(search);
-    return norm(r.memberName).includes(q) || norm(r.regNumber).includes(q) || norm(r.church).includes(q) ||
+    return norm(r.memberName).includes(q) || norm(r.regNumber).includes(q) || matchesRegNumber(r.regNumber, search) || norm(r.church).includes(q) ||
       norm(r.role).includes(q) || norm(r.category).includes(q) || norm(r.team).includes(q) || norm(statusSortOf(r)).includes(q);
   }).map((r) => ({ ...r, statusSort: statusSortOf(r) }));
   const { sorted: viewRegs, Th } = useSortable(viewRegsBase, "memberName");

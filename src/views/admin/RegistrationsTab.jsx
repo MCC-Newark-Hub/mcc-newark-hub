@@ -10,6 +10,7 @@ import DetailModal from "@/components/DetailModal";
 import BadgePrint from "@/components/BadgePrint";
 import Modal from "@/components/Modal";
 import { resendConfirmation } from "@/lib/resendConfirmation";
+import { matchesRegNumber } from "@/lib/regNumber";
 import { useSortable } from "@/hooks/useSortable";
 
 const norm = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -105,6 +106,7 @@ export default function RegistrationsTab(props) {
     const ms =
       norm(r.memberName).includes(q) ||
       norm(r.regNumber).includes(q) ||
+      matchesRegNumber(r.regNumber, search) ||
       norm(r.role).includes(q) ||
       norm(r.category).includes(q) ||
       norm(liveChurchOf(r)).includes(q) ||

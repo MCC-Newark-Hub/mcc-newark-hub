@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildRegNumber, parseRegNumber, regCounters, noteRegNumber, regDateLabel, cleanPrefix } from "../lib/regNumber.js";
+import { buildRegNumber, parseRegNumber, regCounters, noteRegNumber, regDateLabel, cleanPrefix, matchesRegNumber } from "../lib/regNumber.js";
 import { nextEventId, pickCurrentEvent } from "../lib/eventId.js";
 
 describe("buildRegNumber", () => {
@@ -99,5 +99,24 @@ describe("pickCurrentEvent", () => {
   it("falls back to the latest event when none is upcoming", () => {
     expect(pickCurrentEvent([sep], null, today)).toBe(sep);
     expect(pickCurrentEvent([], null, today)).toBeNull();
+  });
+});
+
+describe("matchesRegNumber", () => {
+  const n = "PA202612-1101-001-2";
+
+  it("matches any part, with or without dashes, any case", () => {
+    expect(matchesRegNumber(n, "1101-001")).toBe(true);
+    expect(matchesRegNumber(n, "1101001")).toBe(true);
+    expect(matchesRegNumber(n, "001-2")).toBe(true);
+    expect(matchesRegNumber(n, "pa202612")).toBe(true);
+    expect(matchesRegNumber(n, " 1101 001 ")).toBe(true);
+  });
+
+  it("rejects other numbers and empty queries", () => {
+    expect(matchesRegNumber(n, "1102")).toBe(false);
+    expect(matchesRegNumber(n, "")).toBe(false);
+    expect(matchesRegNumber(n, "--")).toBe(false);
+    expect(matchesRegNumber(null, "1101")).toBe(false);
   });
 });

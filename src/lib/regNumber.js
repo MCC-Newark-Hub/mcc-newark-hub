@@ -48,3 +48,14 @@ export function regDateLabel(reg) {
   const d = String(reg?.regNumber || "").split("-")[1] || "";
   return d.length === 8 ? `${d.slice(6, 8)}/${d.slice(4, 6)}/${d.slice(0, 4)}` : "";
 }
+
+// Partial search on a reg number, ignoring case, dashes and spaces:
+// "1101-001", "1101001", "001-2" and "pa202612" all match PA202612-1101-001-2.
+export function regNumberKey(s) {
+  return String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+export function matchesRegNumber(regNumber, query) {
+  const q = regNumberKey(query);
+  return q.length > 0 && regNumberKey(regNumber).includes(q);
+}
