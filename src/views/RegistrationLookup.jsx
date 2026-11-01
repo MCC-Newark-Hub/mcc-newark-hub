@@ -7,6 +7,7 @@ import BadgePrint from "@/components/BadgePrint";
 import { sb } from "@/lib/supabase";
 import { mapMember } from "@/hooks/useAppData";
 import { genMemberId } from "@/lib/genMemberId";
+import { regDateLabel } from "@/lib/regNumber";
 
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
@@ -25,14 +26,10 @@ function getRegStatus(reg, lang) {
   return               { label: en ? "Pending"              : "Pendente",        color: "#b45309", bg: "#fef3c7" };
 }
 
-function dateFromRegNumber(regNumber) {
-  const d = (regNumber || "").split("-")[1] || "";
-  return d.length === 8 ? `${d.slice(6, 8)}/${d.slice(4, 6)}/${d.slice(0, 4)}` : "";
-}
 
 function RegCard({ reg, onCancel, lang }) {
   const status = getRegStatus(reg, lang);
-  const date = dateFromRegNumber(reg.regNumber);
+  const date = regDateLabel(reg);
   const canCancel = !reg.cancelled && !reg.paid;
 
   return (
@@ -255,6 +252,7 @@ export default function RegistrationLookup({ event, regs, members, setMembers, c
       exempt: false,
       note: found.note, // inherit batch token + contact info from existing registration
       invitedByMemberId: famInvitedBy || null,
+      groupWith: found.regNumber, // joins that registration's submission number
     });
     // addReg shows this reg immediately (before the DB write is confirmed) — await
     // .confirmed so a failed insert doesn't leave someone thinking a family member
@@ -330,7 +328,7 @@ export default function RegistrationLookup({ event, regs, members, setMembers, c
                   value={query}
                   onChange={(e) => { setQuery(e.target.value.toUpperCase()); setNotFound(false); }}
                   onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                  placeholder={event?.prefix ? `ex: ${event.prefix}-20260614-0001` : "ex: MCC-20260614-0001"}
+                  placeholder={event?.prefix ? `ex: ${event.prefix}-1101-001-1` : "ex: PA202612-1101-001-1"}
                   style={{ flex: 1, fontFamily: "monospace", letterSpacing: ".04em", textTransform: "uppercase" }}
                 />
                 <button className="btn btn-primary" onClick={handleSearch} style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>

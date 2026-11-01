@@ -8,6 +8,7 @@ import ChurchSearch from "@/components/ChurchSearch";
 import SearchSelect from "@/components/SearchSelect";
 import DeadlineBanner from "@/components/DeadlineBanner";
 import { getDeadlineStatus } from "@/lib/registrationDeadline";
+import { regDateLabel } from "@/lib/regNumber";
 import { sb } from "@/lib/supabase";
 import { mapMember } from "@/hooks/useAppData";
 import { findSimilarMembers } from "@/lib/similarity";
@@ -114,10 +115,6 @@ function getRegStatus(reg, lang) {
   return               { label: en ? "Pending"             : "Pendente",        color: "#b45309", bg: "#fef3c7" };
 }
 
-function dateFromRegNumber(regNumber) {
-  const d = (regNumber || "").split("-")[1] || "";
-  return d.length === 8 ? `${d.slice(6, 8)}/${d.slice(4, 6)}/${d.slice(0, 4)}` : "";
-}
 
 const CLERK_EMAIL = "mccnewark.secretary@gmail.com";
 
@@ -468,6 +465,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
     ].filter(Boolean).join(" | ");
     const isPastDeadline = getDeadlineStatus(event?.registration_deadline) === "past";
     const submittedRegs = [];
+    let groupNumber = null;
     const failedNames = [];
     for (const m of allParticipants) {
       const isVerifiedMember = m.verified !== false && m.id && !m.id.startsWith("MANUAL-");
@@ -525,8 +523,11 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
           note: sharedNote,
           invitedByMemberId: invitedByMemberId || null,
           forceWaitlist: isBlocked || undefined,
+          // Everyone in this submission shares its number (…-001-1, …-001-2).
+          groupWith: groupNumber,
         });
         const result = optimisticReg.confirmed ? await optimisticReg.confirmed : { ok: true, reg: optimisticReg };
+        if (result.ok && !groupNumber) groupNumber = result.reg.regNumber;
         if (result.ok) {
           submittedRegs.push(result.reg);
         } else if (!result.duplicate) {
@@ -945,7 +946,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
                         <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{primary.category} · {primary.church}</div>
                         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 10 }}>
                           <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 700, color: "#b41926" }}>{existingReg.regNumber}</span>
-                          <span style={{ fontSize: 12, color: "#6b7280" }}>{dateFromRegNumber(existingReg.regNumber)}</span>
+                          <span style={{ fontSize: 12, color: "#6b7280" }}>{regDateLabel(existingReg)}</span>
                           <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 10px", borderRadius: 99, background: status.bg, color: status.color }}>{status.label}</span>
                         </div>
                         <p style={{ fontSize: 12, color: "#78350f", marginTop: 10, marginBottom: 8 }}>

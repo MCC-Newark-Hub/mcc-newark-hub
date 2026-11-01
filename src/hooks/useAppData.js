@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { CHURCH_LIST, addDays } from "@/constants";
 import { sb } from "@/lib/supabase";
 import { APP_USER_COLUMNS } from "@/lib/appUsers";
+import { buildRegNumber, noteRegNumber, parseRegNumber, regCounters } from "@/lib/regNumber";
 
 // ── DB → app object mappers ───────────────────────────────────────────────────
 export function mapMember(m) {
@@ -157,7 +158,6 @@ export function useAppData({ getUserRef, notify }) {
     if (e && e.id) localStorage.setItem("mcc_event_id", e.id);
     else localStorage.removeItem("mcc_event_id");
   };
-  const [seq, setSeq] = useState(0);
   const [dbCategories, setDbCategories] = useState([]);
   const [dbFunctions, setDbFunctions] = useState([]);
   const [dbImmigrationStatuses, setDbImmigrationStatuses] = useState([]);
@@ -168,7 +168,9 @@ export function useAppData({ getUserRef, notify }) {
   const [dbInstruments, setDbInstruments] = useState([]);
   const [dbVoiceTypes, setDbVoiceTypes] = useState([]);
   const [settings, setSettings] = useState({ sessionTtlHours: 2 });
-  const seqRef = useRef(0);
+  // Last submission number per event and last person per submission (see src/lib/regNumber.js).
+  // A ref, not state: a family submission calls addReg several times before React re-renders.
+  const counterRef = useRef({ submissions: {}, persons: {} });
 
   // ── Load all data from Supabase on mount ─────────────────────────────────
   useEffect(function () {
@@ -214,7 +216,9 @@ export function useAppData({ getUserRef, notify }) {
         setMembers(memberList);
         setFamilies((famRes.data || []).map(mapFamily).sort((a, b) => (a.name || "").localeCompare(b.name || "", "pt", { sensitivity: "base" })));
         setGas((gaRes.data || []).map(mapGA));
-        setRegs((regRes.data || []).map(mapReg));
+        var loadedRegs = (regRes.data || []).map(mapReg);
+        setRegs(loadedRegs);
+        counterRef.current = regCounters(loadedRegs);
         if (aprRes.error) console.error("Approvals load error:", aprRes.error);
         setApprovals((aprRes.data || []).map(mapApproval));
         setRosters((rosRes.data || []).map(mapRoster));
@@ -229,12 +233,6 @@ export function useAppData({ getUserRef, notify }) {
         if (instRes.data && instRes.data.length > 0) setDbInstruments(instRes.data);
         if (voiceRes.data && voiceRes.data.length > 0) setDbVoiceTypes(voiceRes.data.map((v) => ({ id: v.id, name: v.name, gender: v.gender, minNote: v.min_note, maxNote: v.max_note, sortOrder: v.sort_order })));
         if (setRes.data) setSettings({ sessionTtlHours: Number(setRes.data.session_ttl_hours) || 2 });
-        var maxSeq = (regRes.data || []).reduce(function (m, r) {
-          var n = parseInt((r.reg_number || "").split("-")[2] || "0");
-          return n > m ? n : m;
-        }, 0);
-        setSeq(maxSeq);
-        seqRef.current = maxSeq;
       } catch (e) {
         if (!cancelled) setDbError(e.message);
       }
@@ -248,8 +246,6 @@ export function useAppData({ getUserRef, notify }) {
 
   // ── Real-time subscriptions ───────────────────────────────────────────────
   useEffect(function () {
-    const extractSeq = (regNumber) => parseInt((regNumber || "").split("-")[2] || "0");
-
     const channel = sb
       .channel("db-changes")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "registrations" }, function (payload) {
@@ -258,9 +254,8 @@ export function useAppData({ getUserRef, notify }) {
           // Replace our own optimistic entry if present (matched by reg_number)
           if (p.some(function (x) { return x.regNumber === r.regNumber; }))
             return p.map(function (x) { return x.regNumber === r.regNumber ? r : x; });
-          // New reg from another clerk — keep seqRef ahead of it
-          const seq = extractSeq(r.regNumber);
-          if (seq > seqRef.current) seqRef.current = seq;
+          // New reg from another device — keep our counters ahead of it
+          noteRegNumber(counterRef.current, r);
           return [...p, r];
         });
       })
@@ -385,22 +380,28 @@ export function useAppData({ getUserRef, notify }) {
     }
     var fees = event.fees || {};
     var fee = fees[data.category] != null ? fees[data.category] : 0;
-    var n = seqRef.current + 1;
-    seqRef.current = n;
-    var d = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    var today = new Date().toISOString().slice(0, 10);
+    // data.groupWith: the reg number of someone already in this submission (a family
+    // registered together), so this person gets the same submission number.
+    var group = parseRegNumber(data.groupWith);
+    if (group && group.prefix !== event.prefix) group = null; // another event's number
+    var counters = counterRef.current;
+    var submission = group ? group.submission : (counters.submissions[event.id] || 0) + 1;
+    if (!group) counters.submissions[event.id] = submission;
+    var person = (counters.persons[event.id + ":" + submission] || 0) + 1;
+    counters.persons[event.id + ":" + submission] = person;
     var isRoleExempt = ["Pastor", "Ungido"].includes(data.role);
     // Zero-fee categories (e.g. young children) don't need payment, so they're exempt too —
     // but unlike role/manual exemption, they still count against event capacity.
     var isExempt = isRoleExempt || fee === 0 || data.exempt || false;
     var bypassesCapacity = isRoleExempt || data.exempt || false;
     var isWaitlisted = !forceExcedente && (isFull || !!data.forceWaitlist) && !bypassesCapacity;
-    var today = new Date().toISOString().slice(0, 10);
     var byName = getUser() ? getUser().name : "Sistema";
     var timeline = [
       { status: "Submetido", date: today, by: byName },
       { status: "Pendente", date: today, by: "Sistema" },
     ];
-    var regNumber = event.prefix + "-" + d + "-" + String(n).padStart(4, "0");
+    var regNumber = buildRegNumber(event.prefix, today, submission, person);
     var dbRow = {
       reg_number: regNumber,
       event_id: event.id,
@@ -427,11 +428,10 @@ export function useAppData({ getUserRef, notify }) {
       registered_at: today,
       registered_by: byName,
     };
-    var r = mapReg({ ...dbRow, id: "tmp-" + n, reg_number: regNumber });
+    var r = mapReg({ ...dbRow, id: "tmp-" + regNumber, reg_number: regNumber });
     setRegs(function (p) {
       return [...p, r];
     });
-    setSeq(n);
     var label = forceExcedente ? "Excedente" : isWaitlisted ? "Em Espera" : "OK";
     notify(data.memberName + " " + label + "! (" + regNumber + ")");
     // The optimistic reg (r) is what most callers use immediately — this UI update
@@ -441,10 +441,31 @@ export function useAppData({ getUserRef, notify }) {
     // instead of trusting the optimistic notify — a failed insert here rolls the
     // optimistic entry back out of local state, but by then a caller that already
     // showed its own "success" UI from the synchronous return has no way to know.
-    r.confirmed = sb.from("registrations")
-      .insert(dbRow)
-      .select()
-      .single()
+    // Another device can take the same number before realtime tells us about it
+    // (reg_number is unique): move to the next free number and try again.
+    var save = function (attempt) {
+      return sb.from("registrations").insert(dbRow).select().single().then(function (res) {
+        if (res.error && res.error.code === "23505" && /reg_number/.test(res.error.message || "") && attempt < 3) {
+          var previous = regNumber;
+          if (group) {
+            person = (counters.persons[event.id + ":" + submission] || person) + 1;
+          } else {
+            submission = Math.max(counters.submissions[event.id] || 0, submission) + 1;
+            counters.submissions[event.id] = submission;
+            person = 1;
+          }
+          counters.persons[event.id + ":" + submission] = Math.max(counters.persons[event.id + ":" + submission] || 0, person);
+          regNumber = buildRegNumber(event.prefix, today, submission, person);
+          dbRow.reg_number = regNumber;
+          setRegs(function (p) {
+            return p.map(function (x) { return x.regNumber === previous ? { ...x, regNumber: regNumber } : x; });
+          });
+          return save(attempt + 1);
+        }
+        return res;
+      });
+    };
+    r.confirmed = save(0)
       .then(function (res) {
         if (res.error) {
           console.error("addReg DB error:", res.error);
@@ -1021,8 +1042,6 @@ export function useAppData({ getUserRef, notify }) {
     setRosters,
     approvals,
     setApprovals,
-    seq,
-    setSeq,
     dbCategories,
     setDbCategories,
     dbFunctions,
