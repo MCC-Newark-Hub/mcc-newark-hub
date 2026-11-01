@@ -15,6 +15,7 @@ const ACTION_LABELS = {
   approval_denied: "Aprovação negada",
   app_user_created: "Usuário criado",
   app_user_updated: "Usuário atualizado",
+  app_user_pin_generated: "Novo PIN gerado",
   member_created: "Membro criado (form próprio)",
   member_updated: "Membro atualizado (form próprio)",
   members_created: "Membro criado",

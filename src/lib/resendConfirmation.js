@@ -1,8 +1,10 @@
+import { authHeaders } from "@/lib/session";
+
 export async function resendConfirmation(regId) {
   try {
     const res = await fetch("/api/send-confirmation", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({ regId }),
     });
     const data = await res.json().catch(() => ({}));

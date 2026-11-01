@@ -6,31 +6,39 @@ import { INIT_USERS } from "@/dev/seeds";
 // keep maintenance off so only the seed fallback is under test
 vi.mock("@/constants", async (orig) => ({ ...(await orig()), MAINTENANCE_MODE: false }));
 
-const DB_USERS = [{ id: 10, name: "Ana", sys_role: "clerk", sys_roles: ["clerk"], pin: "0101" }];
 const SEED_ADMIN = INIT_USERS.find((u) => u.sysRole === "admin");
 
-const tryLogin = (pin) => {
-  const { result } = renderHook(() => useAuth(DB_USERS));
-  let user = null;
-  act(() => { user = result.current.login(pin); });
-  return user;
+// /api/login as `vite dev` sees it (no serverless functions → 404) or as production answers.
+const stubApi = (status, body = {}) =>
+  vi.stubGlobal("fetch", vi.fn(async () => ({ ok: status === 200, status, json: async () => body })));
+
+const tryLogin = async (pin) => {
+  const { result } = renderHook(() => useAuth());
+  let out;
+  await act(async () => { out = await result.current.login(pin); });
+  return out;
 };
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe("useAuth: seed users are dev-only", () => {
-  it("rejects a seed PIN in a production build", () => {
+  it("rejects a seed PIN in a production build, even if the API is missing", async () => {
     vi.stubEnv("DEV", false);
-    expect(tryLogin(SEED_ADMIN.pin)).toBeNull();
+    stubApi(404);
+    expect((await tryLogin(SEED_ADMIN.pin)).user).toBeUndefined();
   });
 
-  it("still lets database users in on a production build", () => {
+  it("signs in through the API on a production build", async () => {
     vi.stubEnv("DEV", false);
-    expect(tryLogin("0101")?.name).toBe("Ana");
+    stubApi(200, { token: "a.b.c", user: { id: 10, name: "Ana", sys_role: "clerk" } });
+    const out = await tryLogin("482913");
+    expect(out.user.name).toBe("Ana");
+    expect(out.token).toBe("a.b.c");
   });
 
-  it("accepts a seed PIN in local dev", () => {
+  it("accepts a seed PIN in local dev when there is no API", async () => {
     vi.stubEnv("DEV", true);
-    expect(tryLogin(SEED_ADMIN.pin)?.name).toBe(SEED_ADMIN.name);
+    stubApi(404);
+    expect((await tryLogin(SEED_ADMIN.pin)).user?.name).toBe(SEED_ADMIN.name);
   });
 });

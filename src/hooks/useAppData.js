@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { CHURCH_LIST, addDays } from "@/constants";
 import { sb } from "@/lib/supabase";
+import { APP_USER_COLUMNS } from "@/lib/appUsers";
 
 // ── DB → app object mappers ───────────────────────────────────────────────────
 export function mapMember(m) {
@@ -185,7 +186,7 @@ export function useAppData({ getUserRef, notify }) {
             sb.from("approvals").select("*").order("created_at"),
             sb.from("rosters").select("*"),
             sb.from("churches").select("*").order("display"),
-            sb.from("app_users").select("*"),
+            sb.from("app_users").select(APP_USER_COLUMNS),
             sb.from("categories").select("*").order("sort_order"),
             sb.from("functions").select("*").order("sort_order"),
             sb.from("teams").select("*").order("sort_order"),

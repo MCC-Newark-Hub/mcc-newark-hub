@@ -4,6 +4,7 @@
 // file for a real registration, not act as an open mail relay.
 
 import { fmt, extractEmail, sendEmail, escapeHtml } from "./_lib/email.js";
+import { restClient, currentUser } from "./_lib/auth.js";
 
 function buildEmailHtml(reg, event) {
   const statusLabel = reg.cancelled
@@ -58,14 +59,21 @@ export default async function handler(req, res) {
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
+  const SESSION_SECRET = process.env.SESSION_SECRET;
   const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
 
-  if (!SUPABASE_URL || !SUPABASE_KEY || !RESEND_API_KEY) {
+  if (!SUPABASE_URL || !SUPABASE_KEY || !RESEND_API_KEY || !SESSION_SECRET) {
     res.status(500).json({ error: "server_not_configured" });
     return;
   }
 
   try {
+    // Staff-only (the "resend" buttons): anyone else could use it to spam registrants.
+    if (!(await currentUser(req, restClient(SUPABASE_URL, SUPABASE_KEY), SESSION_SECRET))) {
+      res.status(401).json({ error: "not_signed_in" });
+      return;
+    }
+
     const regRes = await fetch(
       `${SUPABASE_URL}/rest/v1/registrations?id=eq.${encodeURIComponent(regId)}&select=*`,
       { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
