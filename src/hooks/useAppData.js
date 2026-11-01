@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { CHURCH_LIST, addDays } from "@/constants";
 import { sb } from "@/lib/supabase";
 import { APP_USER_COLUMNS } from "@/lib/appUsers";
+import { pickCurrentEvent } from "@/lib/eventId";
 import { buildRegNumber, noteRegNumber, parseRegNumber, regCounters } from "@/lib/regNumber";
 
 // ── DB → app object mappers ───────────────────────────────────────────────────
@@ -208,9 +209,7 @@ export function useAppData({ getUserRef, notify }) {
         if (memRes.error) console.error("Members query failed:", memRes.error);
         var evList = evRes.data || [];
         setEvents(evList);
-        var storedEventId = localStorage.getItem("mcc_event_id");
-        var restoredEvent = storedEventId && evList.find(function (e) { return e.id === storedEventId; });
-        setEventState(restoredEvent || evList[0] || null);
+        setEventState(pickCurrentEvent(evList, localStorage.getItem("mcc_event_id"), new Date().toISOString().slice(0, 10)));
         var memberList = (memRes.data || []).map(mapMember);
         if (memberList.length === 0) console.warn("Members loaded as empty — check Supabase RLS on the members table");
         setMembers(memberList);

@@ -3,7 +3,7 @@
 // sessions are blocked), and all public routes (register, lookup, check-in,
 // songs) show a maintenance notice instead of their normal content.
 // Set back to false to reopen the app.
-export const MAINTENANCE_MODE = true;
+export const MAINTENANCE_MODE = false;
 
 // app_users.id of non-admin users allowed to log in during maintenance, in
 // addition to admins. Keep this list short and remove entries once they're
