@@ -1,8 +1,10 @@
 import { useState, useRef, Fragment } from "react";
-import { LayoutDashboard, ClipboardList, Users, Clock, BarChart2, Calendar, Check, Plus, FolderOpen, Eye, EyeOff, Pencil, Trash2, ChevronDown, ChevronUp, X, IdCard, UtensilsCrossed, Download, DollarSign } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Users, Clock, BarChart2, Calendar, Check, Plus, FolderOpen, Pencil, Trash2, KeyRound, Copy, ChevronDown, ChevronUp, X, IdCard, UtensilsCrossed, Download, DollarSign } from "lucide-react";
 import { useT, fill } from "@/i18n/strings";
 import { CATEGORIES, TEAMS, ROLE_BADGE, ROLE_GROUPS, fmt, classifyVoice, normalizeNote, isValidNote } from "@/constants";
 import { sb } from "@/lib/supabase";
+import { APP_USER_COLUMNS } from "@/lib/appUsers";
+import { authHeaders } from "@/lib/session";
 import { groupGasByChurch } from "@/lib/gaGroups";
 import { eventSubtitle } from "@/lib/registrationDeadline";
 import { useTopbarContent } from "@/context/TopbarContext";
@@ -820,10 +822,10 @@ function SessionTtlCard({ settings, updateSessionTtlHours }) {
 }
 
 export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify, settings, updateSessionTtlHours, logAudit }) {
-  const [editing, setEditing] = useState(null); // { id, name, pin, sysRole, initials, church }
-  const [showPin, setShowPin] = useState(false);
+  const [editing, setEditing] = useState(null); // { id, name, sysRole, initials, church }
   const [saving, setSaving] = useState(false);
-  const [revealPins, setRevealPins] = useState({});
+  const [newPin, setNewPin] = useState(null); // { name, pin }: shown once, never stored in the browser
+  const [pinBusy, setPinBusy] = useState(null); // user id while its PIN is being generated
   const [sk, setSk] = useState("name");
   const [sd, setSd] = useState("asc");
   const toggle = (k) => { if (sk === k) setSd((d) => (d === "asc" ? "desc" : "asc")); else { setSk(k); setSd("asc"); } };
@@ -839,14 +841,39 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
       gaIds: u.ga_ids || u.gaIds || [],
       showFinancials: u.show_financials !== false,
       churches: u.churches || [],
-      newPin: "",
-      confirmPin: "",
     });
-    setShowPin(false);
   };
   const startNew = () => {
-    setEditing({ id: null, name: "", sysRoles: ["clerk"], primaryRole: "clerk", initials: "", church: "", teamLeads: [], gaIds: [], showFinancials: true, churches: [], newPin: "", confirmPin: "" });
-    setShowPin(false);
+    setEditing({ id: null, name: "", sysRoles: ["clerk"], primaryRole: "clerk", initials: "", church: "", teamLeads: [], gaIds: [], showFinancials: true, churches: [] });
+  };
+
+  // PINs are generated on the server (6 random digits) and only their hash is stored, so
+  // nobody can look a PIN up later: a forgotten PIN gets a new one. The old PIN stops working.
+  const generatePin = async (u, { confirm = true } = {}) => {
+    if (confirm && !window.confirm(`Gerar um novo PIN para "${u.name}"? O PIN atual deixa de funcionar.`)) return;
+    setPinBusy(u.id);
+    try {
+      const res = await fetch("/api/user-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ userId: u.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.pin) {
+        notify(res.status === 401 ? "Sua sessão expirou. Entre de novo para gerar PINs." : "Não foi possível gerar o PIN. Tente de novo.");
+        return;
+      }
+      setNewPin({ name: u.name, pin: data.pin });
+      // Never log the PIN value itself — just that a new one was issued.
+      logAudit?.("app_user_pin_generated", "app_user", u.id, u.name, {});
+    } catch {
+      notify("Não foi possível gerar o PIN. Verifique a conexão.");
+    } finally {
+      setPinBusy(null);
+    }
+  };
+  const copyText = (text, done) => {
+    navigator.clipboard?.writeText(text).then(() => notify(done), () => notify("Não foi possível copiar."));
   };
   const cancel = () => setEditing(null);
 
@@ -859,13 +886,11 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
     if (error || !data?.length) { notify("Erro ao salvar: " + (error?.message || "usuário não encontrado")); return; }
     setDbUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, active } : x)));
     logAudit?.(active ? "app_user_reactivated" : "app_user_deactivated", "app_user", u.id, u.name, {});
+    if (active) notify("Conta reativada. Se a pessoa não tiver PIN, use \"Novo PIN\".");
   };
 
   const save = async () => {
     if (!editing.name.trim()) { notify("Nome é obrigatório."); return; }
-    if (editing.newPin && editing.newPin.length !== 4) { notify("PIN deve ter 4 dígitos."); return; }
-    if (editing.newPin && editing.newPin !== editing.confirmPin) { notify("PINs não coincidem."); return; }
-    if (!editing.id && !editing.newPin) { notify("PIN é obrigatório para novo usuário."); return; }
     setSaving(true);
     try {
       const sysRoles = editing.sysRoles?.length ? editing.sysRoles : [editing.primaryRole];
@@ -879,27 +904,27 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
         church: editing.church || null,
         team_leads: sysRoles.includes("team_leader") ? (editing.teamLeads || []) : [],
         ga_ids: sysRoles.includes("ga_leader") ? (editing.gaIds || []) : [],
-        ...(editing.newPin ? { pin: editing.newPin } : {}),
       };
       if (editing.id) {
         const { error } = await sb.from("app_users").update(row).eq("id", editing.id);
         if (error) throw error;
         await sb.rpc("set_user_show_financials", { p_id: editing.id, p_val: showFin });
         await sb.rpc("set_user_churches", { p_id: editing.id, p_val: editing.churches || [] });
-        setDbUsers((prev) => prev.map((u) => u.id === editing.id ? { ...u, ...row, show_financials: showFin, pin: editing.newPin || u.pin } : u));
-        // Never log the PIN value itself — just that it changed.
-        logAudit?.("app_user_updated", "app_user", editing.id, row.name, { sysRole: row.sys_role, church: row.church, pinChanged: !!editing.newPin });
+        setDbUsers((prev) => prev.map((u) => u.id === editing.id ? { ...u, ...row, show_financials: showFin } : u));
+        logAudit?.("app_user_updated", "app_user", editing.id, row.name, { sysRole: row.sys_role, church: row.church });
       } else {
-        const { data, error } = await sb.from("app_users").insert({ ...row, show_financials: showFin, pin: editing.newPin }).select().single();
+        const { data, error } = await sb.from("app_users").insert({ ...row, show_financials: showFin }).select(APP_USER_COLUMNS).single();
         if (error) throw error;
         setDbUsers((prev) => [...prev, data]);
         logAudit?.("app_user_created", "app_user", data.id, row.name, { sysRole: row.sys_role, church: row.church });
+        setEditing(null);
+        await generatePin(data, { confirm: false });
+        return;
       }
-      notify(editing.id ? "Usuário atualizado!" : "Usuário criado!");
+      notify("Usuário atualizado!");
       setEditing(null);
     } catch (err) {
-      const msg = err?.code === "23505" ? "Este PIN já está em uso. Escolha outro." : (err?.message || "Erro desconhecido.");
-      notify((editing.id ? "Erro ao salvar: " : "Erro ao criar: ") + msg);
+      notify((editing.id ? "Erro ao salvar: " : "Erro ao criar: ") + (err?.message || "Erro desconhecido."));
     } finally {
       setSaving(false);
     }
@@ -914,7 +939,7 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
         </button>
       </div>
       <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 18 }}>
-        Gerencie quem pode acessar o sistema e redefina PINs individualmente.
+        Gerencie quem pode acessar o sistema. Cada pessoa entra com um PIN de 6 dígitos gerado pelo sistema: ele aparece uma única vez, para você enviar no particular.
       </p>
 
       <SessionTtlCard key={settings?.sessionTtlHours} settings={settings} updateSessionTtlHours={updateSessionTtlHours} />
@@ -1060,42 +1085,35 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
                   </div>
                 </div>
               )}
-              <div>
-                <label>{editing.id ? "Novo PIN (deixe em branco para manter)" : "PIN *"}</label>
-                <div style={{ position: "relative" }}>
-                  <input
-                    type={showPin ? "text" : "password"}
-                    maxLength={4}
-                    value={editing.newPin}
-                    onChange={(e) => setEditing({ ...editing, newPin: e.target.value.replace(/\D/g, "").slice(0, 4) })}
-                    placeholder="4 dígitos"
-                    style={{ paddingRight: 40 }}
-                  />
-                  <button onClick={() => setShowPin((v) => !v)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--muted)" }}>
-                    {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </div>
-              {editing.newPin && (
-                <div>
-                  <label>Confirmar PIN *</label>
-                  <input
-                    type={showPin ? "text" : "password"}
-                    maxLength={4}
-                    value={editing.confirmPin}
-                    onChange={(e) => setEditing({ ...editing, confirmPin: e.target.value.replace(/\D/g, "").slice(0, 4) })}
-                    placeholder="Repita o PIN"
-                    style={{ border: editing.confirmPin && editing.confirmPin !== editing.newPin ? "2px solid #c0392b" : undefined }}
-                  />
-                  {editing.confirmPin && editing.confirmPin !== editing.newPin && (
-                    <p style={{ color: "#c0392b", fontSize: 12, marginTop: 4 }}>PINs não coincidem.</p>
-                  )}
-                </div>
-              )}
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
               <button className="btn btn-ghost" style={{ flex: 1 }} onClick={cancel} disabled={saving}>Cancelar</button>
-              <button className="btn btn-primary" style={{ flex: 2 }} onClick={save} disabled={saving}>{saving ? "Salvando…" : "Salvar"}</button>
+              <button className="btn btn-primary" style={{ flex: 2 }} onClick={save} disabled={saving}>{saving ? "Salvando…" : editing.id ? "Salvar" : "Criar e gerar PIN"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {newPin && (
+        <div className="modal-bg">
+          <div className="modal" style={{ maxWidth: 400, textAlign: "center" }}>
+            <h3 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 18, marginBottom: 6 }}>PIN de {newPin.name}</h3>
+            <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 16 }}>
+              Envie no particular (nunca em grupo). Este PIN não aparece de novo: se for perdido, gere outro.
+            </p>
+            <div style={{ fontFamily: "monospace", fontSize: 34, fontWeight: 700, letterSpacing: 8, marginBottom: 18 }}>{newPin.pin}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <button className="btn btn-ghost" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }} onClick={() => copyText(newPin.pin, "PIN copiado.")}>
+                <Copy size={14} /> Copiar PIN
+              </button>
+              <button
+                className="btn btn-ghost"
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                onClick={() => copyText(`Olá, ${newPin.name}! Seu PIN de acesso ao MCC Newark Hub é ${newPin.pin}. Entre em ${window.location.origin}/login. Não compartilhe este PIN.`, "Mensagem copiada.")}
+              >
+                <Copy size={14} /> Copiar mensagem (WhatsApp)
+              </button>
+              <button className="btn btn-primary" onClick={() => setNewPin(null)}>Já enviei, fechar</button>
             </div>
           </div>
         </div>
@@ -1108,7 +1126,7 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
             <col style={{ width: 160 }} />
             <col style={{ width: 220 }} />
             <col style={{ width: 150 }} />
-            <col style={{ width: 100 }} />
+            <col style={{ width: 120 }} />
             <col style={{ width: 80 }} />
           </colgroup>
           <thead style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--card-bg, #fff)" }}>
@@ -1117,7 +1135,7 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
               <Th k="name">Nome</Th>
               <Th k="sys_role">Função</Th>
               <Th k="church">Igreja</Th>
-              <Th k="pin">PIN</Th>
+              <th>PIN</th>
               <th></th>
             </tr>
           </thead>
@@ -1148,12 +1166,9 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
                   )}
                 </td>
                 <td>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "monospace", letterSpacing: 2 }}>
-                    {revealPins[u.id] ? (u.pin || "—") : "••••"}
-                    <button onClick={() => setRevealPins((p) => ({ ...p, [u.id]: !p[u.id] }))} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted)", padding: 0, lineHeight: 1 }}>
-                      {revealPins[u.id] ? <EyeOff size={13} /> : <Eye size={13} />}
-                    </button>
-                  </div>
+                  <button className="btn btn-ghost btn-sm" style={{ display: "flex", alignItems: "center", gap: 4 }} onClick={() => generatePin(u)} disabled={pinBusy === u.id}>
+                    <KeyRound size={13} /> {pinBusy === u.id ? "Gerando…" : "Novo PIN"}
+                  </button>
                 </td>
                 <td>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>

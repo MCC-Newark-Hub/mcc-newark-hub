@@ -1,30 +1,54 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useAuth } from "@/hooks/useAuth";
 
-// sign-in is also gated by the maintenance flag; keep it off so only `active` is under test
+// sign-in is also gated by the maintenance flag; keep it off so only the API answers are under test
 vi.mock("@/constants", async (orig) => ({ ...(await orig()), MAINTENANCE_MODE: false }));
 
-const USERS = [
-  { id: 1, name: "Ana", sys_role: "clerk", sys_roles: ["clerk"], pin: "0101" },
-  { id: 2, name: "Equipe Som", sys_role: "team_leader", sys_roles: ["team_leader"], pin: "2005", active: false },
-  { id: 3, name: "Bia", sys_role: "pastor", sys_roles: ["pastor"], pin: "0201", active: true },
-];
+const stubApi = (status, body = {}) =>
+  vi.stubGlobal("fetch", vi.fn(async () => ({ ok: status === 200, status, json: async () => body })));
 
-const tryLogin = (pin) => {
-  const { result } = renderHook(() => useAuth(USERS));
-  let user = null;
-  act(() => { user = result.current.login(pin); });
-  return user;
-};
+const hook = () => renderHook(() => useAuth()).result;
 
-describe("useAuth: inactive accounts", () => {
-  it("lets active accounts in, including ones created before the column existed", () => {
-    expect(tryLogin("0101")?.name).toBe("Ana");
-    expect(tryLogin("0201")?.name).toBe("Bia");
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+
+describe("useAuth: what the server says goes", () => {
+  it("maps the wrong PIN and rate limiting to error codes", async () => {
+    vi.stubEnv("DEV", false);
+    const result = hook();
+    stubApi(401);
+    let out;
+    await act(async () => { out = await result.current.login("000001"); });
+    expect(out).toEqual({ error: "invalid_pin" });
+    stubApi(429);
+    await act(async () => { out = await result.current.login("000001"); });
+    expect(out).toEqual({ error: "too_many_attempts" });
   });
 
-  it("does not let an inactive account in", () => {
-    expect(tryLogin("2005")).toBeNull();
+  it("drops a saved session the server no longer accepts (expired, deactivated)", async () => {
+    vi.stubEnv("DEV", false);
+    const result = hook();
+    stubApi(401);
+    let out;
+    await act(async () => { out = await result.current.restore("a.b.c"); });
+    expect(out).toBeNull();
+    expect(result.current.user).toBeNull();
+  });
+
+  it("keeps the saved session when the server cannot be reached", async () => {
+    vi.stubEnv("DEV", false);
+    const result = hook();
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("offline"); }));
+    let out;
+    await act(async () => { out = await result.current.restore("a.b.c"); });
+    expect(out).toBeUndefined();
+  });
+
+  it("restores the user the server returns", async () => {
+    vi.stubEnv("DEV", false);
+    const result = hook();
+    stubApi(200, { user: { id: 3, name: "Bia", sys_role: "pastor", sys_roles: ["pastor"] } });
+    await act(async () => { await result.current.restore("a.b.c"); });
+    expect(result.current.user?.name).toBe("Bia");
   });
 });

@@ -13,10 +13,21 @@ export default function HubLoginScreen({ login, lang, setLang }) {
   const [pin, setPin] = useState("");
   const [err, setErr] = useState("");
 
-  const handleSubmit = (p) => {
-    if (login(p)) {
+  const [busy, setBusy] = useState(false);
+
+  const handleSubmit = async (p) => {
+    if (busy) return;
+    setBusy(true);
+    const result = await login(p);
+    setBusy(false);
+    if (result === true) {
       // Always land on the Home: it shows the modules (cards) the person's profile can open.
       navigate("/", { replace: true });
+    } else if (result === "too_many_attempts") {
+      setErr(pt ? "Muitas tentativas. Aguarde 15 minutos e tente de novo." : "Too many attempts. Wait 15 minutes and try again.");
+      setPin("");
+    } else if (result === "unavailable") {
+      setErr(pt ? "Não foi possível entrar agora. Verifique a conexão e tente de novo." : "Could not sign in right now. Check the connection and try again.");
     } else if (MAINTENANCE_MODE) {
       setErr(pt ? "PIN incorreto ou acesso restrito durante a manutenção." : "Incorrect PIN or access restricted during maintenance.");
       setPin("");

@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "format": "prettier --write \"src/**/*.{js,jsx}\"",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "rotate-pins": "node --env-file=.env scripts/rotate-pins.mjs",
+    "reset-pin": "node --env-file=.env scripts/reset-pin.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.1",

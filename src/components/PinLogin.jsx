@@ -37,13 +37,13 @@ export default function PinLogin({ onSubmit, onBack, lang, t, pin, setPin, err, 
       <input
         ref={inputRef}
         type="password"
-        maxLength={4}
+        maxLength={6}
         value={pin}
         onChange={(e) => {
           setPin(e.target.value);
           setErr("");
         }}
-        placeholder="••••"
+        placeholder="••••••" inputMode="numeric" autoComplete="off"
         onKeyDown={(e) => e.key === "Enter" && go()}
         style={{
           fontSize: 28,

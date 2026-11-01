@@ -5,7 +5,7 @@ import { LangContext } from "@/i18n/strings";
 import { ROLES_SYS } from "@/constants";
 import { SwitchRoleContext } from "@/context/switchRole";
 import { AppDataContext } from "@/context/AppDataContext";
-import { isSessionValid, clearSession, getCachedSessionTtlMs } from "@/lib/session";
+import { clearSession, getSessionToken, saveSession } from "@/lib/session";
 
 const ROLE_LABELS = {
   admin: "Administrador",
@@ -65,7 +65,7 @@ export default function App() {
   };
 
   const appData = useAppData({ getUserRef: () => userRef.current, notify });
-  const { user, login: authLogin, logout: authLogout } = useAuth(appData.dbUsers || []);
+  const { user, login: authLogin, restore: authRestore, logout: authLogout } = useAuth();
   useEffect(() => { userRef.current = user; });
 
   // Backward compat: redirect old ?checkin= and ?selfcheckin= QR codes to new routes
@@ -77,32 +77,30 @@ export default function App() {
     else if (selfcheckin) navigate(`/events/selfcheckin/${selfcheckin}`, { replace: true });
   }, []);
 
-  // Keep locally-cached TTL fresh
+  // Restore a saved session (the token from /api/login) once, on load. Expired tokens and
+  // leftovers of the old PIN login are cleared. While the server checks the token, AuthGate
+  // waits instead of sending a deep link (/settings, /cms, ...) to the login page.
+  const [restoring, setRestoring] = useState(() => !!getSessionToken());
   useEffect(() => {
-    if (appData.settings?.sessionTtlHours) {
-      localStorage.setItem("mcc_session_ttl_hours", String(appData.settings.sessionTtlHours));
+    const token = getSessionToken();
+    if (!token) {
+      if (localStorage.getItem("mcc_token") || localStorage.getItem("mcc_pin")) clearSession();
+      return;
     }
-  }, [appData.settings?.sessionTtlHours]);
-
-  // Restore session from saved PIN once DB users load
-  const [savedPin] = useState(() => (isSessionValid() && localStorage.getItem("mcc_pin")) || null);
-  useEffect(() => {
-    if (!savedPin && localStorage.getItem("mcc_pin")) clearSession();
-  }, []);
-
-  useEffect(() => {
-    if (savedPin && !user && appData.dbUsers && appData.dbUsers.length > 0) {
-      const mapped = authLogin(savedPin);
+    authRestore(token).then((mapped) => {
       if (mapped) {
         // Someone with a saved session who lands on the login page goes to the Home (the cards for their
         // profile). Deep links and public pages (/24h-prayers, /songs/:date, ...) must stay where they are.
-        if (location.pathname === "/login") navigate("/", { replace: true });
-      } else {
+        if (window.location.pathname === "/login") navigate("/", { replace: true });
+      } else if (mapped === null) {
         // AuthGate sends gated routes to /login on its own; public pages stay put.
         clearSession();
       }
-    }
-  }, [appData.dbUsers]);
+      setRestoring(false);
+    });
+    // once, on load: later sign-ins and sign-outs go through login/logout
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const selectRole = (role) => {
     const knownRoles = new Set(Object.values(ROLES_SYS));
@@ -112,15 +110,13 @@ export default function App() {
     navigate("/events");
   };
 
-  const login = (pin) => {
-    const mapped = authLogin(pin);
-    if (mapped) {
-      localStorage.setItem("mcc_pin", pin);
-      localStorage.setItem("mcc_pin_ts", String(Date.now()));
-      localStorage.setItem("mcc_view", mapped.primaryRole || mapped.sysRole);
-      return true;
-    }
-    return false;
+  // Resolves to true, or to the error code from useAuth's login.
+  const login = async (pin) => {
+    const result = await authLogin(pin);
+    if (!result.user) return result.error;
+    saveSession(result.token);
+    localStorage.setItem("mcc_view", result.user.primaryRole || result.user.sysRole);
+    return true;
   };
 
   const logout = () => {
@@ -217,7 +213,7 @@ export default function App() {
               </Route>
 
               {/* PIN-gated hub */}
-              <Route element={<AuthGate user={user} />}>
+              <Route element={<AuthGate user={user} restoring={restoring} />}>
                 <Route element={
                   <HubShell user={user} logout={logout} lang={lang} setLang={setLang} theme={theme} toggleTheme={toggleTheme} />
                 }>
