@@ -7,7 +7,7 @@ import BadgePrint from "@/components/BadgePrint";
 import { sb } from "@/lib/supabase";
 import { mapMember } from "@/hooks/useAppData";
 import { genMemberId } from "@/lib/genMemberId";
-import { regDateLabel } from "@/lib/regNumber";
+import { regDateLabel, regNumberKey, matchesRegNumber } from "@/lib/regNumber";
 
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
@@ -132,6 +132,14 @@ export default function RegistrationLookup({ event, regs, members, setMembers, c
           .slice(0, 10)
       : [];
 
+  // Partial number search (at least 3 letters/digits), this event only.
+  const numberResults =
+    regNumberKey(query).length > 2
+      ? (regs || [])
+          .filter((r) => r.eventId === event?.id && matchesRegNumber(r.regNumber, query))
+          .slice(0, 10)
+      : [];
+
   const resolveRelated = (reg) => {
     // Batch token: a real shared-submission id from the public portal's family flow.
     const batchId = extractBatchId(reg.note);
@@ -165,9 +173,12 @@ export default function RegistrationLookup({ event, regs, members, setMembers, c
   };
 
   const handleSearch = () => {
-    const q = query.trim().toUpperCase();
+    const q = regNumberKey(query);
     if (!q) return;
-    const reg = (regs || []).find((r) => r.regNumber === q);
+    // A full number opens directly (any event); otherwise a single partial match does.
+    const reg = (regs || []).find((r) => regNumberKey(r.regNumber) === q) ||
+      (numberResults.length === 1 ? numberResults[0] : null);
+    if (!reg && numberResults.length > 1) return; // the list below already shows them
     if (!reg) {
       setFound(null);
       setRelated([]);
@@ -178,6 +189,31 @@ export default function RegistrationLookup({ event, regs, members, setMembers, c
     }
     selectReg(reg);
   };
+
+  const renderResults = (list) => (
+    <div style={{ border: "1.5px solid var(--border)", borderRadius: 8, overflow: "hidden", marginBottom: 16 }}>
+      {list.map((r) => {
+        const st = getRegStatus(r, lang);
+        return (
+          <div
+            key={r.id}
+            onClick={() => selectReg(r)}
+            style={{ padding: "11px 14px", cursor: "pointer", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#f8faff")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "")}
+          >
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>{r.memberName}</div>
+              <div style={{ fontFamily: "monospace", fontSize: 11, color: "#b41926", marginTop: 1 }}>{r.regNumber}</div>
+            </div>
+            <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 99, background: st.bg, color: st.color, whiteSpace: "nowrap" }}>
+              {st.label}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
 
   const switchMode = (mode) => {
     setSearchMode(mode);
@@ -326,7 +362,7 @@ export default function RegistrationLookup({ event, regs, members, setMembers, c
               <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
                 <input
                   value={query}
-                  onChange={(e) => { setQuery(e.target.value.toUpperCase()); setNotFound(false); }}
+                  onChange={(e) => { setQuery(e.target.value.toUpperCase()); setNotFound(false); setFound(null); }}
                   onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                   placeholder={event?.prefix ? `ex: ${event.prefix}-1101-001-1` : "ex: PA202612-1101-001-1"}
                   style={{ flex: 1, fontFamily: "monospace", letterSpacing: ".04em", textTransform: "uppercase" }}
@@ -335,9 +371,12 @@ export default function RegistrationLookup({ event, regs, members, setMembers, c
                   <Search size={15} /> {lang === "en" ? "Search" : "Buscar"}
                 </button>
               </div>
-              <p style={{ fontSize: 11, color: "#9ca3af", marginBottom: 16 }}>
-                {lang === "en" ? "Your reg number was shown on the confirmation screen." : "O número foi exibido na tela de confirmação."}
+              <p style={{ fontSize: 11, color: "#9ca3af", marginBottom: numberResults.length ? 8 : 16 }}>
+                {lang === "en"
+                  ? "Your reg number was shown on the confirmation screen. Part of it is enough (e.g. 1101-001)."
+                  : "O número foi exibido na tela de confirmação. Basta parte dele (ex: 1101-001)."}
               </p>
+              {numberResults.length > 0 && !found && renderResults(numberResults)}
             </>
           )}
 
@@ -356,30 +395,7 @@ export default function RegistrationLookup({ event, regs, members, setMembers, c
               <p style={{ fontSize: 11, color: "#9ca3af", marginBottom: nameResults.length ? 8 : 16 }}>
                 {lang === "en" ? "Type at least 2 characters to search." : "Digite ao menos 2 caracteres para buscar."}
               </p>
-              {nameResults.length > 0 && !found && (
-                <div style={{ border: "1.5px solid var(--border)", borderRadius: 8, overflow: "hidden", marginBottom: 16 }}>
-                  {nameResults.map((r) => {
-                    const st = getRegStatus(r, lang);
-                    return (
-                      <div
-                        key={r.id}
-                        onClick={() => selectReg(r)}
-                        style={{ padding: "11px 14px", cursor: "pointer", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = "#f8faff")}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = "")}
-                      >
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: 14 }}>{r.memberName}</div>
-                          <div style={{ fontFamily: "monospace", fontSize: 11, color: "#b41926", marginTop: 1 }}>{r.regNumber}</div>
-                        </div>
-                        <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 99, background: st.bg, color: st.color, whiteSpace: "nowrap" }}>
-                          {st.label}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              {nameResults.length > 0 && !found && renderResults(nameResults)}
               {nameQuery.length > 1 && nameResults.length === 0 && !found && (
                 <div style={{ padding: "12px 14px", background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, fontSize: 13, color: "#991b1b", marginBottom: 12 }}>
                   {lang === "en" ? "No registrations found for that name." : "Nenhuma inscrição encontrada com esse nome."}
