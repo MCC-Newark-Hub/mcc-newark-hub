@@ -4,7 +4,7 @@
 //   npm run reset-pin -- --user "Full Name"
 //   npm run reset-pin -- --id 12
 import { assignNewPin } from "../api/_lib/auth.js";
-import { serverEnv, argValue } from "./_env.mjs";
+import { serverEnv, argValue, describeUsers } from "./_env.mjs";
 
 const { rest, pepper } = serverEnv();
 const id = argValue("--id");
@@ -15,13 +15,16 @@ if (!id && !name) {
 }
 
 const filter = id ? `id=eq.${Number(id)}` : `name=ilike.${encodeURIComponent(name.replace(/[%_*]/g, ""))}`;
-const found = await rest(`app_users?${filter}&active=is.true&select=id,name,sys_role`);
-if (!found.ok) throw new Error(`Could not read app_users (${found.status})`);
-if (found.data.length !== 1) {
-  console.error(found.data.length ? `More than one active user matches: ${found.data.map((u) => `${u.id} ${u.name}`).join("; ")}. Use --id.` : "No active user matches.");
+const found = await describeUsers(rest, `${filter}&active=is.true`);
+if (found.length !== 1) {
+  console.error(found.length ? `More than one active user matches: ${found.map((u) => `${u.id} ${u.name}`).join("; ")}. Use --id.` : "No active user matches.");
   process.exit(1);
 }
 
-const u = found.data[0];
+const u = found[0];
 const pin = await assignNewPin(rest, u.id, pepper);
-console.log(`New PIN for ${u.name} (${u.sys_role}): ${pin}`);
+console.log(`New PIN for ${u.name}: ${pin}`);
+console.log(`  Roles: ${u.roles}`);
+if (u.teams) console.log(`  Teams: ${u.teams}`);
+if (u.groups) console.log(`  Assistance groups: ${u.groups}`);
+console.log(`  Church: ${u.church || "—"} · sees: ${u.churches}`);

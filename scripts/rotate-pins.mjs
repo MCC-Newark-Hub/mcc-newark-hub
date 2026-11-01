@@ -11,15 +11,13 @@ import { writeFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { assignNewPin } from "../api/_lib/auth.js";
-import { serverEnv, argValue } from "./_env.mjs";
+import { serverEnv, argValue, describeUsers } from "./_env.mjs";
 
 const apply = process.argv.includes("--apply");
 const newAdmin = argValue("--add-admin")?.trim();
 const { rest, pepper } = serverEnv();
 
-const users = await rest("app_users?active=is.true&select=id,name,sys_role,church&order=name");
-if (!users.ok) throw new Error(`Could not read app_users (${users.status})`);
-let list = users.data;
+let list = await describeUsers(rest);
 
 const adminExists = newAdmin && list.some((u) => u.name.toLowerCase() === newAdmin.toLowerCase());
 console.log(`${list.length} active user(s) will get a new PIN.`);
@@ -34,21 +32,21 @@ if (existsSync(outFile)) throw new Error(`${outFile} already exists`);
 
 if (newAdmin && !adminExists) {
   const initials = newAdmin.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-  const created = await rest("app_users?select=id,name,sys_role,church", {
+  const created = await rest("app_users?select=id", {
     method: "POST",
     body: { name: newAdmin, sys_role: "admin", sys_roles: ["admin"], primary_role: "admin", initials },
     prefer: "return=representation",
   });
   if (!created.ok) throw new Error(`Could not create "${newAdmin}" (${created.status}): ${JSON.stringify(created.data)}`);
-  list = [...list, created.data[0]];
+  list = await describeUsers(rest);
 }
 
 const csv = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-const rows = [["name", "role", "church", "pin", "message"].join(",")];
+const rows = [["name", "roles", "teams", "assistance_groups", "church", "visible_churches", "pin", "message"].join(",")];
 for (const u of list) {
   const pin = await assignNewPin(rest, u.id, pepper);
   const message = `Olá, ${u.name}! Seu novo PIN de acesso ao MCC Newark Hub é ${pin}. Não compartilhe este PIN.`;
-  rows.push([u.name, u.sys_role, u.church, pin, message].map(csv).join(","));
+  rows.push([u.name, u.roles, u.teams, u.groups, u.church, u.churches, pin, message].map(csv).join(","));
   // Written after every user, so a failure halfway still leaves the PINs already issued.
   writeFileSync(outFile, rows.join("\n") + "\n", { mode: 0o600 });
 }
