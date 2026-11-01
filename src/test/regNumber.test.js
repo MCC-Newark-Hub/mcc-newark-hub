@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildRegNumber, parseRegNumber, regCounters, noteRegNumber, regDateLabel, cleanPrefix } from "../lib/regNumber.js";
-import { nextEventId } from "../lib/eventId.js";
+import { nextEventId, pickCurrentEvent } from "../lib/eventId.js";
 
 describe("buildRegNumber", () => {
   it("is PREFIX-MMDD-NNN-P", () => {
@@ -75,5 +75,29 @@ describe("nextEventId", () => {
   it("goes one past the highest id, not the list length", () => {
     expect(nextEventId([{ id: "EVT002" }])).toBe("EVT003");
     expect(nextEventId([])).toBe("EVT001");
+  });
+});
+
+describe("pickCurrentEvent", () => {
+  const sep = { id: "EVT002", date: "2026-09-05", status: "active" };
+  const dec = { id: "EVT003", date: "2026-12-12", status: "active" };
+  const today = "2026-11-01";
+
+  it("opens on the next upcoming event, not the earliest", () => {
+    expect(pickCurrentEvent([sep, dec], null, today)).toBe(dec);
+  });
+
+  it("drops a remembered event that is already over", () => {
+    expect(pickCurrentEvent([sep, dec], "EVT002", today)).toBe(dec);
+  });
+
+  it("keeps a remembered event that is still ahead", () => {
+    const jan = { id: "EVT004", date: "2027-01-20", status: "active" };
+    expect(pickCurrentEvent([sep, dec, jan], "EVT004", today)).toBe(jan);
+  });
+
+  it("falls back to the latest event when none is upcoming", () => {
+    expect(pickCurrentEvent([sep], null, today)).toBe(sep);
+    expect(pickCurrentEvent([], null, today)).toBeNull();
   });
 });
