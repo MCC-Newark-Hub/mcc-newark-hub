@@ -5,6 +5,8 @@ import { CATEGORIES } from "@/constants";
 import { sb } from "@/lib/supabase";
 import Modal from "@/components/Modal";
 import { fetchEventTeams, importTeamsFromEvent } from "@/lib/rosterImport";
+import { cleanPrefix } from "@/lib/regNumber";
+import { nextEventId } from "@/lib/eventId";
 
 export default function EventsTab({ events, setEvents, event, setEvent, lang, notify, rosters, setRosters, logAudit }) {
   const t = useT();
@@ -342,8 +344,9 @@ export default function EventsTab({ events, setEvents, event, setEvent, lang, no
                   <label>{t.prefix} *</label>
                   <input
                     value={cur.prefix}
-                    onChange={(e) => setCur({ ...cur, prefix: e.target.value.toUpperCase() })}
-                    maxLength={5}
+                    onChange={(e) => setCur({ ...cur, prefix: cleanPrefix(e.target.value) })}
+                    maxLength={10}
+                    placeholder="PA202612"
                   />
                 </div>
                 <div>
@@ -513,7 +516,7 @@ export default function EventsTab({ events, setEvents, event, setEvent, lang, no
                       setEditEvt(null);
                     } else {
                       if (!nEvt.name || !nEvt.prefix || !nEvt.date) return;
-                      var newId = "EVT" + String(events.length + 1).padStart(3, "0");
+                      var newId = nextEventId(events);
                       var ev = { ...nEvt, id: newId, status: "active" };
                       var dbRow = {
                         id: newId,
