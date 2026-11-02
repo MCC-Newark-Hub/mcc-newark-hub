@@ -39,7 +39,7 @@ export default async function handler(req, res) {
     let user = null;
     if (PIN_PATTERN.test(pin)) {
       const found = await rest(
-        `app_users?pin_hash=eq.${hashPin(pin, PIN_PEPPER)}&active=is.true&select=${APP_USER_COLUMNS}`
+        `app_users?pin_hash=eq.${hashPin(pin, PIN_PEPPER)}&active=is.true&select=${APP_USER_COLUMNS},must_change_pin`
       );
       if (!found.ok) throw new Error(`user_read_failed:${found.status}`);
       user = found.data[0] || null;

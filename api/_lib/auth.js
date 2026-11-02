@@ -91,12 +91,14 @@ export const hasRole = (u, role) => (u?.sys_roles?.length ? u.sys_roles : [u?.sy
 
 // Generates a fresh PIN for one user and stores only its hash. Retries on the rare
 // collision with another user's PIN (unique index on pin_hash). Returns the plain PIN.
+// Someone else hands this PIN over, so the user must pick their own on the next
+// sign-in (must_change_pin, migration 040).
 export async function assignNewPin(rest, userId, pepper) {
   for (let attempt = 0; attempt < 5; attempt++) {
     const pin = generatePin();
     const r = await rest(`app_users?id=eq.${Number(userId)}&select=id`, {
       method: "PATCH",
-      body: { pin_hash: hashPin(pin, pepper) },
+      body: { pin_hash: hashPin(pin, pepper), must_change_pin: true },
       prefer: "return=representation",
     });
     if (r.ok && Array.isArray(r.data) && r.data.length === 1) return pin;

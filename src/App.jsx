@@ -65,7 +65,7 @@ export default function App() {
   };
 
   const appData = useAppData({ getUserRef: () => userRef.current, notify });
-  const { user, login: authLogin, restore: authRestore, logout: authLogout } = useAuth();
+  const { user, setUser: setAuthUser, login: authLogin, restore: authRestore, logout: authLogout } = useAuth();
   useEffect(() => { userRef.current = user; });
 
   // Backward compat: redirect old ?checkin= and ?selfcheckin= QR codes to new routes
@@ -213,7 +213,8 @@ export default function App() {
               </Route>
 
               {/* PIN-gated hub */}
-              <Route element={<AuthGate user={user} restoring={restoring} />}>
+              <Route element={<AuthGate user={user} restoring={restoring} lang={lang} onLogout={logout}
+                onPinChanged={() => { setAuthUser((u) => (u ? { ...u, mustChangePin: false } : u)); notify(lang === "en" ? "PIN changed." : "PIN alterado."); }} />}>
                 <Route element={
                   <HubShell user={user} logout={logout} lang={lang} setLang={setLang} theme={theme} toggleTheme={toggleTheme} />
                 }>
