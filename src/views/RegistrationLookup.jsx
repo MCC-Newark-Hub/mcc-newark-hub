@@ -8,6 +8,8 @@ import { sb } from "@/lib/supabase";
 import { mapMember } from "@/hooks/useAppData";
 import { genMemberId } from "@/lib/genMemberId";
 import { regDateLabel, regNumberKey, matchesRegNumber } from "@/lib/regNumber";
+import MissingContactPrompt from "@/components/MissingContactPrompt";
+import { eventRequiresContact } from "@/lib/contact";
 
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
@@ -113,6 +115,7 @@ export default function RegistrationLookup({ event, regs, members, setMembers, c
   const [addingFamily, setAddingFamily] = useState(false);
   const [addFamilyError, setAddFamilyError] = useState(null);
   const [showBadges, setShowBadges] = useState(false);
+  const [contactComplete, setContactComplete] = useState(false);
 
   const registeredIds = (regs || [])
     .filter((r) => r.eventId === event?.id && !r.cancelled)
@@ -169,6 +172,7 @@ export default function RegistrationLookup({ event, regs, members, setMembers, c
     setAddDone(false);
     setShowAddFamily(false);
     setShowBadges(false);
+    setContactComplete(false);
     setNameQuery("");
   };
 
@@ -312,6 +316,12 @@ export default function RegistrationLookup({ event, regs, members, setMembers, c
   };
 
   const activeRelated = related.filter((r) => !r.cancelled);
+  // Events that require phone + e-mail: ask for a missing one before the badge.
+  const askContact = !!found && !found.cancelled && found.eventId === event?.id && eventRequiresContact(event);
+  const contactPeople = found
+    ? [found, ...activeRelated].map((r) => ({ id: r.memberId, name: r.memberName || r.name, category: r.category }))
+    : [];
+  const badgeLocked = askContact && !contactComplete;
 
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(160deg,#8B0000 0%,#b41926 50%,#03223f 100%)", padding: "24px 16px" }}>
@@ -485,8 +495,12 @@ export default function RegistrationLookup({ event, regs, members, setMembers, c
                     </>
                   )}
 
+                  {askContact && (
+                    <MissingContactPrompt key={found.id} people={contactPeople} lang={lang} onComplete={setContactComplete} />
+                  )}
+
                   {/* Reprint badge(s) */}
-                  {!found.cancelled && !showBadges && (
+                  {!found.cancelled && !showBadges && !badgeLocked && (
                     <button
                       className="btn btn-ghost"
                       style={{ width: "100%", marginTop: 8, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}

@@ -85,7 +85,14 @@ export default async function handler(req, res) {
       return;
     }
 
-    const toEmail = extractEmail(reg.note);
+    // The member's e-mail in the directory (member_contacts); older registrations
+    // only have it in the note.
+    const contactRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/member_contacts?member_id=eq.${encodeURIComponent(reg.member_id || "")}&select=email`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+    );
+    const contactRows = contactRes.ok ? await contactRes.json() : [];
+    const toEmail = (Array.isArray(contactRows) && contactRows[0]?.email) || extractEmail(reg.note);
     if (!toEmail) {
       res.status(422).json({ error: "no_email" });
       return;

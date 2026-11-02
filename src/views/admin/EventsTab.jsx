@@ -8,6 +8,7 @@ import { fetchEventTeams, importTeamsFromEvent } from "@/lib/rosterImport";
 import { cleanPrefix } from "@/lib/regNumber";
 import { nextEventId } from "@/lib/eventId";
 import { carryOverRegistrations } from "@/lib/carryOverSave";
+import { eventRequiresContact } from "@/lib/contact";
 
 export default function EventsTab({ events, setEvents, event, setEvent, lang, notify, rosters, setRosters, logAudit, members, families, setRegs, user }) {
   const t = useT();
@@ -421,6 +422,24 @@ export default function EventsTab({ events, setEvents, event, setEvent, lang, no
                 </p>
               </div>
               <div>
+                <div className="cb">
+                  <input
+                    type="checkbox"
+                    id="requireContact"
+                    checked={eventRequiresContact(cur)}
+                    onChange={(e) => setCur({ ...cur, require_contact: e.target.checked, requireContact: e.target.checked })}
+                  />
+                  <label htmlFor="requireContact" style={{ textTransform: "none", fontSize: 13 }}>
+                    {lang === "en" ? "Phone and e-mail required" : "Telefone e e-mail obrigatórios"}
+                  </label>
+                </div>
+                <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 3 }}>
+                  {lang === "en"
+                    ? "Each young person and adult gives their own phone and e-mail when registering; children use their parents'. They are saved to the directory."
+                    : "Cada jovem e adulto informa o próprio telefone e e-mail na inscrição; as crianças usam o dos pais. Ficam salvos no diretório."}
+                </p>
+              </div>
+              <div>
                 <label>{t.feesPerCat}</label>
                 <div
                   style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 6 }}
@@ -510,6 +529,7 @@ export default function EventsTab({ events, setEvents, event, setEvent, lang, no
                         capacity: editEvt.capacity,
                         payment_deadline_days: editEvt.paymentDeadlineDays,
                         registration_deadline: (editEvt.registrationDeadline ?? editEvt.registration_deadline) || null,
+                        require_contact: eventRequiresContact(editEvt),
                         fees: editEvt.fees,
                       };
                       setEvents(function (p) {
@@ -542,6 +562,7 @@ export default function EventsTab({ events, setEvents, event, setEvent, lang, no
                         capacity: nEvt.capacity,
                         payment_deadline_days: nEvt.paymentDeadlineDays,
                         registration_deadline: nEvt.registrationDeadline || null,
+                        require_contact: eventRequiresContact(nEvt),
                         fees: nEvt.fees,
                         status: "active",
                       };

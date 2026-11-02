@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useT } from "@/i18n/strings";
 import { TEAMS, ROLE_GROUPS, deadlineStatus } from "@/constants";
+import StaffContactEditor from "@/components/StaffContactEditor";
 
 function DetailModal({
   reg, onClose, onUpdate, canEditPayment, lang, dbTeams, regs, event, members, gas,
@@ -108,6 +109,7 @@ function DetailModal({
               onChange={(e) => setF({ ...f, badgeName: e.target.value })}
             />
           </div>
+          {reg.memberId && reg.memberId !== "GUEST" && <StaffContactEditor memberId={reg.memberId} lang={lang} />}
           <div className="fr3">
             {canEditPayment && (
               <div className="cb">
