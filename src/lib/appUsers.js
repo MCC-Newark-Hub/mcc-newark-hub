@@ -18,5 +18,7 @@ export function mapAppUser(u) {
     gaIds: u.ga_ids || u.gaIds || [],
     teamLeads: u.team_leads || u.teamLeads || [],
     showFinancials: u.show_financials !== false,
+    // Server-only column (not in APP_USER_COLUMNS): /api/login and /api/me send it.
+    mustChangePin: !!(u.must_change_pin ?? u.mustChangePin),
   };
 }

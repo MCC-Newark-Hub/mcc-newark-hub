@@ -20,7 +20,7 @@ export default async function handler(req, res) {
 
   try {
     const rest = restClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const r = await rest(`app_users?id=eq.${Number(claims.sub)}&active=is.true&select=${APP_USER_COLUMNS}`);
+    const r = await rest(`app_users?id=eq.${Number(claims.sub)}&active=is.true&select=${APP_USER_COLUMNS},must_change_pin`);
     if (!r.ok) throw new Error(`user_read_failed:${r.status}`);
     if (!r.data[0]) {
       res.status(401).json({ error: "not_signed_in" });
