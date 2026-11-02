@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, ArrowLeft, CheckCircle2, ClipboardList, Share2, AlertTriangle } from "lucide-react";
 import { STRINGS } from "@/i18n/strings";
 import { CATEGORIES, ROLE_BADGE, OBREIRO_ROLES, fmt, teamForRole } from "@/constants";
@@ -14,6 +14,9 @@ import { mapMember } from "@/hooks/useAppData";
 import { findSimilarMembers } from "@/lib/similarity";
 import { genMemberId } from "@/lib/genMemberId";
 import { syncRegistrationNames } from "@/lib/syncMemberName";
+import ContactFields from "@/components/ContactFields";
+import { contactTargets, contactErrors, eventRequiresContact, normalizeEmail } from "@/lib/contact";
+import { fetchContactStatus, fillContact } from "@/lib/contactApi";
 
 // Accent-insensitive search: "joao" matches "João"
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -330,7 +333,9 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
   const [famNotFound, setFamNotFound] = useState(false);
   const [showManualFam, setShowManualFam] = useState(false);
   const [manualFam, setManualFam] = useState({ name: "", gender: "M", category: "Adulto", role: "", church: "", gaId: "" });
-  const [contact, setContact] = useState({ phone: "", email: "", whatsapp: true });
+  const [contacts, setContacts] = useState({});        // { [participantId]: { phone, email } }
+  const [contactStatus, setContactStatus] = useState({}); // what the directory already has
+  const [contactErrs, setContactErrs] = useState({});
   const [invitedByMemberId, setInvitedByMemberId] = useState("");
   const [translations, setTranslations] = useState({ en: false, es: false });
   const [allergies, setAllergies] = useState({ hasAny: false, other: "" });
@@ -373,6 +378,19 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
   const eventFee = (cat) => event?.fees?.[cat] ?? 0;
   const allParticipants = primary ? [primary, ...familyMembers] : [];
   const totalFee = allParticipants.reduce((s, m) => s + (["Pastor", "Ungido"].includes(m.role) ? 0 : eventFee(m.category)), 0);
+  const contactRequired = eventRequiresContact(event);
+  const contactPeople = contactTargets(allParticipants);
+  const contactPeopleKey = contactPeople.map((m) => m.id).join(",");
+
+  // On the contact step, ask the directory which of these people already have a
+  // phone / e-mail on file (directory members only), so they aren't asked again.
+  useEffect(() => {
+    if (step !== 4) return;
+    const ids = contactPeopleKey.split(",").filter((id) => id && !id.startsWith("MANUAL-"));
+    let alive = true;
+    fetchContactStatus(ids).then((map) => { if (alive) setContactStatus(map); });
+    return () => { alive = false; };
+  }, [step, contactPeopleKey]);
 
   const validateStep1 = () => {
     const e = {};
@@ -452,14 +470,23 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
         : "Um dos participantes está sem igreja selecionada. Volte e selecione uma.");
       return;
     }
+    const errs = {};
+    for (const m of contactPeople) {
+      const e = contactErrors(contacts[m.id] || {}, { required: contactRequired, onFile: contactStatus[m.id] });
+      if (Object.keys(e).length) errs[m.id] = e;
+    }
+    setContactErrs(errs);
+    if (Object.keys(errs).length) {
+      setSubmitError(lang === "en" ? "Please check the phone and e-mail fields." : "Confira os campos de telefone e e-mail.");
+      return;
+    }
     setSubmitError(null);
     setSubmitting(true);
-    // Batch token groups all regs from this submission for family lookup, even when contact info is empty
+    // Batch token groups all regs from this submission for family lookup. Phone and
+    // e-mail go to the directory (fill_member_contact), not into the note.
     const batchId = "B" + Date.now();
     const sharedNote = [
       "[" + batchId + "]",
-      contact.phone ? "Tel: " + contact.phone : "",
-      contact.email ? "Email: " + contact.email : "",
       allergies.hasAny ? "Alergias: " + allergies.other : "",
       specialNeeds.hasAny ? "Nec. especiais: " + specialNeeds.other : "",
     ].filter(Boolean).join(" | ");
@@ -467,6 +494,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
     const submittedRegs = [];
     let groupNumber = null;
     const failedNames = [];
+    const memberIdOf = {}; // participant id → members.id (new for people not in the directory yet)
     for (const m of allParticipants) {
       const isVerifiedMember = m.verified !== false && m.id && !m.id.startsWith("MANUAL-");
       const resolvedBadge = (badgeNames[m.id] || "").trim() || m.badgeName || m.name;
@@ -486,6 +514,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
           return;
         }
       }
+      memberIdOf[m.id] = memberId;
       const category = m.category || "Adulto";
       if (isPastDeadline) {
         submitApproval({
@@ -539,9 +568,15 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
         }
       }
     }
+    // Save the contacts typed here to the directory (fills only what is missing).
+    for (const m of contactPeople) {
+      const err = await fillContact(memberIdOf[m.id], contacts[m.id] || {});
+      if (err) console.error("fill_member_contact failed:", err);
+    }
+    const firstEmail = contactPeople.map((m) => normalizeEmail(contacts[m.id]?.email)).find(Boolean) || "";
     setSubmitting(false);
     if (isPastDeadline) {
-      setSubmitted({ pendingApproval: true, participantNames: allParticipants.map((m) => m.name), email: contact.email });
+      setSubmitted({ pendingApproval: true, participantNames: allParticipants.map((m) => m.name), email: firstEmail });
     } else if (failedNames.length > 0) {
       // Don't show the success screen at all when anyone failed to confirm — it's a
       // full-page takeover (see the early `if (submitted) return ...` below) that would
@@ -558,7 +593,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
           : "")
       );
     } else {
-      setSubmitted({ regs: submittedRegs, email: contact.email });
+      setSubmitted({ regs: submittedRegs, email: firstEmail });
     }
   };
 
@@ -593,7 +628,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
         onReset={() => {
           setStep(0); setIntroAgreed(false); setPrimary(null); setPrimarySearch(""); setFamilyMembers([]);
           setShowManualPrimary(false); setManualPrimary({ name: "", gender: "M", category: "Adulto" });
-          setContact({ phone: "", email: "", whatsapp: true }); setBadgeNames({});
+          setContacts({}); setContactStatus({}); setContactErrs({}); setBadgeNames({});
           setTranslations({ en: false, es: false });
           setAllergies({ hasAny: false, other: "" });
           setSpecialNeeds({ hasAny: false, other: "" });
@@ -1194,12 +1229,23 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
 
               <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
                 <div>
-                  <label>{t.phone} <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 400, textTransform: "none" }}>(WhatsApp — {lang === "en" ? "optional" : "opcional"})</span></label>
-                  <input value={contact.phone} onChange={(e) => setContact({ ...contact, phone: e.target.value })} placeholder="+1 (555) 000-0000" />
-                </div>
-                <div>
-                  <label>{t.email} <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 400, textTransform: "none" }}>({lang === "en" ? "optional" : "opcional"})</span></label>
-                  <input type="email" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} placeholder="seu@email.com" />
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>
+                    {lang === "en" ? "📞 Phone and e-mail" : "📞 Telefone e e-mail"}
+                  </div>
+                  <p style={{ fontSize: 12, color: "#6b7280", marginTop: 0, marginBottom: 10 }}>
+                    {contactPeople.length > 1
+                      ? (lang === "en" ? "Each young person and adult gives their own. Children use their parents'." : "Cada jovem e adulto informa o seu. As crianças usam o dos pais.")
+                      : (lang === "en" ? "We use it to send your registration and badge." : "Usamos para enviar sua inscrição e crachá.")}
+                  </p>
+                  <ContactFields
+                    people={contactPeople}
+                    values={contacts}
+                    onChange={(v) => { setContacts(v); setContactErrs({}); }}
+                    status={contactStatus}
+                    errors={contactErrs}
+                    required={contactRequired}
+                    lang={lang}
+                  />
                 </div>
                 <div>
                   <label>{lang === "en" ? "Invited by someone? " : "Foi convidado(a) por alguém? "}<span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 400, textTransform: "none" }}>({lang === "en" ? "optional" : "opcional"})</span></label>

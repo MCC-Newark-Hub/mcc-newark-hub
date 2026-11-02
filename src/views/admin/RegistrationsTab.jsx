@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useT } from "@/i18n/strings";
 
 import { ROLE_BADGE, fmt, deadlineStatus, addDays } from "@/constants";
@@ -12,6 +12,8 @@ import Modal from "@/components/Modal";
 import { resendConfirmation } from "@/lib/resendConfirmation";
 import { matchesRegNumber } from "@/lib/regNumber";
 import { useSortable } from "@/hooks/useSortable";
+import { eventRequiresContact, needsOwnContact, hasFullContact } from "@/lib/contact";
+import { fetchContactStatus } from "@/lib/contactApi";
 
 const norm = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
@@ -92,6 +94,20 @@ export default function RegistrationsTab(props) {
   const all = regs.filter((r) => r.eventId === event?.id);
   const active = all.filter((r) => !r.cancelled && !r.waitlisted);
   const isOverdue = (r) => !r.cancelled && !r.waitlisted && deadlineStatus(r, event, all)?.overdue;
+  // Events that require phone + e-mail: which young people / adults still have none on file.
+  const requireContact = eventRequiresContact(event);
+  const contactIdsKey = requireContact
+    ? [...new Set(all.filter((r) => !r.cancelled && needsOwnContact(r)).map((r) => r.memberId))].sort().join(",")
+    : "";
+  const [contactStatus, setContactStatus] = useState({});
+  useEffect(() => {
+    if (!contactIdsKey) return;
+    let alive = true;
+    fetchContactStatus(contactIdsKey.split(",")).then((map) => { if (alive) setContactStatus(map); });
+    return () => { alive = false; };
+  }, [contactIdsKey, detail]);
+  const missingContact = (r) => requireContact && !r.cancelled && needsOwnContact(r) && !hasFullContact(contactStatus[r.memberId]);
+  const missingContactCount = requireContact ? all.filter(missingContact).length : 0;
 
   // Chronological position among active registrations (used for over-capacity tracking)
   const ORIG_CAPACITY = 200;
@@ -120,7 +136,8 @@ export default function RegistrationsTab(props) {
       (filter === "waitlist" && r.waitlisted && !r.cancelled) ||
       (filter === "excedente" && r.excedente) ||
       (filter === "cancelled" && r.cancelled) ||
-      (filter === "overdue" && isOverdue(r));
+      (filter === "overdue" && isOverdue(r)) ||
+      (filter === "nocontact" && missingContact(r));
     return ms && mf;
   }).map((r) => ({ ...r, statusSort: statusSortOf(r) }));
   const { sorted: filtered, Th } = useSortable(preFiltered, "memberName");
@@ -180,6 +197,7 @@ export default function RegistrationsTab(props) {
             [t.excenteTab, "excedente"],
             [t.overdueTab, "overdue"],
             [t.cancelledTab, "cancelled"],
+            ...(requireContact ? [[`${t.noContactTab} (${missingContactCount})`, "nocontact"]] : []),
           ].map(([l, k]) => (
             <button
               key={k}

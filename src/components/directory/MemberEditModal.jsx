@@ -6,6 +6,7 @@ import Modal from "@/components/Modal";
 import SearchSelect from "@/components/SearchSelect";
 import RolesMultiSelect from "@/components/directory/RolesMultiSelect";
 import { syncMemberToRegistrations } from "@/lib/syncMemberName";
+import StaffContactEditor from "@/components/StaffContactEditor";
 
 // Church-locked member editor: the acting user's church is always the value written to
 // `members.church`, regardless of what's shown/typed elsewhere — mirrors GroupsPanel's
@@ -155,6 +156,11 @@ export default function MemberEditModal({
           <label>Igreja</label>
           <input value={defaultChurch} disabled style={{ background: "var(--sidebar-active-bg)", color: "var(--muted)" }} />
         </div>
+        {editingMember.id ? (
+          <StaffContactEditor memberId={editingMember.id} lang="pt" />
+        ) : (
+          <p style={{ fontSize: 11, color: "var(--muted)", margin: 0 }}>Telefone e e-mail podem ser adicionados depois de salvar o membro.</p>
+        )}
         <div>
           <label>Grupo (GA){isHubChurch ? " *" : " (opcional)"}</label>
           <SearchSelect
