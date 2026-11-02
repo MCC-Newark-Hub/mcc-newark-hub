@@ -39,7 +39,7 @@ async function get(path) {
 const [events, rosters, members, families, groups, links, churches, existing] = await Promise.all([
   get(`events?id=eq.${encodeURIComponent(to)}&select=id,name,prefix,fees`),
   get(`rosters?event_id=eq.${encodeURIComponent(from)}&select=team,member_ids`),
-  get("members?select=id,name,badge_name,category,church,role,family_id"),
+  get("members?select=id,name,badge_name,category,church,role,roles,family_id"),
   get("families?select=id,member_ids"),
   get("church_groups?select=id,name,kind"),
   get("church_group_members?select=group_id,church_id"),
@@ -54,7 +54,7 @@ const rows = buildCarryOverRegs({
   sourceRosters: rosters.map((r) => ({ team: r.team, memberIds: r.member_ids || [] })),
   members: members.map((m) => ({
     id: m.id, name: m.name, badgeName: m.badge_name, category: m.category,
-    church: m.church, role: m.role || "", familyId: m.family_id,
+    church: m.church, role: m.role || "", roles: m.roles || [], familyId: m.family_id,
   })),
   families: families.map((f) => ({ id: f.id, memberIds: f.member_ids || [] })),
   localChurches,

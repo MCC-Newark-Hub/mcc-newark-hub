@@ -72,7 +72,10 @@ export default function FamiliesPanel({ members, families, setFamilies, gas, sho
   const enrich = (f) => {
     const gs = familyGas(f, members, gas);
     const gaName = gs.map((g) => g.name).join(", ") || "—";
-    const churchName = [...new Set(gs.map((g) => g.church).filter(Boolean))].join(", ") || "—";
+    // Church of the GA; for a family not in a GA yet, the members' own church.
+    const gaChurches = gs.map((g) => g.church).filter(Boolean);
+    const memberChurches = (f.memberIds || []).map((mid) => (members || []).find((m) => m.id === mid)?.church).filter(Boolean);
+    const churchName = [...new Set(gaChurches.length ? gaChurches : memberChurches)].join(", ") || "—";
     return { ...f, gaName, churchName };
   };
 
@@ -82,7 +85,7 @@ export default function FamiliesPanel({ members, families, setFamilies, gas, sho
     (showChurch && norm(f.churchName).includes(norm(search))) ||
     (search.length > 0 && (f.memberIds || []).some((mid) => {
       const m = (members || []).find((x) => x.id === mid);
-      return m && norm(m.name).includes(norm(search));
+      return m && (norm(m.name).includes(norm(search)) || norm(m.badgeName).includes(norm(search)));
     }))
   );
 
@@ -161,6 +164,16 @@ export default function FamiliesPanel({ members, families, setFamilies, gas, sho
             {showChurch && <button className={`btn btn-xs ${groupBy === "church" ? "btn-primary" : "btn-ghost"}`} onClick={() => setGroupBy("church")}>Igreja</button>}
           </div>
         )}
+
+        <div style={{ display: "flex", gap: 10, marginLeft: "auto", alignItems: "center" }}>
+          <button className="btn btn-primary btn-sm" style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={() => openNew({ name: "", selectedMembers: [] })}><Plus size={14} /> Nova Família</button>
+          {(families || []).length > 0 && (
+            <button className="btn btn-danger btn-sm" style={{ display: "flex", alignItems: "center", gap: 6 }}
+              onClick={() => setDeleting({ ids: (families || []).map((f) => f.id).filter(Boolean), label: "" })}>
+              <Trash2 size={13} /> Excluir TODAS ({(families || []).length})
+            </button>
+          )}
+        </div>
       </div>
 
       {editing !== null && (
@@ -182,7 +195,8 @@ export default function FamiliesPanel({ members, families, setFamilies, gas, sho
                     setFormData({ ...formData, selectedMembers: [...cur, sel] });
                   }}
                   items={(members || []).filter((m) => !(formData.selectedMembers || []).find((s) => s.id === m.id))}
-                  getLabel={(m) => m.name}
+                  getLabel={(m) => (m.badgeName && m.badgeName !== m.name ? `${m.name} (${m.badgeName})` : m.name)}
+                  getSearchText={(m) => `${m.name} ${m.badgeName || ""}`}
                   getId={(m) => m.id}
                   placeholder="Buscar membro…"
                 />
@@ -245,16 +259,6 @@ export default function FamiliesPanel({ members, families, setFamilies, gas, sho
             )}
           </tbody>
         </table>
-      </div>
-
-      <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-        <button className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={() => openNew({ name: "", selectedMembers: [] })}><Plus size={14} /> Nova Família</button>
-        {(families || []).length > 0 && (
-          <button className="btn btn-danger btn-sm" style={{ display: "flex", alignItems: "center", gap: 6 }}
-            onClick={() => setDeleting({ ids: (families || []).map((f) => f.id).filter(Boolean), label: "" })}>
-            <Trash2 size={13} /> Excluir TODAS ({(families || []).length})
-          </button>
-        )}
       </div>
     </div>
   );

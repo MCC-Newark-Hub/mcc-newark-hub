@@ -2,14 +2,15 @@ import { useState } from "react";
 
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-export default function SearchSelect({ value, onSelect, items, getLabel, getId, placeholder }) {
+// getSearchText (optional): the text a query is matched against; defaults to the label.
+export default function SearchSelect({ value, onSelect, items, getLabel, getId, getSearchText = getLabel, placeholder }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const selected = value ? items.find((i) => getId(i) === value) : null;
   const label = selected ? getLabel(selected) : "";
   const results = open
     ? (q.length > 0
-        ? items.filter((i) => norm(getLabel(i)).includes(norm(q))).slice(0, 12)
+        ? items.filter((i) => norm(getSearchText(i)).includes(norm(q))).slice(0, 12)
         : items.slice(0, 12))
     : [];
   return (

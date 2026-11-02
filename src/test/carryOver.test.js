@@ -80,6 +80,47 @@ describe("buildCarryOverRegs", () => {
   });
 });
 
+describe("buildCarryOverRegs: leadership first", () => {
+  const people = [
+    ...members,
+    m("D1", "Zé Diácono", { role: "Diácono", church: "Philadelphia, PA" }),
+    m("D2", "Abel Diácono", { role: "Diácono", church: "New York, NY" }), // not on the Diáconos roster
+    m("D3", "Bruno Diácono", { role: "Diácono" }),
+    m("U1", "Ulisses Ungido", { roles: ["Ungido"] }),
+    m("I1", "Iris Intercessora", { roles: ["Grupo de Intercessão"], familyId: "F9" }),
+    m("I2", "Ivo Intercessor", { roles: ["Grupo de Louvor", "Grupo de Intercessão"] }),
+    m("I3", "Igor Intercessor", { roles: ["Grupo de Intercessão"], church: "Provo, UT" }),
+    m("K1", "Kiko Filho", { category: "Criança", familyId: "F9" }),
+    m("T1", "Tadeu Tradutor", { church: "Philadelphia, PA" }),
+    m("T2", "Bento Tradutor", { church: "Toms River, NJ" }),
+  ];
+  const rosters = [
+    ...sourceRosters,
+    { team: "Diáconos", memberIds: ["D1", "D3"] },
+    { team: "Grupo de Louvor", memberIds: ["I2"] },
+    { team: "Tradução", memberIds: ["T2", "T1"] },
+  ];
+  const rows = buildCarryOverRegs({ sourceRosters: rosters, members: people, families, localChurches, event, today });
+  const leads = rows.filter((r) => r.reg_number.endsWith("-1")).map((r) => r.member_id);
+
+  it("pastors, ungidos, deacons, intercession group, then the teams; by church then name", () => {
+    expect(leads).toEqual(["M287", "M180", "M099", "U1", "D3", "D1", "D2", "I1", "I2", "M700", "M800", "T1", "T2"]);
+  });
+
+  it("a deacon off the roster is still registered under Diáconos", () => {
+    expect(byMember(rows, "D2").team).toBe("Diáconos");
+  });
+
+  it("intercessors keep their team; without one they get the role and no payment deadline", () => {
+    expect(byMember(rows, "I2").team).toBe("Grupo de Louvor");
+    expect(byMember(rows, "I1")).toMatchObject({ team: "Participante", role: "Grupo de Intercessão" });
+    expect(byMember(rows, "I3")).toBeUndefined(); // outside the polo
+    const regs = rows.map((r) => ({ ...r, memberId: r.member_id, familyId: r.family_id }));
+    expect(isDeadlineExempt(byMember(regs, "I1"), regs)).toBe(true);
+    expect(isDeadlineExempt(byMember(regs, "K1"), regs)).toBe(true);
+  });
+});
+
 describe("localChurchesOf", () => {
   it("lists the churches of the Newark polo", () => {
     const groups = [{ id: "g1", name: "Newark", kind: "polo" }, { id: "g2", name: "Texas", kind: "polo" }];
