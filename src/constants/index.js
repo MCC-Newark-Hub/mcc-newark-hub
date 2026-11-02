@@ -187,6 +187,9 @@ export const addDays = (dateStr, n) => {
 };
 
 export const OBREIRO_ROLES = ["Pastor", "Ungido", "Diácono", "Obreiro"];
+export const INTERCESSION_ROLES = ["Grupo de Intercessão", "Grupo de Oração"];
+// Registrations with these roles (and their families) have no payment deadline.
+export const DEADLINE_EXEMPT_ROLES = [...OBREIRO_ROLES, ...INTERCESSION_ROLES];
 
 // Pastores/Ungidos/Diáconos belong to their leadership team by virtue of the
 // role itself. Mirrors SERVICE_LEADER_TEAMS in useAppData.js (that copy drives
@@ -202,11 +205,11 @@ export const isDeadlineExempt = (reg, allEventRegs = []) => {
   // persisted correctly (found production data where it wasn't: zero-fee categories
   // like Criança/Intermediário with exempt still false).
   if (reg.fee === 0) return true;
-  if (OBREIRO_ROLES.includes(reg.role)) return true;
+  if (DEADLINE_EXEMPT_ROLES.includes(reg.role)) return true;
   if (reg.team && reg.team !== "Participante") return true;
   if (reg.familyId && allEventRegs.length > 0) {
     const familyRegs = allEventRegs.filter((r) => r.familyId === reg.familyId && !r.cancelled);
-    if (familyRegs.some((r) => OBREIRO_ROLES.includes(r.role))) return true;
+    if (familyRegs.some((r) => DEADLINE_EXEMPT_ROLES.includes(r.role))) return true;
     if (familyRegs.some((r) => r.team && r.team !== "Participante")) return true;
   }
   return false;
