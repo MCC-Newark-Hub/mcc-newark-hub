@@ -70,7 +70,7 @@ function AdminView(props) {
             {sec === "teams" && <TeamsTab {...props} />}
             {sec === "approvals" && <ApprovalsPanel {...props} />}
             {sec === "reports" && <ReportsTab {...props} />}
-            {sec === "events" && <EventsTab events={props.events} setEvents={props.setEvents} event={props.event} setEvent={props.setEvent} lang={props.lang} notify={props.notify} rosters={props.rosters} setRosters={props.setRosters} logAudit={props.logAudit} />}
+            {sec === "events" && <EventsTab events={props.events} setEvents={props.setEvents} event={props.event} setEvent={props.setEvent} lang={props.lang} notify={props.notify} rosters={props.rosters} setRosters={props.setRosters} logAudit={props.logAudit} members={props.members} families={props.families} setRegs={props.setRegs} user={props.user} />}
             {sec === "kitchen" && (
               <>
                 <KitchenTab regs={props.regs} event={props.event} />

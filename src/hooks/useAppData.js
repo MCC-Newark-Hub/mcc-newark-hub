@@ -4,6 +4,7 @@ import { sb } from "@/lib/supabase";
 import { APP_USER_COLUMNS } from "@/lib/appUsers";
 import { pickCurrentEvent } from "@/lib/eventId";
 import { buildRegNumber, noteRegNumber, parseRegNumber, regCounters } from "@/lib/regNumber";
+import { regFeeFlags } from "@/lib/regFee";
 
 // ── DB → app object mappers ───────────────────────────────────────────────────
 export function mapMember(m) {
@@ -377,8 +378,6 @@ export function useAppData({ getUserRef, notify }) {
         return dupe;
       }
     }
-    var fees = event.fees || {};
-    var fee = fees[data.category] != null ? fees[data.category] : 0;
     var today = new Date().toISOString().slice(0, 10);
     // data.groupWith: the reg number of someone already in this submission (a family
     // registered together), so this person gets the same submission number.
@@ -389,11 +388,9 @@ export function useAppData({ getUserRef, notify }) {
     if (!group) counters.submissions[event.id] = submission;
     var person = (counters.persons[event.id + ":" + submission] || 0) + 1;
     counters.persons[event.id + ":" + submission] = person;
-    var isRoleExempt = ["Pastor", "Ungido"].includes(data.role);
-    // Zero-fee categories (e.g. young children) don't need payment, so they're exempt too —
-    // but unlike role/manual exemption, they still count against event capacity.
-    var isExempt = isRoleExempt || fee === 0 || data.exempt || false;
-    var bypassesCapacity = isRoleExempt || data.exempt || false;
+    var feeFlags = regFeeFlags(event, data.category, data.role, data.exempt);
+    var isExempt = feeFlags.isExempt;
+    var bypassesCapacity = feeFlags.bypassesCapacity;
     var isWaitlisted = !forceExcedente && (isFull || !!data.forceWaitlist) && !bypassesCapacity;
     var byName = getUser() ? getUser().name : "Sistema";
     var timeline = [
@@ -413,7 +410,7 @@ export function useAppData({ getUserRef, notify }) {
       family_id: data.familyId || null,
       invited_by_member_id: data.invitedByMemberId || null,
       team: data.team || "Participante",
-      fee: isExempt ? 0 : fee,
+      fee: feeFlags.fee,
       paid: data.paid || false,
       exempt: isExempt,
       cancelled: false,
