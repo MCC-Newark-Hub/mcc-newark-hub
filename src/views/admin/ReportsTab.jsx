@@ -1,21 +1,23 @@
-import { useState, Fragment } from "react";
+import { useState, useEffect, useMemo, Fragment } from "react";
 import { useT } from "@/i18n/strings";
 import { fmt, ROLE_BADGE, CATEGORIES, deadlineStatus } from "@/constants";
+import { buildTeamReport } from "@/lib/teamReport";
+import { staffGetContacts } from "@/lib/contactApi";
 
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 const byName = (a, b) => norm(a.memberName).localeCompare(norm(b.memberName));
+const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
-export default function ReportsTab({ regs, event, wlRegs, exRegs, lang, members, gas, showFinancials = true, ciaOnly = false, dbImmigrationStatuses }) {
+export default function ReportsTab({ regs, event, wlRegs, exRegs, lang, members, gas, showFinancials = true, ciaOnly = false, rosters, dbTeams }) {
   const t = useT();
+  const [onlyMissing, setOnlyMissing] = useState(false);
+  const [leaderPhones, setLeaderPhones] = useState({});
   const [type, setType] = useState(ciaOnly ? "cia" : "summary");
   const [repSearch, setRepSearch] = useState("");
   const [repCategory, setRepCategory] = useState("");
   const [repChurch, setRepChurch] = useState("");
   const [repDate, setRepDate] = useState("");
   const [repGa, setRepGa] = useState("");
-  const [immChurch, setImmChurch] = useState("");
-  const [immGa, setImmGa] = useState("");
-  const [immDim, setImmDim] = useState("overview"); // "overview" | "church" | "ga"
   const [summaryDim, setSummaryDim] = useState("church"); // "church" | "category"
   const [ciaChurch, setCiaChurch] = useState("");
   const [ciaClassFilter, setCiaClassFilter] = useState("all");
@@ -122,6 +124,19 @@ export default function ReportsTab({ regs, event, wlRegs, exRegs, lang, members,
   };
   const otherDim = summaryDim === "church" ? "category" : "church";
   const summaryGroups = groupStats(er, summaryDim);
+  const teamReport = useMemo(
+    () => (rosters ? buildTeamReport({ rosters, regs, members: members || [], eventId: event?.id, teamOrder: [...(dbTeams || [])].sort((a, b) => a.sortOrder - b.sortOrder).map((x) => x.name) }) : null),
+    [rosters, regs, members, event?.id, dbTeams]
+  );
+  const leaderKey = (teamReport?.teams || []).map((x) => x.leaderId).filter(Boolean).join(",");
+  // Leaders' phones come from the staff contacts endpoint (never loaded in the browser otherwise).
+  useEffect(() => {
+    if (type !== "teams" || !leaderKey) return;
+    let cancelled = false;
+    staffGetContacts(leaderKey.split(",")).then((c) => { if (!cancelled) setLeaderPhones(c); });
+    return () => { cancelled = true; };
+  }, [type, leaderKey]);
+  const teamRowsShown = (tm) => (onlyMissing ? tm.rows.filter((r) => r.status !== "registered") : tm.rows);
 
   const printReport = () => {
     const eventName = event?.name || "Evento";
@@ -303,6 +318,40 @@ export default function ReportsTab({ regs, event, wlRegs, exRegs, lang, members,
             </tr>`).join("")}
           </tbody>
         </table>`;
+    } else if (type === "teams" && teamReport) {
+      title = t.teamsReportTab;
+      const tot = teamReport.totals;
+      body = `
+        <table style="${S.table}">
+          <thead><tr>
+            <th style="${S.th}">${t.trTeam}</th><th style="${S.th}">${t.trLeader}</th><th style="${S.th}">${t.trMembers}</th>
+            <th style="${S.th}">${t.trRegistered}</th><th style="${S.th}">${t.trWaitlist}</th><th style="${S.th}">${t.trNotRegistered}</th><th style="${S.th}">${t.trArrived}</th>
+          </tr></thead>
+          <tbody>
+            ${teamReport.teams.map((tm, i) => `<tr ${stripe(i)}
+              <td style="${S.tdBold}">${esc(tm.team)}</td>
+              <td style="${S.td}">${esc(tm.leaderName)}${leaderPhones[tm.leaderId]?.phone ? `<br><span style="color:#6b7280;font-size:11px;">${esc(leaderPhones[tm.leaderId].phone)}</span>` : ""}</td>
+              <td style="${S.td}">${tm.totals.members}</td><td style="${S.td}">${tm.totals.registered}</td>
+              <td style="${S.td}">${tm.totals.waitlist}</td><td style="${S.td}">${tm.totals.none}</td><td style="${S.td}">${tm.totals.checkedIn}</td>
+            </tr>`).join("")}
+            <tr><td style="${S.foot}">${t.trTotal}</td><td style="${S.foot}"></td><td style="${S.foot}">${tot.members}</td><td style="${S.foot}">${tot.registered}</td><td style="${S.foot}">${tot.waitlist}</td><td style="${S.foot}">${tot.none}</td><td style="${S.foot}">${tot.checkedIn}</td></tr>
+          </tbody>
+        </table>
+        ${teamReport.teams.map((tm) => {
+          const rows = teamRowsShown(tm);
+          if (!rows.length) return "";
+          return `<h3 style="margin:18px 0 6px;font-size:14px;">${esc(tm.team)} <span style="color:#6b7280;font-weight:400;">(${tm.totals.registered}/${tm.totals.members})</span></h3>
+          <table style="${S.table}">
+            <thead><tr><th style="${S.th}">${t.memberName}</th><th style="${S.th}">${t.cat}</th><th style="${S.th}">${t.churchH}</th><th style="${S.th}">${t.regNum}</th><th style="${S.th}">${t.trArrivedOne}</th></tr></thead>
+            <tbody>${rows.map((r, i) => `<tr ${stripe(i)}
+              <td style="${S.tdBold}">${esc(r.name)}${r.leader ? ` <span class="bdg-blue">${t.trLeader}</span>` : ""}</td>
+              <td style="${S.td}">${esc(r.category)}</td>
+              <td style="${S.tdMuted}">${esc(r.church)}</td>
+              <td style="${S.td};font-family:monospace;font-size:10px;">${r.status === "registered" ? esc(r.regNumber) : r.status === "waitlist" ? `<span class="bdg-yellow">${t.trWaitlistOne}</span>` : `<span class="bdg-yellow">${t.trNotRegisteredOne}</span>`}</td>
+              <td style="${S.td};text-align:center;">${r.checkedIn ? "✓" : "☐"}</td>
+            </tr>`).join("")}</tbody>
+          </table>`;
+        }).join("")}`;
     } else if (type === "cia") {
       const classesToPrint = ciaClassFilter === "all" ? CIA_CATS : CIA_CATS.filter((c) => c.cat === ciaClassFilter);
       title = `CIA${ciaChurch ? ` — ${ciaChurch}` : ""}${ciaClassFilter !== "all" ? ` — ${CIA_CATS.find((c) => c.cat === ciaClassFilter)?.label || ""}` : ""}`;
@@ -429,9 +478,9 @@ export default function ReportsTab({ regs, event, wlRegs, exRegs, lang, members,
             [t.waitlistTab, "waitlist"],
             ...(showFinancials ? [[t.expiringTab, "expiring"], [t.cancelledNonpaymentTab, "cancelled_nonpayment"]] : []),
             [t.rosterTab, "roster"],
+            ...(rosters ? [[t.teamsReportTab, "teams"]] : []),
             [t.badgesTab, "badges"],
             ["Check-in", "checkin"],
-            ["Imigração", "immigration"],
             ["CIA's", "cia"],
           ].map(([l, k]) => (
             <button
@@ -965,165 +1014,113 @@ export default function ReportsTab({ regs, event, wlRegs, exRegs, lang, members,
         );
       })()}
 
-      {type === "immigration" && (() => {
-        const STATUSES = dbImmigrationStatuses && dbImmigrationStatuses.length > 0
-          ? dbImmigrationStatuses.map((s) => s.name)
-          : ["Cidadão", "Residente Permanente", "Com Visto", "Em Processo", "Sem Visto"];
-        const mems = members || [];
-        const total = mems.length;
-        const pct = (n) => total > 0 ? Math.round(n / total * 100) : 0;
-
-        const immChurches = [...new Set(mems.map((m) => m.church).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt"));
-        const immGas = (gas || []).filter((g) => mems.some((m) => m.gaId === g.id)).sort((a, b) => a.name.localeCompare(b.name, "pt"));
-
-        const filteredMems = mems.filter((m) =>
-          (!immChurch || m.church === immChurch) &&
-          (!immGa || m.gaId === immGa)
-        );
-        const filtTotal = filteredMems.length;
-        const filtPct = (n) => filtTotal > 0 ? Math.round(n / filtTotal * 100) : 0;
-
-        const statusRows = STATUSES.map((s) => ({ label: s, count: filteredMems.filter((m) => m.immigrationStatus === s).length }));
-        const notInformed = filteredMems.filter((m) => !m.immigrationStatus).length;
-
-        const churchBreakdown = immChurches.map((c) => {
-          const cms = mems.filter((m) => m.church === c && (!immGa || m.gaId === immGa));
-          return { church: c, total: cms.length, rows: STATUSES.map((s) => ({ label: s, count: cms.filter((m) => m.immigrationStatus === s).length })), notInformed: cms.filter((m) => !m.immigrationStatus).length };
-        }).filter((c) => c.total > 0);
-
-        const gaBreakdown = immGas.map((g) => {
-          const gms = mems.filter((m) => m.gaId === g.id && (!immChurch || m.church === immChurch));
-          return { name: g.name, church: g.church, total: gms.length, rows: STATUSES.map((s) => ({ label: s, count: gms.filter((m) => m.immigrationStatus === s).length })), notInformed: gms.filter((m) => !m.immigrationStatus).length };
-        }).filter((g) => g.total > 0);
-
-        const tdS = { padding: "6px 10px", borderBottom: "1px solid var(--border)", fontSize: 13 };
-        const thS = { padding: "6px 10px", fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".4px", textAlign: "left", borderBottom: "1px solid var(--border)" };
-
-        return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            {/* Filters */}
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <select value={immChurch} onChange={(e) => setImmChurch(e.target.value)}>
-                <option value="">Todas as igrejas</option>
-                {immChurches.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <select value={immGa} onChange={(e) => setImmGa(e.target.value)}>
-                <option value="">Todos os grupos</option>
-                {immGas.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-              </select>
-              <div style={{ display: "flex", gap: 4 }}>
-                {[["Visão geral", "overview"], ["Por Igreja", "church"], ["Por Grupo", "ga"]].map(([l, d]) => (
-                  <button key={d} className={`tab ${immDim === d ? "active" : ""}`} onClick={() => setImmDim(d)}>{l}</button>
-                ))}
-              </div>
-            </div>
-
-            {/* Overview */}
-            {immDim === "overview" && (
+      {type === "teams" && teamReport && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {teamReport.teams.length === 0 ? (
+            <p style={{ color: "var(--muted)" }}>{t.trNoTeams}</p>
+          ) : (
+            <>
               <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-                <div style={{ padding: "10px 14px", background: "var(--bg2)", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontWeight: 700, fontSize: 14 }}>Situação Imigratória</span>
-                  <span className="badge badge-blue">{filtTotal} membros</span>
-                </div>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead><tr>
-                    <th style={thS}>Status</th>
-                    <th style={{ ...thS, textAlign: "right" }}>N</th>
-                    <th style={{ ...thS, textAlign: "right" }}>%</th>
-                    <th style={{ ...thS }}>Barra</th>
-                  </tr></thead>
-                  <tbody>
-                    {statusRows.map(({ label, count }) => (
-                      <tr key={label}>
-                        <td style={tdS}>{label}</td>
-                        <td style={{ ...tdS, textAlign: "right", fontWeight: 600 }}>{count}</td>
-                        <td style={{ ...tdS, textAlign: "right", color: "var(--muted)" }}>{filtPct(count)}%</td>
-                        <td style={{ ...tdS }}>
-                          <div style={{ height: 8, borderRadius: 4, background: "var(--border)", overflow: "hidden", minWidth: 80 }}>
-                            <div style={{ height: "100%", width: `${filtPct(count)}%`, background: "var(--icm-crimson)", borderRadius: 4 }} />
-                          </div>
-                        </td>
+                <div className="table-wrap">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>{t.trTeam}</th>
+                        <th>{t.trLeader}</th>
+                        <th style={{ textAlign: "right" }}>{t.trMembers}</th>
+                        <th style={{ textAlign: "right" }}>{t.trRegistered}</th>
+                        <th style={{ textAlign: "right" }}>{t.trWaitlist}</th>
+                        <th style={{ textAlign: "right" }}>{t.trNotRegistered}</th>
+                        <th style={{ textAlign: "right" }}>{t.trArrived}</th>
                       </tr>
-                    ))}
-                    <tr style={{ background: "var(--bg2)" }}>
-                      <td style={{ ...tdS, color: "var(--muted)", fontStyle: "italic" }}>Não informado</td>
-                      <td style={{ ...tdS, textAlign: "right", fontWeight: 600 }}>{notInformed}</td>
-                      <td style={{ ...tdS, textAlign: "right", color: "var(--muted)" }}>{filtPct(notInformed)}%</td>
-                      <td style={{ ...tdS }}>
-                        <div style={{ height: 8, borderRadius: 4, background: "var(--border)", overflow: "hidden", minWidth: 80 }}>
-                          <div style={{ height: "100%", width: `${filtPct(notInformed)}%`, background: "#d1d5db", borderRadius: 4 }} />
-                        </div>
-                      </td>
-                    </tr>
-                    <tr style={{ fontWeight: 700, background: "#f3f4f6" }}>
-                      <td style={tdS}>Total</td>
-                      <td style={{ ...tdS, textAlign: "right" }}>{filtTotal}</td>
-                      <td style={{ ...tdS, textAlign: "right" }}>100%</td>
-                      <td style={tdS} />
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* By church */}
-            {immDim === "church" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {churchBreakdown.map((c) => (
-                  <div key={c.church} className="card" style={{ padding: 0, overflow: "hidden" }}>
-                    <div style={{ padding: "8px 14px", background: "var(--bg2)", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontWeight: 700, fontSize: 13 }}>{c.church}</span>
-                      <span className="badge badge-blue">{c.total}</span>
-                    </div>
-                    <div style={{ padding: "6px 14px 8px", display: "flex", flexWrap: "wrap", gap: 10 }}>
-                      {c.rows.filter((r) => r.count > 0).map((r) => (
-                        <span key={r.label} style={{ fontSize: 12 }}>
-                          <span style={{ color: "var(--muted)" }}>{r.label}: </span>
-                          <strong>{r.count}</strong>
-                          <span style={{ color: "var(--muted)" }}> ({Math.round(r.count / c.total * 100)}%)</span>
-                        </span>
+                    </thead>
+                    <tbody>
+                      {teamReport.teams.map((tm) => (
+                        <tr key={tm.team}>
+                          <td style={{ fontWeight: 600 }}><a href={`#team-${encodeURIComponent(tm.team)}`} style={{ color: "inherit" }}>{tm.team}</a></td>
+                          <td style={{ fontSize: 12 }}>
+                            {tm.leaderName || "—"}
+                            {leaderPhones[tm.leaderId]?.phone && (
+                              <div><a href={`tel:${leaderPhones[tm.leaderId].phone}`} style={{ color: "var(--muted)" }}>{leaderPhones[tm.leaderId].phone}</a></div>
+                            )}
+                          </td>
+                          <td style={{ textAlign: "right" }}>{tm.totals.members}</td>
+                          <td style={{ textAlign: "right", color: "var(--ok)", fontWeight: 600 }}>{tm.totals.registered}</td>
+                          <td style={{ textAlign: "right", color: tm.totals.waitlist ? "var(--warn)" : "var(--muted)" }}>{tm.totals.waitlist}</td>
+                          <td style={{ textAlign: "right", color: tm.totals.none ? "var(--danger)" : "var(--muted)", fontWeight: tm.totals.none ? 600 : 400 }}>{tm.totals.none}</td>
+                          <td style={{ textAlign: "right" }}>{tm.totals.checkedIn}</td>
+                        </tr>
                       ))}
-                      {c.notInformed > 0 && (
-                        <span style={{ fontSize: 12, color: "var(--muted)", fontStyle: "italic" }}>
-                          Não informado: <strong style={{ color: "var(--text)" }}>{c.notInformed}</strong> ({Math.round(c.notInformed / c.total * 100)}%)
-                        </span>
-                      )}
+                      <tr style={{ fontWeight: 700 }}>
+                        <td>{t.trTotal}</td>
+                        <td />
+                        <td style={{ textAlign: "right" }}>{teamReport.totals.members}</td>
+                        <td style={{ textAlign: "right" }}>{teamReport.totals.registered}</td>
+                        <td style={{ textAlign: "right" }}>{teamReport.totals.waitlist}</td>
+                        <td style={{ textAlign: "right" }}>{teamReport.totals.none}</td>
+                        <td style={{ textAlign: "right" }}>{teamReport.totals.checkedIn}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 500, textTransform: "none", letterSpacing: 0, color: "var(--text)", margin: 0, alignSelf: "flex-start", cursor: "pointer" }}>
+                <input type="checkbox" style={{ width: "auto", margin: 0 }} checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} />
+                {t.trOnlyMissing}
+              </label>
+
+              {teamReport.teams.map((tm) => {
+                const rows = teamRowsShown(tm);
+                if (!rows.length) return null;
+                return (
+                  <div key={tm.team} id={`team-${encodeURIComponent(tm.team)}`} className="card" style={{ padding: 0, overflow: "hidden" }}>
+                    <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                      <strong>{tm.team}</strong>
+                      <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                        {tm.totals.registered}/{tm.totals.members} {t.trRegistered.toLowerCase()} · {tm.totals.checkedIn} {t.trArrived.toLowerCase()}
+                      </span>
+                    </div>
+                    <div className="table-wrap">
+                      <table className="table">
+                        <thead>
+                          <tr>
+                            <th>{t.memberName}</th>
+                            <th>{t.cat}</th>
+                            <th>{t.churchH}</th>
+                            <th>{t.regNum}</th>
+                            <th style={{ textAlign: "center" }}>{t.trArrivedOne}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((r) => (
+                            <tr key={r.memberId}>
+                              <td style={{ fontWeight: 600 }}>
+                                {r.name}
+                                {r.leader && <span className="badge badge-blue" style={{ marginLeft: 6 }}>{t.trLeader}</span>}
+                              </td>
+                              <td style={{ fontSize: 12 }}>{r.category}</td>
+                              <td style={{ fontSize: 12, color: "var(--muted)" }}>{r.church}</td>
+                              <td style={{ fontFamily: "monospace", fontSize: 11 }}>
+                                {r.status === "registered" ? r.regNumber : (
+                                  <span className={`badge ${r.status === "waitlist" ? "badge-yellow" : "badge-red"}`} style={{ fontFamily: "inherit" }}>
+                                    {r.status === "waitlist" ? t.trWaitlistOne : t.trNotRegisteredOne}
+                                  </span>
+                                )}
+                              </td>
+                              <td style={{ textAlign: "center" }}>{r.checkedIn ? "✓" : "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-
-            {/* By GA */}
-            {immDim === "ga" && (
-              <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead><tr>
-                    <th style={thS}>Grupo</th>
-                    <th style={thS}>Igreja</th>
-                    {STATUSES.map((s) => <th key={s} style={{ ...thS, textAlign: "right" }}>{s}</th>)}
-                    <th style={{ ...thS, textAlign: "right", fontStyle: "italic" }}>N/I</th>
-                    <th style={{ ...thS, textAlign: "right" }}>Total</th>
-                  </tr></thead>
-                  <tbody>
-                    {gaBreakdown.map((g) => (
-                      <tr key={g.name}>
-                        <td style={{ ...tdS, fontWeight: 600 }}>{g.name}</td>
-                        <td style={{ ...tdS, fontSize: 12, color: "var(--muted)" }}>{g.church}</td>
-                        {g.rows.map((r) => (
-                          <td key={r.label} style={{ ...tdS, textAlign: "right" }}>{r.count > 0 ? r.count : <span style={{ color: "var(--border)" }}>—</span>}</td>
-                        ))}
-                        <td style={{ ...tdS, textAlign: "right", color: "var(--muted)", fontStyle: "italic" }}>{g.notInformed > 0 ? g.notInformed : <span style={{ color: "var(--border)" }}>—</span>}</td>
-                        <td style={{ ...tdS, textAlign: "right", fontWeight: 600 }}>{g.total}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        );
-      })()}
+                );
+              })}
+            </>
+          )}
+        </div>
+      )}
 
       {type === "badges" && (
         <div>

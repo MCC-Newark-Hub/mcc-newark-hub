@@ -6,6 +6,7 @@ import Sidebar from "@/components/Sidebar";
 import FuncoesTab from "@/views/admin/FuncoesTab";
 import OverviewPanel from "@/components/directory/OverviewPanel";
 import ReportsPanel from "@/components/directory/ReportsPanel";
+import ImmigrationReport from "@/components/directory/ImmigrationReport";
 import { AdminDirectory, AdminGA, AdminImport } from "@/views/AdminView";
 
 // Diretório: members, families, groups and functions — the tools that used to sit in the Eventos menu.
@@ -48,7 +49,13 @@ function CMSAdmin({ props, lang }) {
           <div className="page-pad">
             {sec === "overview" && <OverviewPanel />}
             {sec === "directory" && <AdminDirectory {...props} />}
-            {sec === "reports" && <ReportsPanel />}
+            {sec === "reports" && (
+              <>
+                <ReportsPanel />
+                <h3 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 18, margin: "28px 0 12px" }}>{pt ? "Situação imigratória" : "Immigration status"}</h3>
+                <ImmigrationReport />
+              </>
+            )}
             {sec === "ga" && <AdminGA {...props} />}
             {sec === "funcoes" && <FuncoesTab members={props.members} setMembers={props.setMembers} gas={props.gas} notify={props.notify} logAudit={props.logAudit} />}
             {sec === "import" && <AdminImport members={props.members} setMembers={props.setMembers} families={props.families} setFamilies={props.setFamilies} gas={props.gas} setGas={props.setGas} rosters={props.rosters} setRosters={props.setRosters} churches={props.churches} setChurches={props.setChurches} notify={props.notify} />}
