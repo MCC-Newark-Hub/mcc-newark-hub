@@ -33,6 +33,7 @@ export default function DoorTab({ lang }) {
   const [perService, setPerService] = useState(1);
   const [generating, setGenerating] = useState(false);
   const [uncovered, setUncovered] = useState([]);
+  const [exceptions, setExceptions] = useState([]);
   const [copied, setCopied] = useState(false);
   const [loadError, setLoadError] = useState(false);
 
@@ -59,6 +60,7 @@ export default function DoorTab({ lang }) {
       setRows(r);
       if (i) setPerService(i.per_service);
       setUncovered([]);
+      setExceptions([]);
       setLoadedMonth(month);
     });
     return () => { cancelled = true; };
@@ -132,7 +134,10 @@ export default function DoorTab({ lang }) {
     setGenerating(true);
     try {
       const services = monthServices(month);
-      const result = generateSchedule(usable, services, { perService, seed: Math.floor(Math.random() * 1e9) });
+      // The months around this one, so nobody repeats across the month boundary.
+      const [before, after] = await Promise.all([fetchMonth(shiftMonth(month, -1)), fetchMonth(shiftMonth(month, 1))]);
+      const history = [...before.rows, ...after.rows].map((r) => ({ date: r.service_date, slot: r.slot, workerId: r.worker_id }));
+      const result = generateSchedule(usable, services, { perService, seed: Math.floor(Math.random() * 1e9), history });
       const m = await sb.from("door_months").upsert({ month, per_service: perService, generated_at: new Date().toISOString() }).select().single();
       if (m.error) throw m.error;
       const { data: saved, error } = await replaceMonthAssignments(
@@ -143,6 +148,7 @@ export default function DoorTab({ lang }) {
       setInfo(m.data);
       setRows(saved.sort((a, b) => a.service_date.localeCompare(b.service_date) || a.created_at.localeCompare(b.created_at)));
       setUncovered(result.uncovered);
+      setExceptions(result.exceptions);
       say(tt.doorGenerated);
     } catch (e) {
       console.error("door schedule generate error:", e);
@@ -290,6 +296,19 @@ export default function DoorTab({ lang }) {
           <p role="alert" style={{ padding: "10px 14px", borderRadius: 8, background: "#fffbeb", color: "#92400e", fontSize: 13 }}>
             {fill(tt.doorUncovered, { n: uncovered.length, list: uncovered.map((u) => `${fmtDay(u.date)} ${tt[SLOT_KEYS[u.slot]]}`).join(", ") })}
           </p>
+        )}
+
+        {exceptions.length > 0 && (
+          <div role="status" style={{ padding: "10px 14px", borderRadius: 8, background: "#fffbeb", color: "#92400e", fontSize: 13, margin: "0 0 12px" }}>
+            {fill(tt.doorExceptions, { n: exceptions.length })}
+            <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+              {exceptions.map((e) => (
+                <li key={`${e.date}|${e.slot}|${e.workerId}`}>
+                  {fmtDay(e.date)} {tt[SLOT_KEYS[e.slot]]} — <strong>{e.workerName}</strong>: {e.rule === "week" ? tt.doorRuleWeek : tt.doorRuleConsecutive}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {monthLoaded && !info && <p style={{ color: "var(--muted)", fontSize: 13 }}>{tt.doorNotGenerated}</p>}
