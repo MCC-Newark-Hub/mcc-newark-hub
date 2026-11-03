@@ -41,6 +41,7 @@ Uses React Router v6. `<BrowserRouter>` in `src/main.jsx`; full route tree in `s
 | `/events/selfcheckin/:eventId` | SelfCheckInScreen |
 | `/24h-prayers/:id?` (aliases `/uninterrupted-prayers`, `/uninterrupted-prayer`) | PrayerPublicView — 24h prayer board; shows every active `prayer_periods` row as a tab (one period = one list, each with its own church scope). Deliberately outside `PublicLayout` so it stays open in maintenance mode |
 | `/portaria/:month?` (alias `/door-schedule`) | DoorPublicView — published door-duty month calendar (`YYYY-MM`); outside `PublicLayout` |
+| `/painel/:eventId?` (alias `/dashboard`) | PublicStatsView — numbers-only registration dashboard for the big screen (RPC `event_public_stats`, migration 041); outside `PublicLayout` |
 
 **PIN-gated routes** (wrapped in `AuthGate` → `HubShell`):
 
