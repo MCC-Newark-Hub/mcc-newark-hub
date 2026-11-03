@@ -36,6 +36,8 @@ export function summarizeStats(stats, today) {
 
   const daysToDeadline = daysUntil(stats.registration_deadline, today);
   const closed = !!stats.paused || !!stats.locked || (daysToDeadline !== null && daysToDeadline < 0);
+  // Paused is temporary; anything else that stops registrations is "closed".
+  const paused = !!stats.paused && !stats.locked && !(daysToDeadline !== null && daysToDeadline < 0);
 
   const byCat = stats.by_category || {};
   const waitCat = stats.waitlist_by_category || {};
@@ -76,6 +78,7 @@ export function summarizeStats(stats, today) {
     stage,
     daysToDeadline,
     closed,
+    paused,
     categories,
     churches,
   };
