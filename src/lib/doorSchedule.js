@@ -42,10 +42,11 @@ export function monthGrid(key) {
   return weeks;
 }
 
-// Week (Sunday to Saturday) a date belongs to, as the date of its Sunday.
-const weekOf = (date) => {
+// Week (Monday to Sunday, the church week) a date belongs to, as the date of its Monday.
+// EBD and the Sunday service close the week that began on the Monday before.
+export const weekOf = (date) => {
   const d = new Date(date + "T12:00:00");
-  d.setDate(d.getDate() - d.getDay());
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 const dayNumber = (date) => Math.round(new Date(date + "T12:00:00").getTime() / 86400000);
@@ -61,27 +62,52 @@ function rng(seed) {
   };
 }
 
-// Penalties (lower total = better candidate). Availability is a hard rule; these are preferences.
-const W = {
-  sameDay: 200,   // already on another service of the same day (EBD + Domingo)
-  sameWeek: 100,  // already on the door this week
-  sameSlotRepeat: 25, // was on the door the last time this same weekday came around
-  load: 60,       // share of their own available services already taken (fairness)
-  rest: 1,        // per day since their last turn, capped: rewards long rests
-};
-
 /**
  * Builds the month's schedule.
  * workers: [{ id, name, days: string[] }]  (only active ones)
  * services: monthServices(key)
- * Returns { assignments: [{ date, slot, workerId, workerName }], uncovered: [{ date, slot, missing }], counts: Map<workerId, n> }
+ * history: [{ date, slot, workerId }] already on the door around this month (the previous month
+ *   and, if generated, the next one), so the rules hold across the month boundary.
+ * Returns { assignments: [{ date, slot, workerId, workerName }], uncovered: [{ date, slot, missing }],
+ *   exceptions: [{ date, slot, workerId, workerName, rule: "week" | "consecutive" }], counts: Map<workerId, n> }
  *
- * Services with the fewest eligible workers are filled first, so someone who can only do Wednesdays
- * is not "used up" elsewhere. Each pick minimises repeats in the same week / same weekday and keeps
- * the load proportional to how many services each person can actually cover. A service nobody
- * can cover is reported in `uncovered` instead of being forced.
+ * Rules, in order (a later one never overrides an earlier one):
+ *   0. only people who marked that service day (hard rule);
+ *   1. nobody twice in the same Monday–Sunday week (both Sunday services count);
+ *   2. nobody on the same service day in consecutive weeks;
+ *   3. the load stays proportional to how many services each person can cover;
+ *   4. among equally good candidates, the pick is random, so generating again gives another schedule.
+ * Rules 1 and 2 are broken only when every available person breaks them, and every such case is
+ * reported in `exceptions`. Services with the fewest available people are filled first, so someone
+ * who can only do Wednesdays is not used up elsewhere. A service nobody can cover goes to `uncovered`.
  */
-export function generateSchedule(workers, services, { perService = 1, seed = 1 } = {}) {
+export function generateSchedule(workers, services, { perService = 1, seed = 1, history = [], attempts = 200 } = {}) {
+  // Picking one service at a time can paint itself into a corner (a later service left with only
+  // people who would break a rule), so the month is drawn many times and the draw with the fewest
+  // broken rules wins (then the fairest). Every draw is random, so the result still changes on
+  // every "Gerar novamente"; the same seed gives the same schedule.
+  const pick = rng(seed);
+  let best = null;
+  for (let i = 0; i < attempts; i++) {
+    const r = drawSchedule(workers, services, { perService, seed: Math.floor(pick() * 4294967296), history });
+    const weekBreaks = r.exceptions.filter((e) => e.rule === "week").length;
+    const loads = workers.map((w) => r.counts.get(w.id) / Math.max(1, services.filter((s) => (w.days || []).includes(s.slot)).length));
+    const spread = loads.length ? Math.max(...loads) - Math.min(...loads) : 0;
+    const key = [weekBreaks, r.exceptions.length - weekBreaks, spread];
+    if (!best || lexLess(key, best.key)) best = { r, key };
+    if (!best.key[0] && !best.key[1] && i >= 20) break; // no broken rules: good enough
+  }
+  return best.r;
+}
+
+// a < b, comparing element by element.
+function lexLess(a, b) {
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] < b[i];
+  return false;
+}
+
+// One random draw of the month (see generateSchedule).
+function drawSchedule(workers, services, { perService, seed, history }) {
   const rand = rng(seed);
   const eligible = (s) => workers.filter((w) => (w.days || []).includes(s.slot));
   const capacityOf = new Map(workers.map((w) => [w.id, Math.max(1, services.filter((s) => (w.days || []).includes(s.slot)).length)]));
@@ -90,25 +116,26 @@ export function generateSchedule(workers, services, { perService = 1, seed = 1 }
     .map((s, i) => ({ ...s, i, n: eligible(s).length, tie: rand() }))
     .sort((a, b) => a.n - b.n || a.tie - b.tie || a.i - b.i);
 
-  const taken = new Map(workers.map((w) => [w.id, []])); // worker -> [{ date, slot }]
+  const taken = new Map(workers.map((w) => [w.id, []])); // worker -> [{ date, slot }] in this month
+  const around = new Map(workers.map((w) => [w.id, []])); // worker -> history entries
+  for (const h of history) if (around.has(h.workerId)) around.get(h.workerId).push(h);
   const assigned = new Map(); // "date|slot" -> workers
   const uncovered = [];
+  const exceptions = [];
 
-  const cost = (w, s) => {
-    const mine = taken.get(w.id);
-    let c = (mine.length / capacityOf.get(w.id)) * W.load;
-    let lastGap = 30;
-    let lastSameSlot = null;
-    for (const t of mine) {
-      if (t.date === s.date) c += W.sameDay;
-      else if (weekOf(t.date) === weekOf(s.date)) c += W.sameWeek;
-      lastGap = Math.min(lastGap, Math.abs(dayNumber(t.date) - dayNumber(s.date)));
-      if (t.slot === s.slot && (!lastSameSlot || Math.abs(dayNumber(t.date) - dayNumber(s.date)) < lastSameSlot)) {
-        lastSameSlot = Math.abs(dayNumber(t.date) - dayNumber(s.date));
-      }
+  // Smaller is better, compared key by key.
+  const score = (w, s) => {
+    const all = taken.get(w.id).concat(around.get(w.id));
+    const week = weekOf(s.date);
+    let weekRepeats = 0;
+    let consecutive = 0;
+    for (const t of all) {
+      if (weekOf(t.date) === week) weekRepeats++;
+      if (t.slot === s.slot && Math.abs(dayNumber(t.date) - dayNumber(s.date)) === 7) consecutive++;
     }
-    if (lastSameSlot !== null && lastSameSlot <= 7) c += W.sameSlotRepeat;
-    return c - Math.min(lastGap, 14) * W.rest + rand() * 0.5;
+    // Share of their own available services already given; equal shares tie and are drawn at random.
+    const load = taken.get(w.id).length / capacityOf.get(w.id);
+    return [weekRepeats, consecutive, load, rand()];
   };
 
   for (const s of order) {
@@ -116,9 +143,15 @@ export function generateSchedule(workers, services, { perService = 1, seed = 1 }
     for (let k = 0; k < perService; k++) {
       const pool = eligible(s).filter((w) => !chosen.includes(w));
       if (!pool.length) break;
-      const best = pool.map((w) => ({ w, c: cost(w, s) })).sort((a, b) => a.c - b.c)[0].w;
-      chosen.push(best);
-      taken.get(best.id).push({ date: s.date, slot: s.slot });
+      let best = null;
+      for (const w of pool) {
+        const sc = score(w, s);
+        if (!best || lexLess(sc, best.sc)) best = { w, sc };
+      }
+      chosen.push(best.w);
+      taken.get(best.w.id).push({ date: s.date, slot: s.slot });
+      if (best.sc[0] > 0) exceptions.push({ date: s.date, slot: s.slot, workerId: best.w.id, workerName: best.w.name, rule: "week" });
+      else if (best.sc[1] > 0) exceptions.push({ date: s.date, slot: s.slot, workerId: best.w.id, workerName: best.w.name, rule: "consecutive" });
     }
     assigned.set(`${s.date}|${s.slot}`, chosen);
     if (chosen.length < perService) uncovered.push({ date: s.date, slot: s.slot, missing: perService - chosen.length });
@@ -129,8 +162,10 @@ export function generateSchedule(workers, services, { perService = 1, seed = 1 }
     for (const w of assigned.get(`${s.date}|${s.slot}`) || []) assignments.push({ date: s.date, slot: s.slot, workerId: w.id, workerName: w.name });
   }
   const counts = new Map(workers.map((w) => [w.id, taken.get(w.id).length]));
-  uncovered.sort((a, b) => a.date.localeCompare(b.date) || DOOR_SLOTS.indexOf(a.slot) - DOOR_SLOTS.indexOf(b.slot));
-  return { assignments, uncovered, counts };
+  const bySlot = (a, b) => a.date.localeCompare(b.date) || DOOR_SLOTS.indexOf(a.slot) - DOOR_SLOTS.indexOf(b.slot);
+  uncovered.sort(bySlot);
+  exceptions.sort(bySlot);
+  return { assignments, uncovered, exceptions, counts };
 }
 
 // Groups rows { service_date, slot, worker_name } by date → slot → names, for the calendar.
