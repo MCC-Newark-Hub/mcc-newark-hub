@@ -171,7 +171,7 @@ export default function PublicStatsView({ lang = "pt", setLang }) {
                 {!d.capacity && <small>{tt.statsRegistered}</small>}
               </div>
               <div className="ps-msg" style={{ color: d.closed ? "var(--muted)" : STAGE_COLOR[d.stage] }}>
-                {d.closed ? tt.statsClosed : message}
+                {d.paused ? tt.statsPaused : d.closed ? tt.statsClosed : message}
               </div>
               {d.capacity > 0 && (
                 <div className="ps-track" role="progressbar" aria-valuemin={0} aria-valuemax={d.capacity} aria-valuenow={Math.min(d.active, d.capacity)}>
@@ -191,7 +191,7 @@ export default function PublicStatsView({ lang = "pt", setLang }) {
                       <div className="ps-msg" style={{ color: d.daysToDeadline <= 7 ? "var(--danger)" : "var(--text)", marginTop: 2 }}>{daysText}</div>
                     </>
                   )}
-                  {d.closed && <strong style={{ color: "var(--muted)" }}>{tt.statsClosed}</strong>}
+                  {d.closed && <strong style={{ color: "var(--muted)" }}>{d.paused ? tt.statsPausedLong : tt.statsClosed}</strong>}
                 </div>
                 {qr && !d.closed && (
                   <div className="ps-qr">

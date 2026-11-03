@@ -358,6 +358,9 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
   const registrationPaused = !!event?.registration_paused;
   const registrationLocked = !!event?.registrations_locked;
   const isBlocked = registrationPaused || registrationLocked;
+  // Paused is temporary: nobody registers (not even to the waitlist) until it resumes.
+  // Closed (locked) is final: new people can only join the waitlist.
+  const isPausedOnly = registrationPaused && !registrationLocked;
   const isEventPast = !!(event?.date && event.date <= new Date().toISOString().slice(0, 10));
   // When blocked (paused or locked), treat as effectively full so the form uses waitlist mode
   const effectivelyFull = eventIsFull || isBlocked;
@@ -462,6 +465,12 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
     if (deadlineDays && !deadlineAccepted) { setDeadlineError(true); return; }
     if (totalFee > 0 && !cashAcknowledged) { setCashChecked(true); return; }
     if (!addReg || submitting) return;
+    if (isPausedOnly) {
+      setSubmitError(lang === "en"
+        ? "Registrations were paused a moment ago. Please try again when they reopen."
+        : "As inscrições acabaram de ser pausadas. Tente de novo quando forem reabertas.");
+      return;
+    }
     // Last line of defense — catches a verified/directory member whose church is
     // blank on file, which the earlier per-field checks can't see.
     if (allParticipants.some((m) => !m.church)) {
@@ -691,8 +700,22 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
           )}
           {step === 0 && !isEventPast && (
             <div>
-              {/* Closed/paused notice — shown when registrations are locked or paused */}
-              {isBlocked && (
+              {/* Paused notice — temporary, no form and no waitlist */}
+              {isPausedOnly && (
+                <div style={{ background: "#fef3c7", border: "2px solid #f59e0b", borderRadius: 14, padding: "24px 18px", textAlign: "center" }}>
+                  <div style={{ fontSize: 40, marginBottom: 8 }}>⏸</div>
+                  <h3 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 18, fontWeight: 700, color: "#78350f", marginBottom: 6 }}>
+                    {lang === "en" ? "Registrations Paused" : "Inscrições Pausadas"}
+                  </h3>
+                  <p style={{ fontSize: 13, color: "#92400e", lineHeight: 1.6, margin: 0 }}>
+                    {lang === "en"
+                      ? "Registrations are temporarily paused. They will reopen soon — please come back later."
+                      : "As inscrições estão temporariamente pausadas e serão reabertas em breve. Volte mais tarde."}
+                  </p>
+                </div>
+              )}
+              {/* Closed notice — registrations locked: only the waitlist is open */}
+              {registrationLocked && (
                 <div style={{ background: "#fef3c7", border: "2px solid #f59e0b", borderRadius: 14, padding: "20px 18px", marginBottom: 24 }}>
                   <div style={{ textAlign: "center", marginBottom: 14 }}>
                     <div style={{ fontSize: 40, marginBottom: 8 }}>🔒</div>

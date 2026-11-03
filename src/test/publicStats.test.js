@@ -20,7 +20,8 @@ describe("summarizeStats", () => {
     expect(s({ registration_deadline: "2026-11-14" })).toMatchObject({ daysToDeadline: 12, closed: false });
     expect(s({ registration_deadline: "2026-11-02" })).toMatchObject({ daysToDeadline: 0, closed: false });
     expect(s({ registration_deadline: "2026-11-01" }).closed).toBe(true);
-    expect(s({ paused: true }).closed).toBe(true);
+    expect(s({ paused: true })).toMatchObject({ closed: true, paused: true });
+    expect(s({ paused: true, locked: true }).paused).toBe(false);
     expect(s({ locked: true }).closed).toBe(true);
     expect(s({}).daysToDeadline).toBeNull();
   });
