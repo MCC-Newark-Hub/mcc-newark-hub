@@ -1,5 +1,7 @@
 import { useState, Fragment } from "react";
+import { MonitorPlay } from "lucide-react";
 import { CATEGORIES } from "@/constants";
+import { useT } from "@/i18n/strings";
 
 const CIA_CATS = ["0-3", "Criança", "Intermediário"];
 
@@ -22,6 +24,7 @@ const isSeminaryProfessor = (r, membersMap) =>
   ((membersMap[r.memberId] || {}).roles || []).includes("Professor de Seminário");
 
 export default function RegistrationDashboard({ regs, wlRegs, event, members, churches }) {
+  const tt = useT();
   const membersMap = memberById(members);
   const [expandedCh, setExpandedCh] = useState({});
   const [expandedHub, setExpandedHub] = useState({});
@@ -136,11 +139,18 @@ export default function RegistrationDashboard({ regs, wlRegs, event, members, ch
 
   return (
     <div>
-      <div style={{ marginBottom: 18 }}>
-        <h2 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 22, fontWeight: 700 }}>
-          Resumo de Inscrições
-        </h2>
-        <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>{event?.name}</p>
+      <div style={{ marginBottom: 18, display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <h2 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 22, fontWeight: 700 }}>
+            Resumo de Inscrições
+          </h2>
+          <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>{event?.name}</p>
+        </div>
+        {event?.id && (
+          <a className="btn btn-ghost btn-sm" style={{ marginLeft: "auto" }} href={`/painel/${event.id}`} target="_blank" rel="noopener noreferrer">
+            <MonitorPlay size={14} /> {tt.statsOpenPublic}
+          </a>
+        )}
       </div>
 
       {/* ── Total + status ─────────────────────────────────────────────── */}

@@ -41,6 +41,7 @@ import RegistrationLookup from "@/views/RegistrationLookup";
 import SetlistPublicView from "@/views/SetlistPublicView";
 import WorshipListPublicView from "@/views/WorshipListPublicView";
 import DoorPublicView from "@/views/DoorPublicView";
+import PublicStatsView from "@/views/PublicStatsView";
 import PrayerPublicView from "@/views/PrayerPublicView";
 
 export default function App() {
@@ -154,6 +155,11 @@ export default function App() {
               {/* Public: door duty schedule of a month — outside PublicLayout so it stays open in maintenance mode */}
               {["/portaria", "/door-schedule"].map((p) => (
                 <Route key={p} path={`${p}/:month?`} element={<DoorPublicView lang={lang} setLang={setLang} />} />
+              ))}
+
+              {/* Public: registration numbers for the big screen at church — outside PublicLayout so it stays open in maintenance mode */}
+              {["/painel", "/dashboard"].map((p) => (
+                <Route key={p} path={`${p}/:eventId?`} element={<PublicStatsView lang={lang} setLang={setLang} />} />
               ))}
 
               {/* Public: event flows (no PIN required) */}
