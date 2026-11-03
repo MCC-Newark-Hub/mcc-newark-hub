@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
+import { Routes, Route, useNavigate, useLocation, useParams, Navigate } from "react-router-dom";
 import "./index.css";
 import { LangContext } from "@/i18n/strings";
 import { ROLES_SYS } from "@/constants";
@@ -158,8 +158,10 @@ export default function App() {
               ))}
 
               {/* Public: registration numbers for the big screen at church — outside PublicLayout so it stays open in maintenance mode */}
+              <Route path="/events/painel/:eventId?" element={<PublicStatsView lang={lang} setLang={setLang} />} />
+              {/* The first links (/painel, /dashboard) keep working */}
               {["/painel", "/dashboard"].map((p) => (
-                <Route key={p} path={`${p}/:eventId?`} element={<PublicStatsView lang={lang} setLang={setLang} />} />
+                <Route key={p} path={`${p}/:eventId?`} element={<PainelRedirect />} />
               ))}
 
               {/* Public: event flows (no PIN required) */}
@@ -262,4 +264,10 @@ export default function App() {
       </LangContext.Provider>
     </AppDataContext.Provider>
   );
+}
+
+function PainelRedirect() {
+  const { eventId } = useParams();
+  const { search } = useLocation();
+  return <Navigate to={`/events/painel${eventId ? `/${eventId}` : ""}${search}`} replace />;
 }

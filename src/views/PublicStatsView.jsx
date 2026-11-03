@@ -68,7 +68,7 @@ function Rows({ items, max }) {
   );
 }
 
-// /painel: registration numbers for the big screen at church. Numbers only (no names,
+// /events/painel: registration numbers for the big screen at church. Numbers only (no names,
 // nothing about money), read from the event_public_stats RPC and refreshed every 20s.
 export default function PublicStatsView({ lang = "pt", setLang }) {
   const { eventId: param } = useParams();
