@@ -147,7 +147,7 @@ export default function RegistrationDashboard({ regs, wlRegs, event, members, ch
           <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>{event?.name}</p>
         </div>
         {event?.id && (
-          <a className="btn btn-ghost btn-sm" style={{ marginLeft: "auto" }} href={`/painel/${event.id}`} target="_blank" rel="noopener noreferrer">
+          <a className="btn btn-ghost btn-sm" style={{ marginLeft: "auto" }} href={`/events/painel/${event.id}`} target="_blank" rel="noopener noreferrer">
             <MonitorPlay size={14} /> {tt.statsOpenPublic}
           </a>
         )}

@@ -1,7 +1,7 @@
 import { sb } from "@/lib/supabase";
 import { CATEGORIES } from "@/constants";
 
-// Numbers for the public dashboard (/painel), from the event_public_stats RPC
+// Numbers for the public dashboard (/events/painel), from the event_public_stats RPC
 // (migration 041). Aggregates only: no names and nothing about money.
 export async function fetchPublicStats(eventId) {
   const { data, error } = await sb.rpc("event_public_stats", { p_event_id: eventId || null });
