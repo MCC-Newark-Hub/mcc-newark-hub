@@ -7,10 +7,9 @@ import Modal from "@/components/Modal";
 import { fetchEventTeams, importTeamsFromEvent } from "@/lib/rosterImport";
 import { cleanPrefix } from "@/lib/regNumber";
 import { nextEventId } from "@/lib/eventId";
-import { carryOverRegistrations } from "@/lib/carryOverSave";
 import { eventRequiresContact } from "@/lib/contact";
 
-export default function EventsTab({ events, setEvents, event, setEvent, lang, notify, rosters, setRosters, logAudit, members, families, setRegs, user }) {
+export default function EventsTab({ events, setEvents, event, setEvent, lang, notify, rosters, setRosters, logAudit }) {
   const t = useT();
   const [showNew, setShowNew] = useState(false);
   const [editEvt, setEditEvt] = useState(null);
@@ -18,7 +17,6 @@ export default function EventsTab({ events, setEvents, event, setEvent, lang, no
   const [importSourceId, setImportSourceId] = useState("");
   const [importTeams, setImportTeams] = useState([]); // [{ team, memberCount, checked }]
   const [importLoading, setImportLoading] = useState(false);
-  const [importRegs, setImportRegs] = useState(true); // also register the team members and their families
   const [confirmDelete, setConfirmDelete] = useState(null); // { id, name, checking, regCount }
   const [deleting, setDeleting] = useState(false);
   const [showForceDelete, setShowForceDelete] = useState(false);
@@ -153,7 +151,6 @@ export default function EventsTab({ events, setEvents, event, setEvent, lang, no
               },
             });
             setImportSourceId("");
-            setImportRegs(true);
             setImportTeams([]);
             setShowNew(true);
           }}
@@ -500,17 +497,6 @@ export default function EventsTab({ events, setEvents, event, setEvent, lang, no
                           {it.team} <span style={{ color: "#9ca3af" }}>({it.memberCount} membros)</span>
                         </label>
                       ))}
-                      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginTop: 6, fontWeight: 600 }}>
-                        <input type="checkbox" checked={importRegs} onChange={(e) => setImportRegs(e.target.checked)} />
-                        {lang === "en" ? "Register the team members and their families" : "Inscrever membros das equipes e famílias"}
-                      </label>
-                      {importRegs && (
-                        <p style={{ fontSize: 11, color: "#6b7280", margin: 0 }}>
-                          {lang === "en"
-                            ? "Payments are not copied. Pastores: only pastors from Polo Newark churches."
-                            : "Pagamentos não são copiados. Pastores: só os das igrejas do Polo Newark."}
-                        </p>
-                      )}
                     </div>
                   )}
                 </div>
@@ -572,7 +558,6 @@ export default function EventsTab({ events, setEvents, event, setEvent, lang, no
                       setEvent(ev);
                       var teamsToImport = importTeams.filter((it) => it.checked).map((it) => it.team);
                       var sourceEventId = importSourceId;
-                      var carryRegs = importRegs;
                       setShowNew(false);
                       sb.from("events")
                         .insert(dbRow)
@@ -589,26 +574,9 @@ export default function EventsTab({ events, setEvents, event, setEvent, lang, no
                               teamNames: teamsToImport,
                               rosters: rosters || [],
                               setRosters,
-                            }).then(async function (imported) {
-                              if (!carryRegs) {
-                                notify(`Evento criado com ${imported.length} equipe(s) importada(s)!`);
-                                return;
-                              }
-                              const saved = await carryOverRegistrations({
-                                sourceEventId,
-                                event: ev,
-                                teamNames: teamsToImport,
-                                members,
-                                families,
-                                byName: user?.name,
-                              });
-                              if (saved.error) {
-                                notify("Equipes importadas, mas as inscrições não foram salvas: " + saved.error);
-                                return;
-                              }
-                              if (setRegs && saved.regs.length) setRegs((prev) => [...prev, ...saved.regs]);
-                              logAudit?.("event_regs_carried_over", "event", newId, nEvt.name, { from: sourceEventId, count: saved.regs.length });
-                              notify(`Evento criado: ${imported.length} equipe(s), ${saved.regs.length} inscrição(ões).`);
+                            }).then(function (imported) {
+                              // Teams only: everyone registers themselves.
+                              notify(`Evento criado com ${imported.length} equipe(s) importada(s)!`);
                             });
                           }
                         });
