@@ -17,6 +17,7 @@ import { syncRegistrationNames } from "@/lib/syncMemberName";
 import ContactFields from "@/components/ContactFields";
 import { contactTargets, contactErrors, eventRequiresContact, normalizeEmail } from "@/lib/contact";
 import { fetchContactStatus, fillContact } from "@/lib/contactApi";
+import { pauseModeOf, PAUSE_WAITLIST, PAUSED_WAITLIST_REASON } from "@/lib/pause";
 
 // Accent-insensitive search: "joao" matches "João"
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -361,6 +362,8 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
   // Paused is temporary: nobody registers (not even to the waitlist) until it resumes.
   // Closed (locked) is final: new people can only join the waitlist.
   const isPausedOnly = registrationPaused && !registrationLocked;
+  const pausedWaitlist = isPausedOnly && pauseModeOf(event) === PAUSE_WAITLIST; // waitlist stays open
+  const pausedFull = isPausedOnly && !pausedWaitlist;
   const isEventPast = !!(event?.date && event.date <= new Date().toISOString().slice(0, 10));
   // When blocked (paused or locked), treat as effectively full so the form uses waitlist mode
   const effectivelyFull = eventIsFull || isBlocked;
@@ -465,7 +468,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
     if (deadlineDays && !deadlineAccepted) { setDeadlineError(true); return; }
     if (totalFee > 0 && !cashAcknowledged) { setCashChecked(true); return; }
     if (!addReg || submitting) return;
-    if (isPausedOnly) {
+    if (pausedFull) {
       setSubmitError(lang === "en"
         ? "Registrations were paused a moment ago. Please try again when they reopen."
         : "As inscrições acabaram de ser pausadas. Tente de novo quando forem reabertas.");
@@ -561,6 +564,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
           note: sharedNote,
           invitedByMemberId: invitedByMemberId || null,
           forceWaitlist: isBlocked || undefined,
+          waitlistReason: pausedWaitlist ? PAUSED_WAITLIST_REASON : undefined,
           // Everyone in this submission shares its number (…-001-1, …-001-2).
           groupWith: groupNumber,
         });
@@ -701,7 +705,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
           {step === 0 && !isEventPast && (
             <div>
               {/* Paused notice — temporary, no form and no waitlist */}
-              {isPausedOnly && (
+              {pausedFull && (
                 <div style={{ background: "#fef3c7", border: "2px solid #f59e0b", borderRadius: 14, padding: "24px 18px", textAlign: "center" }}>
                   <div style={{ fontSize: 40, marginBottom: 8 }}>⏸</div>
                   <h3 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 18, fontWeight: 700, color: "#78350f", marginBottom: 6 }}>
@@ -714,18 +718,24 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
                   </p>
                 </div>
               )}
-              {/* Closed notice — registrations locked: only the waitlist is open */}
-              {registrationLocked && (
+              {/* Closed, or paused with the waitlist open: only the waitlist is open */}
+              {(registrationLocked || pausedWaitlist) && (
                 <div style={{ background: "#fef3c7", border: "2px solid #f59e0b", borderRadius: 14, padding: "20px 18px", marginBottom: 24 }}>
                   <div style={{ textAlign: "center", marginBottom: 14 }}>
-                    <div style={{ fontSize: 40, marginBottom: 8 }}>🔒</div>
+                    <div style={{ fontSize: 40, marginBottom: 8 }}>{pausedWaitlist ? "⏸" : "🔒"}</div>
                     <h3 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 18, fontWeight: 700, color: "#78350f", marginBottom: 6 }}>
-                      {lang === "en" ? "Registrations Closed" : "Inscrições Encerradas"}
+                      {pausedWaitlist
+                        ? (lang === "en" ? "Registrations Paused" : "Inscrições Pausadas")
+                        : (lang === "en" ? "Registrations Closed" : "Inscrições Encerradas")}
                     </h3>
                     <p style={{ fontSize: 13, color: "#92400e", lineHeight: 1.6, margin: 0 }}>
-                      {lang === "en"
-                        ? "Registrations are closed. You can still join the waitlist and will be notified if a spot opens up."
-                        : "As inscrições estão encerradas. Você ainda pode entrar na lista de espera e será avisado(a) caso uma vaga se abra."}
+                      {pausedWaitlist
+                        ? (lang === "en"
+                          ? "Registrations are temporarily paused. You can join the waitlist now: when registrations reopen, the waitlist moves to the main list while spots remain."
+                          : "As inscrições estão temporariamente pausadas. Você já pode entrar na lista de espera: quando as inscrições forem reabertas, a lista de espera passa para a lista principal enquanto houver vagas.")
+                        : (lang === "en"
+                          ? "Registrations are closed. You can still join the waitlist and will be notified if a spot opens up."
+                          : "As inscrições estão encerradas. Você ainda pode entrar na lista de espera e será avisado(a) caso uma vaga se abra.")}
                     </p>
                   </div>
                   <div style={{ background: "#fff", border: "1px solid #fcd34d", borderRadius: 10, padding: "12px 14px", marginBottom: 14, fontSize: 13, color: "#78350f", lineHeight: 1.6 }}>

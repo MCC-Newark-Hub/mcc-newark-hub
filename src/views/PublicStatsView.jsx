@@ -191,7 +191,7 @@ export default function PublicStatsView({ lang = "pt", setLang }) {
                       <div className="ps-msg" style={{ color: d.daysToDeadline <= 7 ? "var(--danger)" : "var(--text)", marginTop: 2 }}>{daysText}</div>
                     </>
                   )}
-                  {d.closed && <strong style={{ color: "var(--muted)" }}>{d.paused ? tt.statsPausedLong : tt.statsClosed}</strong>}
+                  {d.closed && <strong style={{ color: "var(--muted)" }}>{d.pausedWaitlist ? tt.statsPausedWaitlist : d.paused ? tt.statsPausedLong : tt.statsClosed}</strong>}
                 </div>
                 {qr && !d.closed && (
                   <div className="ps-qr">
