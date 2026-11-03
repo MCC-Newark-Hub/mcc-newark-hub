@@ -5,6 +5,7 @@ import { APP_USER_COLUMNS } from "@/lib/appUsers";
 import { pickCurrentEvent } from "@/lib/eventId";
 import { buildRegNumber, noteRegNumber, parseRegNumber, regCounters } from "@/lib/regNumber";
 import { regFeeFlags } from "@/lib/regFee";
+import { waitlistToPromote, PAUSE_FULL, PAUSE_WAITLIST } from "@/lib/pause";
 
 // ── DB → app object mappers ───────────────────────────────────────────────────
 export function mapMember(m) {
@@ -415,7 +416,7 @@ export function useAppData({ getUserRef, notify }) {
       exempt: isExempt,
       cancelled: false,
       waitlisted: isWaitlisted,
-      waitlist_reason: isWaitlisted ? "Capacidade esgotada" : null,
+      waitlist_reason: isWaitlisted ? (data.waitlistReason || "Capacidade esgotada") : null,
       excedente: forceExcedente,
       needs_translation: data.needsTranslation || false,
       note: data.note || "",
@@ -956,23 +957,46 @@ export function useAppData({ getUserRef, notify }) {
     notify("Capacidade atualizada para " + newCapacity + ".");
   };
 
-  const toggleRegistrationPaused = function () {
+  // Pause (mode "full" or "waitlist", see src/lib/pause.js) or resume. Resuming moves
+  // the waitlist into the spots still free.
+  const toggleRegistrationPaused = async function (mode) {
     if (!event) return;
     var newVal = !event.registration_paused;
     var byName = getUser()?.name || "Sistema";
-    setEventState(function (cur) { return cur ? { ...cur, registration_paused: newVal } : cur; });
-    setEvents(function (p) { return p.map(function (e) { return e.id === event.id ? { ...e, registration_paused: newVal } : e; }); });
-    sb.from("events").update({ registration_paused: newVal }).eq("id", event.id)
-      .then(function (res) {
-        if (res.error) {
-          notify("Erro: " + res.error.message);
-          setEventState(function (cur) { return cur ? { ...cur, registration_paused: !newVal } : cur; });
-          setEvents(function (p) { return p.map(function (e) { return e.id === event.id ? { ...e, registration_paused: !newVal } : e; }); });
-        } else {
-          logAudit(newVal ? "registrations_paused" : "registrations_resumed", "event", event.id, event.name, { by: byName });
-        }
-      });
-    notify(newVal ? "Inscrições pausadas." : "Inscrições reabertas.");
+    var upd = newVal ? { registration_paused: true, registration_pause_mode: mode === PAUSE_WAITLIST ? PAUSE_WAITLIST : PAUSE_FULL } : { registration_paused: false };
+    var prev = { registration_paused: event.registration_paused, registration_pause_mode: event.registration_pause_mode };
+    setEventState(function (cur) { return cur ? { ...cur, ...upd } : cur; });
+    setEvents(function (p) { return p.map(function (e) { return e.id === event.id ? { ...e, ...upd } : e; }); });
+    var res = await sb.from("events").update(upd).eq("id", event.id).select("id");
+    if (res.error || !res.data?.length) {
+      notify("Erro: " + (res.error?.message || "evento não atualizado"));
+      setEventState(function (cur) { return cur ? { ...cur, ...prev } : cur; });
+      setEvents(function (p) { return p.map(function (e) { return e.id === event.id ? { ...e, ...prev } : e; }); });
+      return;
+    }
+    logAudit(newVal ? "registrations_paused" : "registrations_resumed", "event", event.id, event.name, { by: byName, mode: upd.registration_pause_mode });
+    if (newVal) {
+      notify(upd.registration_pause_mode === PAUSE_WAITLIST ? "Inscrições pausadas — novas inscrições vão para a lista de espera." : "Inscrições pausadas.");
+      return;
+    }
+    var ids = waitlistToPromote(regs, event);
+    if (!ids.length) {
+      notify("Inscrições reabertas.");
+      return;
+    }
+    var today = new Date().toISOString().slice(0, 10);
+    var entry = { status: "Confirmado", date: today, by: byName, note: "Confirmado da lista de espera (inscrições reabertas)" };
+    var byId = new Map(regs.map(function (r) { return [r.id, r]; }));
+    var results = await Promise.all(ids.map(function (id) {
+      var timeline = [...(byId.get(id)?.timeline || []), entry];
+      return sb.from("registrations").update({ waitlisted: false, waitlist_reason: null, timeline: timeline }).eq("id", id).select("id")
+        .then(function (r) { return { id: id, ok: !r.error && r.data?.length === 1, timeline: timeline }; });
+    }));
+    var moved = results.filter(function (r) { return r.ok; });
+    var movedMap = new Map(moved.map(function (r) { return [r.id, r.timeline]; }));
+    setRegs(function (p) { return p.map(function (r) { return movedMap.has(r.id) ? { ...r, waitlisted: false, waitlistReason: null, timeline: movedMap.get(r.id) } : r; }); });
+    logAudit("waitlist_promoted_on_resume", "event", event.id, event.name, { count: moved.length });
+    notify("Inscrições reabertas. " + moved.length + " pessoa(s) da lista de espera → lista principal." + (moved.length < ids.length ? " " + (ids.length - moved.length) + " não puderam ser movidas." : ""));
   };
 
   const closeRegistrations = async () => {

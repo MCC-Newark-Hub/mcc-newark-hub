@@ -79,6 +79,7 @@ export function summarizeStats(stats, today) {
     daysToDeadline,
     closed,
     paused,
+    pausedWaitlist: paused && stats.pause_mode === "waitlist",
     categories,
     churches,
   };

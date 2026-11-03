@@ -34,6 +34,7 @@ import { TesourariaSection } from "./TreasurerView";
 import MemberFunctionsView from "@/components/MemberFunctionsView";
 import { syncRegistrationNames, syncMemberToRegistrations } from "@/lib/syncMemberName";
 import { groupByFamily, familyIdOf } from "@/lib/family";
+import PauseControl from "@/components/PauseControl";
 
 // Accent-insensitive search: "joao" matches "João"
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -172,15 +173,7 @@ function AdminOverview({ event, regs, activeCount, wlRegs, exRegs, members, lang
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
         <h2 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{t.overview}</h2>
         <div style={{ display: "flex", gap: 8 }}>
-          {!event?.registrations_locked && toggleRegistrationPaused && (
-            <button
-              onClick={toggleRegistrationPaused}
-              className={`btn btn-sm ${event?.registration_paused ? "btn-primary" : "btn-ghost"}`}
-              style={event?.registration_paused ? { background: "#b45309", borderColor: "#b45309" } : {}}
-            >
-              {event?.registration_paused ? "▶ Retomar Inscrições" : "⏸ Pausar Inscrições"}
-            </button>
-          )}
+          <PauseControl event={event} onToggle={toggleRegistrationPaused} lang={lang} />
           {!event?.registrations_locked && (
             <button className="btn btn-sm btn-danger" onClick={() => setConfirmClose(true)}>
               🔒 Encerrar Inscrições
@@ -200,7 +193,7 @@ function AdminOverview({ event, regs, activeCount, wlRegs, exRegs, members, lang
       )}
       {!event?.registrations_locked && event?.registration_paused && (
         <div style={{ background: "#fef3c7", border: "1px solid #f59e0b", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: "#92400e", fontWeight: 600 }}>
-          ⏸ Inscrições pausadas — o portal público está bloqueado para novas inscrições.
+          {event?.registration_pause_mode === "waitlist" ? "⏸ Inscrições pausadas — novas inscrições vão para a lista de espera e passam para a lista principal ao retomar, enquanto houver vagas." : "⏸ Inscrições pausadas — ninguém consegue se inscrever, nem na lista de espera."}
         </div>
       )}
       {confirmClose && (
