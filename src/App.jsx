@@ -3,10 +3,12 @@ import { Routes, Route, useNavigate, useLocation, useParams, Navigate } from "re
 import "./index.css";
 import { LangContext } from "@/i18n/strings";
 import { ROLES_SYS } from "@/constants";
-import { SwitchRoleContext } from "@/context/switchRole";
+import { SwitchRoleContext, SeeAsContext } from "@/context/switchRole";
 import { AppDataContext } from "@/context/AppDataContext";
 import { clearSession, getSessionToken, saveSession } from "@/lib/session";
-import { viewAs } from "@/lib/roleView";
+import { viewAs, seeAs, canSeeAs, actingName } from "@/lib/roleView";
+import { mapAppUser } from "@/lib/appUsers";
+import SeeAsPicker from "@/components/SeeAsPicker";
 
 const ROLE_LABELS = {
   admin: "Administrador",
@@ -72,8 +74,18 @@ export default function App() {
   const { user: authUser, setUser: setAuthUser, login: authLogin, restore: authRestore, logout: authLogout } = useAuth();
   // The profile chosen in "Trocar Função" is the only role the screens see (see viewAs).
   const [view, setView] = useState(() => localStorage.getItem("mcc_view"));
-  const user = useMemo(() => viewAs(authUser, view), [authUser, view]);
-  useEffect(() => { userRef.current = user; });
+  // "Ver como" (admins): the user being looked at, kept for this browser tab only.
+  const readSeeAs = () => { try { return JSON.parse(sessionStorage.getItem("mcc_see_as") || "null"); } catch { return null; } };
+  const [seeAsState, setSeeAsState] = useState(readSeeAs); // { id, role } | null
+  const [seeAsPicker, setSeeAsPicker] = useState(false);
+  const saveSeeAs = (v) => { setSeeAsState(v); try { v ? sessionStorage.setItem("mcc_see_as", JSON.stringify(v)) : sessionStorage.removeItem("mcc_see_as"); } catch { /* private mode */ } };
+  const seeAsRow = seeAsState && (appData.dbUsers || []).find((u) => String(u.id) === String(seeAsState.id));
+  const user = useMemo(() => {
+    const seen = seeAsRow && seeAs(authUser, mapAppUser(seeAsRow), seeAsState.role);
+    return seen || viewAs(authUser, view);
+  }, [authUser, view, seeAsRow, seeAsState]);
+  // Timelines and the audit log name whoever really acts: "Admin (como Fulano)" while seeing as someone.
+  useEffect(() => { userRef.current = user?.viewedBy ? { ...user, id: user.viewedBy.id, name: actingName(user) } : user; });
 
   // Backward compat: redirect old ?checkin= and ?selfcheckin= QR codes to new routes
   useEffect(() => {
@@ -112,9 +124,10 @@ export default function App() {
   const selectRole = (role) => {
     const knownRoles = new Set(Object.values(ROLES_SYS));
     const safeRole = knownRoles.has(role) ? role : ROLES_SYS.ADMIN;
+    setRoleSwitcher(false);
+    if (user?.viewedBy) { saveSeeAs({ ...seeAsState, role: safeRole }); navigate("/"); return; }
     localStorage.setItem("mcc_view", safeRole);
     setView(safeRole);
-    setRoleSwitcher(false);
     navigate("/");
   };
 
@@ -129,7 +142,11 @@ export default function App() {
     return true;
   };
 
+  const startSeeAs = (id) => { setSeeAsPicker(false); saveSeeAs({ id, role: null }); navigate("/"); };
+  const stopSeeAs = () => { saveSeeAs(null); navigate("/"); };
+
   const logout = () => {
+    saveSeeAs(null);
     authLogout();
     clearSession();
     setRoleSwitcher(false);
@@ -142,6 +159,7 @@ export default function App() {
     <AppDataContext.Provider value={shared}>
       <LangContext.Provider value={lang}>
         <SwitchRoleContext.Provider value={user?.allRoles?.length > 1 ? () => setRoleSwitcher(true) : null}>
+        <SeeAsContext.Provider value={canSeeAs(authUser) ? () => setSeeAsPicker(true) : null}>
           <div data-theme={theme} style={{ minHeight: "100vh", fontFamily: "'Montserrat','Segoe UI',sans-serif" }}>
             {toast && <div className={`toast${toast.leaving ? " toast-leaving" : ""}`}>{toast.msg}</div>}
 
@@ -274,7 +292,19 @@ export default function App() {
                 </div>
               </div>
             )}
+            {seeAsPicker && authUser && (
+              <SeeAsPicker dbUsers={appData.dbUsers} currentId={authUser.id} roleLabel={(r) => ROLE_LABELS[r] || r} lang={lang} onPick={startSeeAs} onClose={() => setSeeAsPicker(false)} />
+            )}
+
+            {/* While seeing as someone: who it is, and the way back */}
+            {user?.viewedBy && (
+              <div role="status" className="see-as-bar">
+                <span>👁 {lang === "en" ? "Viewing as" : "Vendo como"} <strong>{user.name}</strong> · {ROLE_LABELS[user.sysRole] || user.sysRole}</span>
+                <button className="btn btn-sm" onClick={stopSeeAs}>{lang === "en" ? "Exit" : "Sair"}</button>
+              </div>
+            )}
           </div>
+        </SeeAsContext.Provider>
         </SwitchRoleContext.Provider>
       </LangContext.Provider>
     </AppDataContext.Provider>

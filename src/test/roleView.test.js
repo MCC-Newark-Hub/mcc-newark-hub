@@ -25,3 +25,37 @@ describe("viewAs", () => {
     expect(viewAs(null, "admin")).toBe(null);
   });
 });
+
+import { seeAs, canSeeAs, actingName } from "@/lib/roleView";
+import { staffActor } from "@/lib/auditEvent";
+
+describe("Ver como", () => {
+  const admin = { id: 1, name: "Admin Geral", sysRole: "admin", sysRoles: ["admin"] };
+  const marcos = { id: 9, name: "Marcos Martins", sysRole: "team_leader", primaryRole: "team_leader", sysRoles: ["team_leader"], teamLeads: ["Professoras"] };
+
+  it("only admins can, and not as themselves", () => {
+    expect(canSeeAs(admin)).toBe(true);
+    expect(canSeeAs(marcos)).toBe(false);
+    expect(seeAs(marcos, admin)).toBeNull();
+    expect(seeAs(admin, admin)).toBeNull();
+    expect(seeAs(admin, null)).toBeNull();
+  });
+
+  it("shows the app as that user, remembering who is looking", () => {
+    const u = seeAs(admin, marcos);
+    expect(u).toMatchObject({ id: 9, name: "Marcos Martins", sysRoles: ["team_leader"], teamLeads: ["Professoras"], viewedBy: { id: 1, name: "Admin Geral" } });
+  });
+
+  it("uses one of that user's profiles at a time", () => {
+    const multi = { ...marcos, sysRoles: ["team_leader", "ga_leader"], gaIds: ["g1"] };
+    expect(seeAs(admin, multi, "ga_leader").sysRoles).toEqual(["ga_leader"]);
+    expect(seeAs(admin, multi).allRoles).toEqual(["team_leader", "ga_leader"]);
+  });
+
+  it("records actions under the admin", () => {
+    const u = seeAs(admin, marcos);
+    expect(actingName(u)).toBe("Admin Geral (como Marcos Martins)");
+    expect(staffActor(u)).toEqual({ name: "Admin Geral (como Marcos Martins)", id: 1, role: "admin" });
+    expect(staffActor(marcos)).toEqual({ name: "Marcos Martins", id: 9, role: "team_leader" });
+  });
+});
