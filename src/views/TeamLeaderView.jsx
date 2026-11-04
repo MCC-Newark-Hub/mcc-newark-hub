@@ -1037,6 +1037,7 @@ function TeamLeaderView(props) {
                       })}
                     </div>
                   )}
+                  <TeamRegisterPanel event={event} team={team} rosters={rosters} regs={regs} members={members} addReg={addReg} notify={notify} logAudit={logAudit} t={t} />
                 </div>
               );
             }
