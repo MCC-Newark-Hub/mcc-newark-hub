@@ -6,6 +6,7 @@ import fs from "node:fs";
 import { STRINGS } from "@/i18n/strings";
 
 vi.mock("@/lib/praiseData", () => ({
+  fetchSuggestDays: () => Promise.resolve({ data: 7, error: null }), saveSuggestDays: vi.fn(),
   fetchListsByDate: vi.fn(), fetchRecentLists: vi.fn(), createList: vi.fn(), updateList: vi.fn(),
   addListItem: vi.fn(), removeListItem: vi.fn(), saveItemPositions: vi.fn(), createSong: vi.fn(),
 }));

@@ -9,7 +9,7 @@ import WorshipListSharedView from "@/views/WorshipListSharedView";
 import { logAuditEvent, publicActor, deviceInfo } from "@/lib/auditEvent";
 import { STRINGS, fill } from "@/i18n/strings";
 import {
-  fetchSongs, fetchListsByDate, fetchListFor, fetchRecentLists, createList, updateList, addListItem, removeListItem, saveItemPositions,
+  fetchSongs, fetchSuggestDays, fetchListsByDate, fetchListFor, fetchRecentLists, createList, updateList, addListItem, removeListItem, saveItemPositions,
 } from "@/lib/praiseData";
 import { serviceTypesFor, dateKey, isListLocked, isFinalizeEnabled, moveItem, renumber, songLabel, listPath } from "@/lib/praiseLists";
 
@@ -98,6 +98,11 @@ export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreat
   const [loadedKey, setLoadedKey] = useState(null); // "date|type" of the list currently shown
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null); // { kind: "ok" | "error" | "info", text }
+  const [suggestDays, setSuggestDays] = useState(0); // same-theme suggestions window, from app_settings
+
+  useEffect(() => {
+    fetchSuggestDays().then(({ data }) => setSuggestDays(data));
+  }, []);
   const nameRef = useRef(null);
 
   const locked = list ? isListLocked(list) : false;
@@ -303,7 +308,7 @@ export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreat
           <div>
             <p style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>{tt.praiseSongsHeading}</p>
             {canEdit && (
-              <SongPicker songs={songs} church={header.church} excludeIds={items.map((i) => i.song_id)} onPick={addSong} onCreated={(s) => { onSongCreated(s); addSong(s); }} tt={tt} enteredBy={enteredBy.trim()} today={today} autoApprove={admin} />
+              <SongPicker songs={songs} church={header.church} excludeIds={items.map((i) => i.song_id)} onPick={addSong} onCreated={(s) => { onSongCreated(s); addSong(s); }} tt={tt} enteredBy={enteredBy.trim()} today={today} autoApprove={admin} suggestDays={suggestDays} />
             )}
             <SongRows items={items} songsById={songsById} tt={tt} canEdit={canEdit} onMove={move} onRemove={removeItem} />
           </div>

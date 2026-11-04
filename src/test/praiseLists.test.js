@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   normalizeCode, formatCode, categoryFromCode, searchSongs, findSimilarSongs,
-  isListLocked, daysBetween, recency, moveItem, renumber, songLabel, themeApplies, THEMES, songNumberLabel, listPath,
+  isListLocked, daysBetween, recency, moveItem, renumber, songLabel, themeApplies, THEMES, songNumberLabel, listPath, themeSuggestions,
 } from "@/lib/praiseLists";
 
 const SONGS = [
@@ -152,5 +152,45 @@ describe("songNumberLabel / listPath", () => {
 
   it("builds the public path of a list", () => {
     expect(listPath("abc")).toBe("/culto-profetico/abc");
+  });
+});
+
+describe("themeSuggestions", () => {
+  const today = "2026-11-10";
+  const song = (id, code, theme, sung, extra = {}) => ({
+    id, code, title: id, category: "coletanea", theme, status: "active",
+    sung_by_church: sung ? { "Newark, NJ": sung } : {}, ...extra,
+  });
+  const picked = song("34", "CL-034", "Clamor", { last_sung_on: "2026-11-05", times_sung: 9 });
+  const songs = [
+    picked,
+    song("3", "CL-003", "Clamor", { last_sung_on: "2026-09-01", times_sung: 2 }),
+    song("15", "CL-015", "Clamor", { last_sung_on: "2026-08-01", times_sung: 7 }),
+    song("19", "CL-019", "Clamor", null),
+    song("21", "CL-021", "Clamor", { last_sung_on: "2026-11-08", times_sung: 4 }), // sung 2 days ago
+    song("43", "CL-043", "Clamor", null, { status: "pending" }),
+    song("57", "CL-057", "Invocação e Comunhão", null),
+  ];
+  const opts = { church: "Newark, NJ", today };
+
+  it("offers approved, not-recent songs of the same theme, the known ones first", () => {
+    expect(themeSuggestions(songs, picked, opts).map((s) => s.id)).toEqual(["15", "3", "19"]);
+  });
+
+  it("leaves out songs already in the list", () => {
+    expect(themeSuggestions(songs, picked, { ...opts, excludeIds: ["15"] }).map((s) => s.id)).toEqual(["3", "19"]);
+  });
+
+  it("offers nothing when the song was not sung in the last 7 days or has no theme", () => {
+    expect(themeSuggestions(songs, picked, { ...opts, today: "2026-11-13" })).toEqual([]);
+    expect(themeSuggestions(songs, { ...picked, theme: null }, opts)).toEqual([]);
+    expect(themeSuggestions(songs, picked, { ...opts, church: "Philadelphia, PA" })).toEqual([]);
+  });
+
+  it("uses the configured window, and 0 turns it off", () => {
+    // picked was sung 5 days ago: outside a 3-day window, inside a 14-day one (where CL-021 is recent too)
+    expect(themeSuggestions(songs, picked, { ...opts, days: 3 })).toEqual([]);
+    expect(themeSuggestions(songs, picked, { ...opts, days: 14 }).map((s) => s.id)).toEqual(["15", "3", "19"]);
+    expect(themeSuggestions(songs, picked, { ...opts, days: 0 })).toEqual([]);
   });
 });

@@ -12,7 +12,7 @@ export const THEMES = [
   "Invocação e Comunhão",
   "Morte, Ressurreição e Salvação",
   "Dedicação",
-  "Console e Encorajamento",
+  "Consolo e Encorajamento",
   "Santificação e Derramamento do Espírito Santo",
   "Volta de Jesus e Eternidade",
   "Louvor",
@@ -200,6 +200,28 @@ export function songHistory(song, church) {
   if (!song) return { last_sung_on: null, times_sung: 0 };
   if (church) return song.sung_by_church?.[church] || { last_sung_on: null, times_sung: 0 };
   return { last_sung_on: song.last_sung_on || null, times_sung: song.times_sung || 0 };
+}
+
+// Picking a song sung in the last `days` days offers other songs of the same theme instead. The window is
+// app_settings.praise_suggest_days (admins change it); SUGGEST_DAYS is the default, 0 turns it off.
+export const SUGGEST_DAYS = 7;
+export const SUGGEST_DAYS_MAX = 60;
+const SUGGEST_LIMIT = 5;
+
+// Same-theme songs to offer instead of `song`: approved, not in the list, not sung in the last `days` days.
+// Songs the church already knows (sung more often) come first, then by number. Empty when `song` was not sung
+// recently or has no theme.
+export function themeSuggestions(songs, song, { church, today = dateKey(), excludeIds = [], limit = SUGGEST_LIMIT, days = SUGGEST_DAYS } = {}) {
+  if (!song?.theme || !(days > 0)) return [];
+  const recent = (s) => {
+    const r = recency(songHistory(s, church).last_sung_on, today);
+    return r && r.days <= days;
+  };
+  if (!recent(song)) return [];
+  return (songs || [])
+    .filter((s) => s.id !== song.id && s.theme === song.theme && s.status === "active" && !excludeIds.includes(s.id) && !recent(s))
+    .sort((a, b) => songHistory(b, church).times_sung - songHistory(a, church).times_sung || String(a.code || "~").localeCompare(String(b.code || "~")))
+    .slice(0, limit);
 }
 
 // Lists that are the same service (church + date + service) — duplicates to merge. Newest service first.

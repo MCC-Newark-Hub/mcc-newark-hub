@@ -6,8 +6,8 @@ import { MergeSongModal, MergeListsModal } from "@/sections/worship/PraiseMergeM
 import { useAppDataContext } from "@/context/AppDataContext";
 import { STRINGS, fill } from "@/i18n/strings";
 import { logAuditEvent, staffActor } from "@/lib/auditEvent";
-import { fetchSongs, fetchRecentLists, updateSong, deleteSong, updateList, deleteList } from "@/lib/praiseData";
-import { CATEGORIES, THEMES, themeApplies, dateKey, isListLocked, songLabel, songNumber, formatCode, canManagePraise, listPath, hasNumberPrefix, songErrorText, catalogTotals, filterCatalog, sortCatalog, upperTitle, duplicateServices, songHistory } from "@/lib/praiseLists";
+import { fetchSongs, fetchRecentLists, updateSong, deleteSong, updateList, deleteList, fetchSuggestDays, saveSuggestDays } from "@/lib/praiseData";
+import { CATEGORIES, THEMES, themeApplies, dateKey, isListLocked, songLabel, songNumber, formatCode, canManagePraise, listPath, hasNumberPrefix, songErrorText, catalogTotals, filterCatalog, sortCatalog, upperTitle, duplicateServices, songHistory, SUGGEST_DAYS_MAX } from "@/lib/praiseLists";
 
 const CAT_KEYS = { coletanea: "praiseCatColetanea", cia: "praiseCatCia", avulso: "praiseCatAvulso", english: "praiseCatEnglish" };
 const TYPE_KEYS = { ebd: "praiseTypeEbd", noite: "praiseTypeNoite", outro: "praiseTypeOutro" };
@@ -249,6 +249,7 @@ export default function PraiseListsTab({ lang }) {
       {sub === "lists" && (
         <>
           {canManage && <button className="btn btn-primary btn-sm" style={{ marginBottom: 12 }} onClick={() => openEditor(null)}><Plus size={14} /> {tt.praiseNewList}</button>}
+          {canManage && <SuggestDaysCard tt={tt} actor={actor} say={say} />}
           {duplicates.length > 0 && (
             <div role="status" style={{ background: "#fef3c7", color: "#78350f", padding: "9px 12px", borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
               {fill(tt.praiseDuplicateListsBanner, { n: duplicates.length })}
@@ -402,6 +403,41 @@ function EditSongModal({ song, tt, canDelete, onClose, onSave, onDelete }) {
             {canDelete && <button className="btn btn-danger" onClick={onDelete}><Trash2 size={14} /> {tt.praiseDeleteAction}</button>}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// How many days back a song counts as "sung recently" for the same-theme suggestions (0 = off).
+function SuggestDaysCard({ tt, actor, say }) {
+  const [saved, setSaved] = useState(null); // value in the database; null while loading
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    fetchSuggestDays().then(({ data }) => { setSaved(data); setDraft(String(data)); });
+  }, []);
+
+  const n = Number(draft);
+  const valid = draft !== "" && Number.isInteger(n) && n >= 0 && n <= SUGGEST_DAYS_MAX;
+  const save = async () => {
+    setBusy(true);
+    const { data, error } = await saveSuggestDays(n);
+    setBusy(false);
+    if (error) { say(tt.praiseSaveFailed); return; }
+    logAuditEvent({ actor, action: "praise_suggest_days_changed", entityType: "app_settings", entityId: "1", entityLabel: tt.praiseSuggestDaysTitle, details: { from: saved, to: data } });
+    setSaved(data);
+    say(fill(tt.praiseSuggestDaysSaved, { n: data }));
+  };
+
+  return (
+    <div className="card" style={{ padding: "12px 14px", marginBottom: 12, maxWidth: 460 }}>
+      <label htmlFor="praise-suggest-days" style={{ fontWeight: 700, fontSize: 13, display: "block", marginBottom: 2 }}>{tt.praiseSuggestDaysTitle}</label>
+      <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>{tt.praiseSuggestDaysHelp}</p>
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <input id="praise-suggest-days" type="number" min={0} max={SUGGEST_DAYS_MAX} step={1} value={draft} disabled={saved === null} onChange={(e) => setDraft(e.target.value)} style={{ ...inputStyle, width: 80 }} />
+        <span style={{ fontSize: 13, color: "var(--muted)" }}>{tt.praiseSuggestDaysUnit}</span>
+        <button className="btn btn-primary btn-sm" disabled={busy || !valid || n === saved} onClick={save}>{busy ? "…" : tt.praiseSuggestDaysSave}</button>
       </div>
     </div>
   );
