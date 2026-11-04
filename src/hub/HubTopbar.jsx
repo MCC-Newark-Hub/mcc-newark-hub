@@ -1,9 +1,9 @@
 import { useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Home, LogOut, Clock, Moon, Sun, HelpCircle, MoreHorizontal } from "lucide-react";
+import { Home, LogOut, Clock, Moon, Sun, HelpCircle, MoreHorizontal, Eye } from "lucide-react";
 import ICMLogo from "@/components/ICMLogo";
 import HelpModal from "@/components/HelpModal";
-import { SwitchRoleContext } from "@/context/switchRole";
+import { SwitchRoleContext, SeeAsContext } from "@/context/switchRole";
 import { STRINGS } from "@/i18n/strings";
 
 // The one header for every PIN-gated screen. Global chrome (home, logo,
@@ -15,6 +15,7 @@ export default function HubTopbar({ user, logout, lang, setLang, theme, toggleTh
   const navigate = useNavigate();
   const t = STRINGS[lang] || STRINGS.pt;
   const onSwitchRole = useContext(SwitchRoleContext);
+  const onSeeAs = useContext(SeeAsContext);
   const [showHelp, setShowHelp] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -46,6 +47,12 @@ export default function HubTopbar({ user, logout, lang, setLang, theme, toggleTh
   const switchRoleButton = onSwitchRole && (
     <button className="btn btn-ghost btn-sm" style={ghostBtnStyle} onClick={onSwitchRole}>
       Trocar Função
+    </button>
+  );
+  const seeAsLabel = lang === "en" ? "View as" : "Ver como";
+  const seeAsButton = onSeeAs && (
+    <button className="btn btn-ghost btn-sm" style={ghostBtnStyle} onClick={onSeeAs} title={seeAsLabel}>
+      <Eye size={14} style={{ marginRight: 4 }} />{seeAsLabel}
     </button>
   );
   const logoutButton = (
@@ -97,6 +104,7 @@ export default function HubTopbar({ user, logout, lang, setLang, theme, toggleTh
         {helpButton}
         {langButtons}
         {themeButton}
+        {seeAsButton}
         {switchRoleButton}
       </div>
 
@@ -119,6 +127,7 @@ export default function HubTopbar({ user, logout, lang, setLang, theme, toggleTh
         </button>
         {moreOpen && (
           <div
+            className="topbar-menu"
             style={{ position: "absolute", top: "100%", right: 0, marginTop: 8, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,.25)", padding: 10, display: "flex", flexDirection: "column", gap: 8, zIndex: 60, minWidth: 160 }}
             onClick={() => setMoreOpen(false)}
           >
@@ -126,6 +135,11 @@ export default function HubTopbar({ user, logout, lang, setLang, theme, toggleTh
             {helpPath && (
               <button className="btn btn-ghost btn-sm" onClick={() => setShowHelp(true)}>
                 <HelpCircle size={13} style={{ marginRight: 6 }} />Ajuda
+              </button>
+            )}
+            {onSeeAs && (
+              <button className="btn btn-ghost btn-sm" onClick={onSeeAs}>
+                <Eye size={13} style={{ marginRight: 6 }} />{seeAsLabel}
               </button>
             )}
             {onSwitchRole && (

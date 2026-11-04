@@ -21,6 +21,11 @@ export function logAuditEvent({ actor, action, entityType, entityId = null, enti
     .catch((err) => console.error("audit error:", err));
 }
 
-export const staffActor = (user) => (user ? { name: user.name, id: user.id, role: user.sysRole || user.primaryRole || "staff" } : null);
+// While an admin is seeing the app as someone else ("Ver como"), the actor is the admin.
+export const staffActor = (user) => {
+  if (!user) return null;
+  if (user.viewedBy) return { name: `${user.viewedBy.name} (como ${user.name})`, id: user.viewedBy.id, role: "admin" };
+  return { name: user.name, id: user.id, role: user.sysRole || user.primaryRole || "staff" };
+};
 export const publicActor = (name) => ({ name: String(name || "").trim() || "Público", id: null, role: "public" });
 export const deviceInfo = () => (typeof navigator !== "undefined" && navigator.userAgent ? navigator.userAgent.slice(0, 140) : null);
