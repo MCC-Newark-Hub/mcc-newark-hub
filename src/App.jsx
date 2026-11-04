@@ -42,6 +42,7 @@ import RegistrationLookup from "@/views/RegistrationLookup";
 import SetlistPublicView from "@/views/SetlistPublicView";
 import WorshipListPublicView from "@/views/WorshipListPublicView";
 import DoorPublicView from "@/views/DoorPublicView";
+import CensusPublicView from "@/views/CensusPublicView";
 import PublicStatsView from "@/views/PublicStatsView";
 import PrayerPublicView from "@/views/PrayerPublicView";
 
@@ -162,6 +163,11 @@ export default function App() {
               {/* Public: door duty schedule of a month — outside PublicLayout so it stays open in maintenance mode */}
               {["/portaria", "/door-schedule"].map((p) => (
                 <Route key={p} path={`${p}/:month?`} element={<DoorPublicView lang={lang} setLang={setLang} />} />
+              ))}
+
+              {/* Public: service census (Frequência de Culto) — outside PublicLayout so it stays open in maintenance mode */}
+              {["/frequencia", "/attendance"].map((p) => (
+                <Route key={p} path={p} element={<CensusPublicView lang={lang} setLang={setLang} />} />
               ))}
 
               {/* Public: registration numbers for the big screen at church — outside PublicLayout so it stays open in maintenance mode */}
