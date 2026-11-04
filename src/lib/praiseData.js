@@ -1,6 +1,6 @@
 // Supabase access for the Lista de Louvores. Every function resolves to { data, error } and never throws.
 import { sb } from "@/lib/supabase";
-import { normalizeCode, isValidCode, hasNumberPrefix, formatSongTitle } from "@/lib/praiseLists";
+import { normalizeCode, isValidCode, hasNumberPrefix, formatSongTitle, SUGGEST_DAYS } from "@/lib/praiseLists";
 import { logAuditEvent, publicActor, deviceInfo } from "@/lib/auditEvent";
 
 const UNIQUE_VIOLATION = "23505";
@@ -40,6 +40,20 @@ export async function fetchSongs() {
     sung_by_church: byChurch.get(s.id) || {},
   }));
   return { data, error: null };
+}
+
+// How many days back a song counts as "sung recently" for the same-theme suggestions
+// (app_settings.praise_suggest_days, migration 044). Falls back to SUGGEST_DAYS when it can't be read.
+export async function fetchSuggestDays() {
+  const { data, error } = await sb.from("app_settings").select("praise_suggest_days").eq("id", 1).maybeSingle();
+  const days = Number(data?.praise_suggest_days);
+  return { data: error || !Number.isFinite(days) ? SUGGEST_DAYS : days, error };
+}
+
+// .select().single() turns an update that changed no row into an error instead of a silent no-op.
+export async function saveSuggestDays(days) {
+  const { data, error } = await sb.from("app_settings").update({ praise_suggest_days: days, updated_at: new Date().toISOString() }).eq("id", 1).select("praise_suggest_days").single();
+  return { data: data ? data.praise_suggest_days : null, error: error || (data ? null : { message: "no row updated" }) };
 }
 
 // Merges a duplicate song into the right one (database function, one transaction): the lists that used the

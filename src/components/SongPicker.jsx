@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 import { fill } from "@/i18n/strings";
 import { createSong } from "@/lib/praiseData";
 import {
-  CATEGORIES, THEMES, themeApplies, searchSongs, findSimilarSongs, categoryFromCode, normalizeCode, formatCode, recency, songLabel, sungText, songHistory,
+  CATEGORIES, THEMES, themeApplies, searchSongs, findSimilarSongs, categoryFromCode, normalizeCode, formatCode, recency, songLabel, sungText, songHistory, themeSuggestions,
   hasNumberPrefix, songErrorText, upperTitle,
 } from "@/lib/praiseLists";
 
@@ -14,23 +14,34 @@ const CAT_KEYS = { coletanea: "praiseCatColetanea", cia: "praiseCatCia", avulso:
 // One search box for number and title. Picking a result calls onPick(song); typing something that
 // does not exist offers to create it (pending until an admin / the Grupo de Louvor leader approves).
 // "Cantado há X dias" uses the history of `church` (each church has its own); without one, every church.
-export default function SongPicker({ songs, church = "", excludeIds = [], onPick, onCreated, tt, enteredBy, today, autoApprove = false }) {
+// With `suggestDays` > 0, picking a song sung in the last `suggestDays` days first offers other songs of its theme.
+export default function SongPicker({ songs, church = "", excludeIds = [], onPick, onCreated, tt, enteredBy, today, autoApprove = false, suggestDays = 0 }) {
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
+  const [offer, setOffer] = useState(null); // { song, days, suggestions }
   const results = useMemo(() => searchSongs(songs, query), [songs, query]);
   const q = query.trim();
   const exact = results.find((s) => s.code && s.code === normalizeCode(q));
 
   const pick = (song) => {
-    onPick(song);
     setQuery("");
+    const suggestions = themeSuggestions(songs, song, { church, today, excludeIds, days: suggestDays });
+    if (suggestions.length) {
+      setOffer({ song, days: recency(songHistory(song, church).last_sung_on, today).days, suggestions });
+      return;
+    }
+    onPick(song);
+  };
+  const choose = (song) => {
+    setOffer(null);
+    onPick(song);
   };
 
   return (
     <div>
       <input
         value={query}
-        onChange={(e) => { setQuery(e.target.value); setCreating(false); }}
+        onChange={(e) => { setQuery(e.target.value); setCreating(false); setOffer(null); }}
         placeholder={tt.praiseSearchPlaceholder}
         style={inputStyle}
         autoComplete="off"
@@ -66,6 +77,31 @@ export default function SongPicker({ songs, church = "", excludeIds = [], onPick
               <Plus size={15} /> {fill(tt.praiseAddNew, { text: q })}
             </button>
           )}
+        </div>
+      )}
+
+      {offer && !q && (
+        <div role="group" aria-label={tt.praiseSuggestHeading} style={{ border: "1.5px solid #7c3aed55", borderRadius: 10, padding: 12, marginTop: 6, background: "var(--card)" }}>
+          <p style={{ fontSize: 13, marginBottom: 8, color: "var(--text)" }}>
+            {fill(tt.praiseSuggestIntro, { song: songLabel(offer.song), sung: sungText(tt, offer.days).toLowerCase(), theme: offer.song.theme })}
+          </p>
+          <div style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+            {offer.suggestions.map((s) => {
+              const r = recency(songHistory(s, church).last_sung_on, today);
+              return (
+                <button key={s.id} type="button" onClick={() => choose(s)}
+                  style={{ display: "flex", width: "100%", alignItems: "center", gap: 8, flexWrap: "wrap", textAlign: "left", padding: "10px 12px", background: "none", border: "none", borderBottom: "1px solid var(--border)", cursor: "pointer", color: "var(--text)", fontFamily: "'Montserrat',sans-serif", fontSize: 14 }}>
+                  <Plus size={14} aria-hidden="true" />
+                  <span style={{ fontWeight: 600 }}>{songLabel(s)}</span>
+                  {r && <span style={{ fontSize: 12, color: "var(--muted)" }}>{sungText(tt, r.days)}</span>}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+            <button type="button" className="btn btn-sm btn-ghost" onClick={() => choose(offer.song)}>{fill(tt.praiseSuggestKeep, { song: songLabel(offer.song) })}</button>
+            <button type="button" className="btn btn-sm btn-ghost" onClick={() => setOffer(null)}>{tt.praiseCancel}</button>
+          </div>
         </div>
       )}
 

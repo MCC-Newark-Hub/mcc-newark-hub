@@ -4,6 +4,7 @@ import { STRINGS, fill } from "@/i18n/strings";
 import * as data from "@/lib/praiseData";
 
 vi.mock("@/lib/praiseData", () => ({
+  fetchSuggestDays: () => Promise.resolve({ data: 7, error: null }), saveSuggestDays: vi.fn(),
   fetchSongs: vi.fn(), fetchRecentLists: vi.fn(), fetchListsByDate: vi.fn(), fetchListFor: vi.fn(),
   createList: vi.fn(), updateList: vi.fn(), deleteList: vi.fn(), addListItem: vi.fn(), removeListItem: vi.fn(), saveItemPositions: vi.fn(),
   createSong: vi.fn(), updateSong: vi.fn(), deleteSong: vi.fn(), mergeSongs: vi.fn(), mergeLists: vi.fn(),
