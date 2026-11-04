@@ -34,6 +34,18 @@ export function publicDateAllowed(date, now = new Date()) {
 }
 
 const pad = (n) => String(n).padStart(2, "0");
+const localDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+// Which service day the public page records, from the device clock. Until 4am the night service that just ended is
+// still being counted, so yesterday comes first (and is picked); later in the day only today. Both are inside the
+// server's window (census_save: New York today or yesterday) for the churches of the US and Canada.
+export const LATE_SERVICE_UNTIL_HOUR = 4;
+export function serviceDateOptions(now = new Date()) {
+  const today = localDate(now);
+  if (now.getHours() >= LATE_SERVICE_UNTIL_HOUR) return { options: [today], initial: today };
+  const yesterday = localDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
+  return { options: [yesterday, today], initial: yesterday };
+}
 
 // Staff period filter: from the first day of this month ("month"), or of 3 / 12 months counting this one, through today.
 export function periodRange(kind, today) {

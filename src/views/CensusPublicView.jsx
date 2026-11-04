@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { STRINGS } from "@/i18n/strings";
 import { useAppDataContext } from "@/context/AppDataContext";
-import { todayLocal, splitChurches, formatDate } from "@/lib/prayerSlots";
-import { censusTotals, censusTypesFor, cleanCounts } from "@/lib/census";
+import { splitChurches, formatDate } from "@/lib/prayerSlots";
+import { censusTotals, censusTypesFor, cleanCounts, serviceDateOptions } from "@/lib/census";
 import { searchCensusMembers, fetchCensus, saveCensusPublic } from "@/lib/censusData";
 import { logAuditEvent, publicActor, deviceInfo } from "@/lib/auditEvent";
 
@@ -21,21 +21,26 @@ const input = { width: "100%", padding: "12px 14px", fontSize: 16, borderRadius:
 // Public page of the service census (/frequencia): whoever counts at the door picks the church and their own name
 // (from the directory, via census_member_search) and records today's service. Outside PublicLayout, so it stays open
 // in maintenance mode. Every save goes to the audit log with the name and the device.
-export default function CensusPublicView({ lang }) {
+export default function CensusPublicView({ lang, setLang }) {
   const tt = STRINGS[lang === "en" ? "en" : "pt"];
   const { churches = [] } = useAppDataContext() || {};
   const { hubs, others } = splitChurches(churches);
-  const today = todayLocal();
-  const types = censusTypesFor(today);
+  // The service day is fixed when the page opens, so the clock passing midnight while typing changes nothing. Until 4am
+  // last night's service comes first.
+  const [dates] = useState(() => serviceDateOptions());
+  const [date, setDate] = useState(dates.initial);
+  const types = censusTypesFor(date);
 
   const [church, setChurch] = useState(() => readText(CHURCH_KEY));
   const [member, setMember] = useState(() => { const m = read(MEMBER_KEY, null); return m && m.church === readText(CHURCH_KEY) ? m : null; });
   const [query, setQuery] = useState("");
   const [matches, setMatches] = useState([]);
-  const [type, setType] = useState(types[types.length - 1]); // Noite by default; EBD is picked on Sunday mornings
+  const [pickedType, setType] = useState("noite"); // Noite by default; EBD is picked on Sunday mornings
+  const type = types.includes(pickedType) ? pickedType : types[types.length - 1];
   const [counts, setCounts] = useState(EMPTY);
   const [notes, setNotes] = useState("");
   const [existingBy, setExistingBy] = useState("");
+  const [loadedStamp, setLoadedStamp] = useState(null); // updated_at of the row the form shows (null: none yet)
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState(null); // { kind: "ok" | "error", text }
   const searchSeq = useRef(0);
@@ -57,8 +62,9 @@ export default function CensusPublicView({ lang }) {
   useEffect(() => {
     if (!church || !member) return;
     let live = true;
-    fetchCensus(church, today, type).then(({ data }) => {
+    fetchCensus(church, date, type).then(({ data }) => {
       if (!live) return;
+      setLoadedStamp(data?.updated_at || null);
       if (data) {
         setCounts({ members_cia: String(data.members_cia), members_adult: String(data.members_adult), visitors_cia: String(data.visitors_cia), visitors_adult: String(data.visitors_adult) });
         setNotes(data.notes || "");
@@ -66,15 +72,26 @@ export default function CensusPublicView({ lang }) {
       } else { setCounts(EMPTY); setNotes(""); setExistingBy(""); }
     });
     return () => { live = false; };
-  }, [church, member, today, type]);
+  }, [church, member, date, type]);
 
   const totals = useMemo(() => censusTotals(counts), [counts]);
   const setCount = (k) => (e) => setCounts((c) => ({ ...c, [k]: e.target.value }));
 
   const save = async () => {
     setSaving(true); setNotice(null);
+    // Two people may count the same service: if someone saved it after this form was opened, show it first and let the
+    // next tap replace it, instead of overwriting their numbers silently.
+    const { data: current } = await fetchCensus(church, date, type);
+    const currentStamp = current?.updated_at || null;
+    if (current && currentStamp !== loadedStamp) {
+      setLoadedStamp(currentStamp);
+      setExistingBy(current.entered_by_name || "");
+      setSaving(false);
+      setNotice({ kind: "error", text: fill(tt.censusChanged, { name: current.entered_by_name || "?", total: censusTotals(current).overall }) });
+      return;
+    }
     const clean = cleanCounts(counts);
-    const { data, error } = await saveCensusPublic({ church, date: today, type, memberId: member.id, counts: clean, notes });
+    const { data, error } = await saveCensusPublic({ church, date, type, memberId: member.id, counts: clean, notes });
     setSaving(false);
     if (error) {
       if (error === "member") notYou();
@@ -82,9 +99,10 @@ export default function CensusPublicView({ lang }) {
       return;
     }
     setExistingBy(member.name);
+    setLoadedStamp(data?.updated_at || null);
     setNotice({ kind: "ok", text: tt.censusSaved });
     logAuditEvent({ actor: publicActor(member.name), action: "census_saved", entityType: "service_census", entityId: data?.id,
-      entityLabel: `${today} · ${type}`, details: { church, date: today, type, ...clean, via: "public link", device: deviceInfo() } });
+      entityLabel: `${date} · ${type}`, details: { church, date, type, ...clean, via: "public link", device: deviceInfo() } });
   };
 
   const typeLabel = { ebd: tt.praiseTypeEbd, noite: tt.praiseTypeNoite, outro: tt.praiseTypeOutro };
@@ -100,7 +118,12 @@ export default function CensusPublicView({ lang }) {
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)", padding: "24px 16px" }}>
-      <div style={{ maxWidth: 520, margin: "0 auto" }}>
+      <div style={{ maxWidth: 520, margin: "0 auto", position: "relative" }}>
+        {setLang && (
+          <button onClick={() => setLang(lang === "en" ? "pt" : "en")} className="lang-btn" style={{ position: "absolute", right: 0, top: 0 }}>
+            {lang === "en" ? "PT" : "EN"}
+          </button>
+        )}
         <h1 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 24, color: "var(--text)", marginBottom: 4 }}>{tt.censusPageTitle}</h1>
         <p style={{ color: "var(--muted)", fontSize: 14, marginBottom: 18 }}>{tt.censusPageIntro}</p>
 
@@ -142,11 +165,24 @@ export default function CensusPublicView({ lang }) {
           <>
             <div style={box}>
               <div style={{ display: "flex", gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <span style={label}>{tt.censusDate}</span>
-                  <div style={{ padding: "12px 0", color: "var(--text)" }}>{formatDate(today, lang)}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {dates.options.length > 1 ? (
+                    <>
+                      <label htmlFor="census-date" style={label}>{tt.censusDate}</label>
+                      <select id="census-date" value={date} onChange={(e) => setDate(e.target.value)} style={input}>
+                        {dates.options.map((d) => (
+                          <option key={d} value={d}>{formatDate(d, lang)}{d === dates.initial ? ` · ${tt.censusYesterday}` : ""}</option>
+                        ))}
+                      </select>
+                    </>
+                  ) : (
+                    <>
+                      <span style={label}>{tt.censusDate}</span>
+                      <div style={{ padding: "12px 0", color: "var(--text)" }}>{formatDate(date, lang)}</div>
+                    </>
+                  )}
                 </div>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <label htmlFor="census-type" style={label}>{tt.censusService}</label>
                   <select id="census-type" value={type} onChange={(e) => setType(e.target.value)} style={input}>
                     {types.map((t) => <option key={t} value={t}>{typeLabel[t]}</option>)}

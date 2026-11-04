@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import * as census from "@/lib/census";
 import { cleanCount, cleanCounts, censusTotals, nyDate, publicDateAllowed, censusTypesFor, summarizeCensus, censusCsv } from "@/lib/census";
 
 const row = (o) => ({ church: "Newark, NJ", service_date: "2026-11-01", service_type: "noite", members_cia: 0, members_adult: 0, visitors_cia: 0, visitors_adult: 0, notes: null, entered_by_name: "Ana", ...o });
@@ -80,5 +81,22 @@ describe("censusCsv", () => {
     const [head, line] = csv.split("\n");
     expect(head).toBe('"Data","Igreja","Culto","Membros CIAs","Membros Jovens e Adultos","Membros","Visitantes CIAs","Visitantes Jovens e Adultos","Visitantes","Total geral","Anotações","Registrado por"');
     expect(line).toBe('"2026-11-01","Newark, NJ","Noite","0","5","5","1","0","1","6","Chuva, ""frio""","Ana"');
+  });
+});
+
+describe("serviceDateOptions (public page service day)", () => {
+  it("after midnight and before 4am offers yesterday's service first, then today", () => {
+    const { serviceDateOptions } = census;
+    expect(serviceDateOptions(new Date(2026, 10, 9, 0, 15))).toEqual({ options: ["2026-11-08", "2026-11-09"], initial: "2026-11-08" });
+    expect(serviceDateOptions(new Date(2026, 10, 9, 3, 59))).toEqual({ options: ["2026-11-08", "2026-11-09"], initial: "2026-11-08" });
+  });
+  it("the rest of the day offers only today", () => {
+    const { serviceDateOptions } = census;
+    expect(serviceDateOptions(new Date(2026, 10, 9, 4, 0))).toEqual({ options: ["2026-11-09"], initial: "2026-11-09" });
+    expect(serviceDateOptions(new Date(2026, 10, 1, 23, 50))).toEqual({ options: ["2026-11-01"], initial: "2026-11-01" });
+  });
+  it("crosses month and year boundaries", () => {
+    const { serviceDateOptions } = census;
+    expect(serviceDateOptions(new Date(2027, 0, 1, 1, 0)).options).toEqual(["2026-12-31", "2027-01-01"]);
   });
 });

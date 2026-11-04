@@ -53,3 +53,13 @@ describe("staff writes report rows that were not found", () => {
     expect((await deleteCensus("x")).error).toBe("not_found");
   });
 });
+
+describe("staff add of a service that already exists", () => {
+  it("upserts on church + date + type instead of failing on the unique key", async () => {
+    const upsert = vi.fn(() => chain({ data: [{ id: "r1" }], error: null }));
+    from.mockReturnValue({ upsert });
+    const res = await upsertCensusStaff({ church: "Newark, NJ", service_date: "2026-11-01", service_type: "noite", members_adult: "40", entered_by_name: "Admin" });
+    expect(res).toEqual({ data: { id: "r1" }, error: null });
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ church: "Newark, NJ", members_adult: 40 }), { onConflict: "church,service_date,service_type" });
+  });
+});

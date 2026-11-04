@@ -47,7 +47,8 @@ export async function upsertCensusStaff(row) {
     entered_by_name: row.entered_by_name, updated_at: new Date().toISOString(),
   };
   if (row.id) return one(await sb.from("service_census").update(fields).eq("id", row.id).select(COLS));
-  return one(await sb.from("service_census").insert(fields).select(COLS));
+  // A new one for a service already recorded (e.g. by the door) corrects that row instead of hitting the unique key.
+  return one(await sb.from("service_census").upsert(fields, { onConflict: "church,service_date,service_type" }).select(COLS));
 }
 
 export async function deleteCensus(id) {

@@ -890,6 +890,9 @@ export const STRINGS = {
     censusDelete: "Excluir",
     censusDeleteLabel: "a frequência de {date} · {type}",
     censusNotFound: "Registro não encontrado — atualize a página.",
+    censusChanged: "{name} acabou de registrar este culto (total {total}). Confira os números e toque em Salvar de novo para substituir.",
+    censusYesterday: "culto de ontem",
+    assistNoAccess: "Esta seção é para pastores, secretários e administradores.",
   },
   en: {
     appName: "Pólo Newark",
@@ -1748,5 +1751,8 @@ export const STRINGS = {
     censusDelete: "Delete",
     censusDeleteLabel: "the attendance of {date} · {type}",
     censusNotFound: "Record not found — refresh the page.",
+    censusChanged: "{name} just recorded this service (total {total}). Check the numbers and tap Save again to replace it.",
+    censusYesterday: "last night's service",
+    assistNoAccess: "This section is for pastors, church clerks and admins.",
   },
 };
