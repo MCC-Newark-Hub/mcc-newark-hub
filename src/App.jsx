@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Routes, Route, useNavigate, useLocation, useParams, Navigate } from "react-router-dom";
 import "./index.css";
 import { LangContext } from "@/i18n/strings";
@@ -6,6 +6,7 @@ import { ROLES_SYS } from "@/constants";
 import { SwitchRoleContext } from "@/context/switchRole";
 import { AppDataContext } from "@/context/AppDataContext";
 import { clearSession, getSessionToken, saveSession } from "@/lib/session";
+import { viewAs } from "@/lib/roleView";
 
 const ROLE_LABELS = {
   admin: "Administrador",
@@ -66,7 +67,10 @@ export default function App() {
   };
 
   const appData = useAppData({ getUserRef: () => userRef.current, notify });
-  const { user, setUser: setAuthUser, login: authLogin, restore: authRestore, logout: authLogout } = useAuth();
+  const { user: authUser, setUser: setAuthUser, login: authLogin, restore: authRestore, logout: authLogout } = useAuth();
+  // The profile chosen in "Trocar Função" is the only role the screens see (see viewAs).
+  const [view, setView] = useState(() => localStorage.getItem("mcc_view"));
+  const user = useMemo(() => viewAs(authUser, view), [authUser, view]);
   useEffect(() => { userRef.current = user; });
 
   // Backward compat: redirect old ?checkin= and ?selfcheckin= QR codes to new routes
@@ -107,8 +111,9 @@ export default function App() {
     const knownRoles = new Set(Object.values(ROLES_SYS));
     const safeRole = knownRoles.has(role) ? role : ROLES_SYS.ADMIN;
     localStorage.setItem("mcc_view", safeRole);
+    setView(safeRole);
     setRoleSwitcher(false);
-    navigate("/events");
+    navigate("/");
   };
 
   // Resolves to true, or to the error code from useAuth's login.
@@ -116,7 +121,9 @@ export default function App() {
     const result = await authLogin(pin);
     if (!result.user) return result.error;
     saveSession(result.token);
-    localStorage.setItem("mcc_view", result.user.primaryRole || result.user.sysRole);
+    const role = result.user.primaryRole || result.user.sysRole;
+    localStorage.setItem("mcc_view", role);
+    setView(role);
     return true;
   };
 
@@ -132,7 +139,7 @@ export default function App() {
   return (
     <AppDataContext.Provider value={shared}>
       <LangContext.Provider value={lang}>
-        <SwitchRoleContext.Provider value={user?.sysRoles?.length > 1 ? () => setRoleSwitcher(true) : null}>
+        <SwitchRoleContext.Provider value={user?.allRoles?.length > 1 ? () => setRoleSwitcher(true) : null}>
           <div data-theme={theme} style={{ minHeight: "100vh", fontFamily: "'Montserrat','Segoe UI',sans-serif" }}>
             {toast && <div className={`toast${toast.leaving ? " toast-leaving" : ""}`}>{toast.msg}</div>}
 
@@ -221,7 +228,7 @@ export default function App() {
               </Route>
 
               {/* PIN-gated hub */}
-              <Route element={<AuthGate user={user} restoring={restoring} lang={lang} onLogout={logout}
+              <Route element={<AuthGate user={authUser} restoring={restoring} lang={lang} onLogout={logout}
                 onPinChanged={() => { setAuthUser((u) => (u ? { ...u, mustChangePin: false } : u)); notify(lang === "en" ? "PIN changed." : "PIN alterado."); }} />}>
                 <Route element={
                   <HubShell user={user} logout={logout} lang={lang} setLang={setLang} theme={theme} toggleTheme={toggleTheme} />
@@ -245,12 +252,12 @@ export default function App() {
                 <div className="modal" style={{ maxWidth: 320 }}>
                   <h3 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 18, marginBottom: 16 }}>Trocar Função</h3>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {user.sysRoles.map((role) => {
+                    {user.allRoles.map((role) => {
                       const label = role === "team_leader" && user.teamLeads?.length
                         ? `Líder de Equipe — ${user.teamLeads.join(", ")}`
                         : ROLE_LABELS[role] || role;
                       return (
-                        <button key={role} className={`btn ${location.pathname === "/events" ? "btn-primary" : "btn-ghost"}`} style={{ textAlign: "left" }} onClick={() => selectRole(role)}>
+                        <button key={role} className={`btn ${role === user.sysRole ? "btn-primary" : "btn-ghost"}`} style={{ textAlign: "left" }} onClick={() => selectRole(role)}>
                           {label}
                         </button>
                       );
