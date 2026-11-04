@@ -33,6 +33,16 @@ export function publicDateAllowed(date, now = new Date()) {
   return date === nyDate(now) || date === nyDate(new Date(now.getTime() - 24 * 60 * 60 * 1000));
 }
 
+const pad = (n) => String(n).padStart(2, "0");
+
+// Staff period filter: from the first day of this month ("month"), or of 3 / 12 months counting this one, through today.
+export function periodRange(kind, today) {
+  const [y, m] = today.split("-").map(Number);
+  const back = kind === "12m" ? 11 : kind === "3m" ? 2 : 0;
+  const d = new Date(y, m - 1 - back, 1);
+  return { from: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-01`, to: today };
+}
+
 // Same services as the Profético: Sunday has EBD (morning) and Noite, every other day only Noite.
 export const censusTypesFor = (date) => serviceTypesFor(date);
 

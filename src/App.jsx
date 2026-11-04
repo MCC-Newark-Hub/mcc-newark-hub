@@ -30,6 +30,7 @@ import PublicLayout from "@/hub/PublicLayout";
 // Sections
 import EventsSection from "@/sections/events/EventsSection";
 import CMSSection from "@/sections/cms/CMSSection";
+import AssistanceSection from "@/sections/assistance/AssistanceSection";
 import ScheduleSection from "@/sections/schedule/ScheduleSection";
 import WorshipSection from "@/sections/worship/WorshipSection";
 import SettingsSection from "@/sections/settings/SettingsSection";
@@ -242,6 +243,7 @@ export default function App() {
                   <Route index element={<HubHome user={user} lang={lang} />} />
                   <Route path="/events" element={<EventsSection {...shared} />} />
                   <Route path="/cms" element={<CMSSection lang={lang} />} />
+                  <Route path="/assistance" element={<AssistanceSection lang={lang} />} />
                   <Route path="/schedule" element={<ScheduleSection lang={lang} />} />
                   <Route path="/worship" element={<WorshipSection lang={lang} />} />
                   <Route path="/settings" element={<SettingsSection lang={lang} />} />

@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Calendar, BookOpen, Settings, Clock, GraduationCap, Music } from "lucide-react";
+import { Calendar, BookOpen, Settings, Clock, GraduationCap, Music, HeartHandshake } from "lucide-react";
 
 const SECTIONS = [
   {
@@ -19,6 +19,16 @@ const SECTIONS = [
     color: "#03223f",
     pt: { label: "Diretório", desc: "Membros, famílias, grupos e funções" },
     en: { label: "Directory", desc: "Members, families, groups and roles" },
+    roles: ["admin", "clerk", "pastor"],
+    live: true,
+  },
+  {
+    id: "assistance",
+    path: "/assistance",
+    icon: HeartHandshake,
+    color: "#b45309",
+    pt: { label: "Assistência", desc: "Frequência dos cultos e acompanhamento" },
+    en: { label: "Care", desc: "Service attendance and pastoral follow-up" },
     roles: ["admin", "clerk", "pastor"],
     live: true,
   },
