@@ -957,6 +957,24 @@ export function useAppData({ getUserRef, notify }) {
     notify("Capacidade atualizada para " + newCapacity + ".");
   };
 
+  // Whether team leaders may register their teams while the event is paused (migration 046).
+  const setLeadersRegisterWhenPaused = async function (allowed) {
+    if (!event) return;
+    var prev = event.leaders_register_when_paused !== false;
+    var upd = { leaders_register_when_paused: allowed };
+    setEventState(function (cur) { return cur ? { ...cur, ...upd } : cur; });
+    setEvents(function (p) { return p.map(function (e) { return e.id === event.id ? { ...e, ...upd } : e; }); });
+    var res = await sb.from("events").update(upd).eq("id", event.id).select("id");
+    if (res.error || !res.data?.length) {
+      notify("Erro: " + (res.error?.message || "evento não atualizado"));
+      var back = { leaders_register_when_paused: prev };
+      setEventState(function (cur) { return cur ? { ...cur, ...back } : cur; });
+      setEvents(function (p) { return p.map(function (e) { return e.id === event.id ? { ...e, ...back } : e; }); });
+      return;
+    }
+    logAudit("leaders_register_when_paused_changed", "event", event.id, event.name, { allowed: allowed });
+  };
+
   // Pause (mode "full" or "waitlist", see src/lib/pause.js) or resume. Resuming moves
   // the waitlist into the spots still free.
   const toggleRegistrationPaused = async function (mode) {
@@ -1083,6 +1101,7 @@ export function useAppData({ getUserRef, notify }) {
     settings,
     updateEventCapacity,
     toggleRegistrationPaused,
+    setLeadersRegisterWhenPaused,
     closeRegistrations,
     updateSessionTtlHours,
     activeRegs,

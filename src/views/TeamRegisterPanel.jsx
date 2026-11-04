@@ -18,8 +18,8 @@ export default function TeamRegisterPanel({ event, team, rosters, regs, members,
 
   const register = () => {
     // addReg is called in one synchronous loop: its counter ref gives each person their own number.
-    for (const m of chosen) addReg(teamMemberReg(m, team, mode));
-    logAudit?.("team_leader_registered", "roster", team, team, { memberIds: chosen.map((m) => m.id), waitlist: !!mode.forceWaitlist });
+    for (const m of chosen) addReg(teamMemberReg(m, team));
+    logAudit?.("team_leader_registered", "roster", team, team, { memberIds: chosen.map((m) => m.id), duringPause: !!mode.paused });
     notify?.(fill(t.teamRegDone, { n: chosen.length, team }));
     setSelected([]);
     setOpen(false);
@@ -37,7 +37,7 @@ export default function TeamRegisterPanel({ event, team, rosters, regs, members,
             <p role="status" style={{ fontSize: 13, color: "#92400e", background: "#fef3c7", padding: "8px 10px", borderRadius: 8 }}>{blockedText}</p>
           ) : (
             <>
-              {mode.forceWaitlist && <p role="status" style={{ fontSize: 13, color: "#92400e", background: "#fef3c7", padding: "8px 10px", borderRadius: 8, marginBottom: 8 }}>{t.teamRegWaitlist}</p>}
+              {mode.paused && <p role="status" style={{ fontSize: 13, color: "#92400e", background: "#fef3c7", padding: "8px 10px", borderRadius: 8, marginBottom: 8 }}>{t.teamRegPausedAllowed}</p>}
               <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, padding: "4px 0" }}>
                 <input type="checkbox" checked={chosen.length === candidates.length} onChange={(e) => setSelected(e.target.checked ? candidates.map((m) => m.id) : [])} />
                 {t.teamRegSelectAll}

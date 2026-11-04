@@ -35,6 +35,7 @@ import MemberFunctionsView from "@/components/MemberFunctionsView";
 import { syncRegistrationNames, syncMemberToRegistrations } from "@/lib/syncMemberName";
 import { groupByFamily, familyIdOf } from "@/lib/family";
 import PauseControl from "@/components/PauseControl";
+import { leadersMayRegisterWhenPaused } from "@/lib/teamRegistration";
 
 // Accent-insensitive search: "joao" matches "João"
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -142,7 +143,7 @@ function PaymentStatusStrip({ paid, exempt, pend, total, wlPaid, wlExempt, wlPen
   );
 }
 
-function AdminOverview({ event, regs, activeCount, wlRegs, exRegs, members, lang, toggleRegistrationPaused, closeRegistrations, navToRegs }) {
+function AdminOverview({ event, regs, activeCount, wlRegs, exRegs, members, lang, toggleRegistrationPaused, setLeadersRegisterWhenPaused, closeRegistrations, navToRegs }) {
   const t = useT();
   const [expandedCat, setExpandedCat] = useState({});
   const [expandedCh, setExpandedCh] = useState({});
@@ -194,6 +195,12 @@ function AdminOverview({ event, regs, activeCount, wlRegs, exRegs, members, lang
       {!event?.registrations_locked && event?.registration_paused && (
         <div style={{ background: "#fef3c7", border: "1px solid #f59e0b", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: "#92400e", fontWeight: 600 }}>
           {event?.registration_pause_mode === "waitlist" ? "⏸ Inscrições pausadas — novas inscrições vão para a lista de espera e passam para a lista principal ao retomar, enquanto houver vagas." : "⏸ Inscrições pausadas — ninguém consegue se inscrever, nem na lista de espera."}
+          {setLeadersRegisterWhenPaused && (
+            <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, marginBottom: 0, fontSize: 13, fontWeight: 500, textTransform: "none", letterSpacing: "normal", color: "#92400e", cursor: "pointer" }}>
+              <input type="checkbox" style={{ width: "auto", margin: 0, flex: "none" }} checked={leadersMayRegisterWhenPaused(event)} onChange={(e) => setLeadersRegisterWhenPaused(e.target.checked)} />
+              {t.leadersWhenPausedLabel}
+            </label>
+          )}
         </div>
       )}
       {confirmClose && (
