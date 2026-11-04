@@ -120,7 +120,8 @@ export default function CensusPublicView({ lang, setLang }) {
     <div style={{ minHeight: "100vh", background: "var(--bg)", padding: "24px 16px" }}>
       <div style={{ maxWidth: 520, margin: "0 auto", position: "relative" }}>
         {setLang && (
-          <button onClick={() => setLang(lang === "en" ? "pt" : "en")} className="lang-btn" style={{ position: "absolute", right: 0, top: 0 }}>
+          <button onClick={() => setLang(lang === "en" ? "pt" : "en")} className="lang-btn"
+            style={{ position: "absolute", right: 0, top: 0, color: "var(--text)", borderColor: "var(--border)", background: "var(--card)" }}>
             {lang === "en" ? "PT" : "EN"}
           </button>
         )}
