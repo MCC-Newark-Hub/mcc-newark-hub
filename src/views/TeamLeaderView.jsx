@@ -8,6 +8,9 @@ import { sb } from "@/lib/supabase";
 import { canAssignToTeam } from "@/lib/teamAssignment";
 import { eventSubtitle } from "@/lib/registrationDeadline";
 import { useTopbarContent } from "@/context/TopbarContext";
+import { churchWideScope, churchMembers } from "@/lib/teamScope";
+import ChurchWidePanel from "./ChurchWidePanel";
+import TeamRegisterPanel from "./TeamRegisterPanel";
 import Modal from "@/components/Modal";
 import KitchenTab from "./admin/KitchenTab";
 import KitchenPlanningTab from "./admin/KitchenPlanningTab";
@@ -30,6 +33,7 @@ function TeamLeaderView(props) {
     churches,
     gas,
     logAudit,
+    addReg,
   } = props;
   const t = useT();
   const [mainView, setMainView] = useState("equipe");
@@ -56,6 +60,9 @@ function TeamLeaderView(props) {
     const r = rosters.find((ro) => ro.eventId === event?.id && ro.team === team);
     return r?.memberIds || [];
   }))];
+  // The Secretaria leader also sees everyone in their church (see churchWideScope).
+  const wideChurch = churchWideScope(user);
+  const visibleMemberIds = wideChurch ? [...new Set([...allTeamMemberIds, ...churchMembers(members, wideChurch).map((m) => m.id)])] : allTeamMemberIds;
   // Flat pool of everyone on any of this leader's teams, for the scoped reports view.
   const isCozinhaLeader = myTeams.includes("Cozinha");
   const isCIALeader = myTeams.includes("Professoras");
@@ -232,7 +239,7 @@ function TeamLeaderView(props) {
               setMembers={setMembers}
               gas={gas}
               notify={notify}
-              filterMemberIds={allTeamMemberIds}
+              filterMemberIds={visibleMemberIds}
             />
           )}
 
@@ -1288,9 +1295,11 @@ function TeamLeaderView(props) {
                     {notReg.map((m) => m.name).join(", ")} — {t.reachOut}
                   </div>
                 )}
+                <TeamRegisterPanel event={event} team={team} rosters={rosters} regs={regs} members={members} addReg={addReg} notify={notify} logAudit={logAudit} t={t} />
               </div>
             );
           })}
+          {wideChurch && <ChurchWidePanel church={wideChurch} members={members} getStatus={getStatus} getReg={getReg} />}
           <div
             style={{
               padding: "10px 14px",

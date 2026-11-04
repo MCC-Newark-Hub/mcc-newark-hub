@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Search, ArrowLeft, CheckCircle2, ClipboardList, Share2, AlertTriangle } from "lucide-react";
-import { STRINGS } from "@/i18n/strings";
+import { STRINGS, fill } from "@/i18n/strings";
 import { CATEGORIES, ROLE_BADGE, OBREIRO_ROLES, fmt, teamForRole } from "@/constants";
 import BadgePrint from "@/components/BadgePrint";
 import Modal from "@/components/Modal";
@@ -330,6 +330,8 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
   const [correctedName, setCorrectedName] = useState("");
   const [savingCorrection, setSavingCorrection] = useState(false);
   const [familyMembers, setFamilyMembers] = useState([]);
+  // Someone already registered adds their family to their own registration (same number).
+  const [addFamilyOnly, setAddFamilyOnly] = useState(false);
   const [famSearch, setFamSearch] = useState("");
   const [famNotFound, setFamNotFound] = useState(false);
   const [showManualFam, setShowManualFam] = useState(false);
@@ -382,7 +384,9 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
   const existingReg = primary ? (regs || []).find((r) => r.eventId === event?.id && r.memberId === primary.id && !r.cancelled) : null;
 
   const eventFee = (cat) => event?.fees?.[cat] ?? 0;
-  const allParticipants = primary ? [primary, ...familyMembers] : [];
+  const addingFamily = addFamilyOnly && !!existingReg;
+  // Adding family to an existing registration registers only the family.
+  const allParticipants = primary ? (addingFamily ? familyMembers : [primary, ...familyMembers]) : [];
   const totalFee = allParticipants.reduce((s, m) => s + (["Pastor", "Ungido"].includes(m.role) ? 0 : eventFee(m.category)), 0);
   const contactRequired = eventRequiresContact(event);
   const contactPeople = contactTargets(allParticipants);
@@ -402,7 +406,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
     const e = {};
     if (!primary) e.primary = t.pleaseSelectName;
     else if (!primary.church) e.primary = t.churchRequiredError;
-    if (existingReg) e.primary = t.alreadyRegisteredError;
+    if (existingReg && !addFamilyOnly) e.primary = t.alreadyRegisteredError;
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -504,7 +508,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
     ].filter(Boolean).join(" | ");
     const isPastDeadline = getDeadlineStatus(event?.registration_deadline) === "past";
     const submittedRegs = [];
-    let groupNumber = null;
+    let groupNumber = addingFamily ? existingReg.regNumber : null;
     const failedNames = [];
     const memberIdOf = {}; // participant id → members.id (new for people not in the directory yet)
     for (const m of allParticipants) {
@@ -606,7 +610,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
           : "")
       );
     } else {
-      setSubmitted({ regs: submittedRegs, email: firstEmail });
+      setSubmitted({ regs: addingFamily ? [existingReg, ...submittedRegs] : submittedRegs, email: firstEmail });
     }
   };
 
@@ -639,7 +643,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
         setLang={setLang}
         t={t}
         onReset={() => {
-          setStep(0); setIntroAgreed(false); setPrimary(null); setPrimarySearch(""); setFamilyMembers([]);
+          setStep(0); setIntroAgreed(false); setPrimary(null); setPrimarySearch(""); setFamilyMembers([]); setAddFamilyOnly(false);
           setShowManualPrimary(false); setManualPrimary({ name: "", gender: "M", category: "Adulto" });
           setContacts({}); setContactStatus({}); setContactErrs({}); setBadgeNames({});
           setTranslations({ en: false, es: false });
@@ -1021,12 +1025,15 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
                           {t.needHelpContactClerk}
                         </p>
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <button onClick={() => { setAddFamilyOnly(true); setErrors({}); setStep(2); }} style={{ background: "#03223f", border: "1px solid #03223f", borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer", color: "#fff" }}>
+                            {t.addMyFamily}
+                          </button>
                           {onLookup && (
                             <button onClick={() => onLookup(primary.name)} style={{ background: "#f59e0b", border: "1px solid #f59e0b", borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer", color: "#fff", fontWeight: 600 }}>
                               {t.viewMyConfirmation}
                             </button>
                           )}
-                          <button onClick={() => { setPrimary(null); setPrimarySearch(""); }} style={{ background: "none", border: "1px solid #f59e0b", borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer", color: "#92400e" }}>
+                          <button onClick={() => { setPrimary(null); setPrimarySearch(""); setAddFamilyOnly(false); }} style={{ background: "none", border: "1px solid #f59e0b", borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer", color: "#92400e" }}>
                             {t.searchAnotherName}
                           </button>
                         </div>
@@ -1056,7 +1063,11 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
           {step === 2 && (
             <div>
               <h3 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 18, fontWeight: 700, color: "#03223f", marginBottom: 4 }}>2. {t.step2}</h3>
-              <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 16 }}>{lang === "en" ? "Add family members. Skip if registering alone." : "Adicione membros da família. Pule se for sozinho."}</p>
+              <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 16 }}>
+                {addingFamily
+                  ? fill(t.addingFamilyTo, { name: primary.name, number: existingReg.regNumber })
+                  : lang === "en" ? "Add family members. Skip if registering alone." : "Adicione membros da família. Pule se for sozinho."}
+              </p>
 
               {primary && (
                 <div style={{ background: "#f8f9fb", borderRadius: 10, padding: "12px 14px", marginBottom: 14 }}>
@@ -1065,7 +1076,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
                     <span style={{ fontWeight: 600 }}>{primary.name}</span>
                     <div style={{ display: "flex", gap: 6 }}>
                       <span className="badge badge-blue">{primary.category}</span>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: "#2d8a4e" }}>{["Pastor", "Ungido"].includes(primary.role) ? t.exempt : eventFee(primary.category) === 0 ? t.free : fmt(eventFee(primary.category))}</span>
+                      {addingFamily ? <span style={{ fontFamily: "monospace", fontSize: 12, fontWeight: 700, color: "#b41926" }}>{existingReg.regNumber}</span> : <span style={{ fontSize: 12, fontWeight: 600, color: "#2d8a4e" }}>{["Pastor", "Ungido"].includes(primary.role) ? t.exempt : eventFee(primary.category) === 0 ? t.free : fmt(eventFee(primary.category))}</span>}
                     </div>
                   </div>
                 </div>
@@ -1200,7 +1211,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
 
               <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
                 <button className="btn btn-ghost" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }} onClick={() => setStep(1)}><ArrowLeft size={14} /> {t.back}</button>
-                <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => setStep(3)}>{lang === "en" ? "Next: Health →" : "Próximo: Saúde →"}</button>
+                <button className="btn btn-primary" style={{ flex: 2 }} disabled={addingFamily && familyMembers.length === 0} onClick={() => setStep(3)}>{lang === "en" ? "Next: Health →" : "Próximo: Saúde →"}</button>
               </div>
             </div>
           )}
