@@ -3,6 +3,10 @@ import { UserPlus } from "lucide-react";
 import { fill } from "@/i18n/strings";
 import { registrableTeamMembers, teamRegistrationMode, teamMemberReg } from "@/lib/teamRegistration";
 
+// The app styles every <label> as a small uppercase form caption; these are checkbox rows.
+const rowStyle = { display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "6px 0", margin: 0, textTransform: "none", letterSpacing: "normal", color: "var(--text)", cursor: "pointer" };
+const boxStyle = { width: "auto", margin: 0, flex: "none" };
+
 // "Inscrever membros da equipe": the leader registers the members of their team who have no
 // registration yet. Only the members; each one registers their own family.
 export default function TeamRegisterPanel({ event, team, rosters, regs, members, addReg, notify, logAudit, t }) {
@@ -38,13 +42,13 @@ export default function TeamRegisterPanel({ event, team, rosters, regs, members,
           ) : (
             <>
               {mode.paused && <p role="status" style={{ fontSize: 13, color: "#92400e", background: "#fef3c7", padding: "8px 10px", borderRadius: 8, marginBottom: 8 }}>{t.teamRegPausedAllowed}</p>}
-              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, padding: "4px 0" }}>
-                <input type="checkbox" checked={chosen.length === candidates.length} onChange={(e) => setSelected(e.target.checked ? candidates.map((m) => m.id) : [])} />
+              <label style={{ ...rowStyle, fontWeight: 600 }}>
+                <input type="checkbox" style={boxStyle} checked={chosen.length === candidates.length} onChange={(e) => setSelected(e.target.checked ? candidates.map((m) => m.id) : [])} />
                 {t.teamRegSelectAll}
               </label>
               {candidates.map((m) => (
-                <label key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "4px 0", borderTop: "1px solid var(--border)" }}>
-                  <input type="checkbox" checked={selected.includes(m.id)} onChange={() => toggle(m.id)} />
+                <label key={m.id} style={{ ...rowStyle, borderTop: "1px solid var(--border)" }}>
+                  <input type="checkbox" style={boxStyle} checked={selected.includes(m.id)} onChange={() => toggle(m.id)} />
                   <span>{m.name} <span style={{ color: "var(--muted)", fontSize: 11 }}>({m.category})</span></span>
                 </label>
               ))}
