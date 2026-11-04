@@ -98,3 +98,26 @@ describe("computeOverview", () => {
     expect(computeOverview({ ...base, churchFilter: "Toms River, NJ" }).byChurch.map((c) => [c.church, c.total])).toEqual([["Toms River, NJ", 0]]);
   });
 });
+
+describe("GA leader scope", () => {
+  const leader = { sysRole: "ga_leader", sysRoles: ["ga_leader"], gaIds: ["g2"], church: "Newark, NJ" };
+
+  it("sees only their groups, in the churches of those groups", () => {
+    const scope = scopeFor(leader, GAS);
+    expect(scope).toEqual({ all: false, cities: ["Philadelphia"], gaIds: ["g2"] });
+    const o = computeOverview({ members: MEMBERS, gas: GAS, families: FAMILIES, churches: CHURCHES, scope, now: NOW });
+    expect(o.byChurch.map((c) => [c.church, c.total])).toEqual([["Philadelphia, PA", 1]]);
+    expect(o.gaList.map((g) => g.id)).toEqual(["g2"]);
+  });
+
+  it("is empty without groups", () => {
+    const scope = scopeFor({ ...leader, gaIds: [] }, GAS);
+    expect(scope.cities).toEqual([]);
+  });
+
+  it("does not narrow a pastor or a secretary who is also a GA leader", () => {
+    expect(scopeFor({ sysRoles: ["pastor", "ga_leader"], gaIds: ["g2"] }, GAS).gaIds).toBeUndefined();
+    expect(scopeFor({ sysRoles: ["clerk", "ga_leader"], church: "Newark, NJ", gaIds: ["g2"] }, GAS)).toEqual({ all: false, cities: ["Newark"] });
+  });
+});
+

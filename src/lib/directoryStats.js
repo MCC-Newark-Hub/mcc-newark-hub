@@ -14,10 +14,16 @@ export const isUnsetChurch = (church) => !church || /^sem igreja/i.test(church) 
 //  - admin → everything
 //  - a limited list (app_users.churches) → exactly those
 //  - a pastor with no list (Pr Nairon) → everything
+//  - a GA leader (and nothing above) → only the members of their groups: { gaIds }, cities of those groups
 //  - anyone else (church secretary) → the church of their account
-export function scopeFor(user) {
+export function scopeFor(user, gas = []) {
   const roles = user?.sysRoles?.length ? user.sysRoles : [user?.sysRole].filter(Boolean);
   if (roles.includes("admin")) return { all: true, cities: [] };
+  if (roles.includes("ga_leader") && !roles.some((r) => r === "pastor" || r === "clerk")) {
+    const gaIds = user?.gaIds || [];
+    const cities = [...new Set((gas || []).filter((g) => gaIds.includes(g.id)).map((g) => cityOf(g.church)).filter(Boolean))];
+    return { all: false, cities, gaIds };
+  }
   const list = (user?.churches || []).map(cityOf).filter(Boolean);
   if (list.length) return { all: false, cities: list };
   if (roles.includes("pastor")) return { all: true, cities: [] };
@@ -32,7 +38,10 @@ export function churchesInScope(churches, scope) {
 }
 
 // Every overview number. `churchFilter` is "" (everything the user may see) or one church display name.
-export function computeOverview({ members = [], gas = [], families = [], churches = [], scope, churchFilter = "", now = new Date() }) {
+export function computeOverview({ members: allMembers = [], gas: allGas = [], families = [], churches = [], scope, churchFilter = "", now = new Date() }) {
+  // A GA leader's scope: only their groups and the people in them.
+  const members = scope.gaIds ? allMembers.filter((m) => scope.gaIds.includes(m.gaId)) : allMembers;
+  const gas = scope.gaIds ? allGas.filter((g) => scope.gaIds.includes(g.id)) : allGas;
   const allowed = churchesInScope(churches, scope);
   const allowedSet = new Set(allowed);
   const visible = churchFilter ? new Set(allowedSet.has(churchFilter) ? [churchFilter] : []) : allowedSet;

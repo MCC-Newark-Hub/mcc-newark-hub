@@ -13,7 +13,7 @@ export default function OverviewPanel() {
   const tt = useT();
   const lang = useLang();
   const { user, members = [], gas = [], families = [], churches = [] } = useAppDataContext() || {};
-  const scope = useMemo(() => scopeFor(user), [user]);
+  const scope = useMemo(() => scopeFor(user, gas), [user, gas]);
   const allowed = useMemo(() => churchesInScope(churches, scope), [churches, scope]);
 
   const [churchFilter, setChurchFilter] = useState("");

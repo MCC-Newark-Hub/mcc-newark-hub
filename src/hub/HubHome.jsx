@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Calendar, BookOpen, Settings, Clock, GraduationCap, Music } from "lucide-react";
+import { GL_TEAM } from "@/lib/praiseLists";
 
 const SECTIONS = [
   {
@@ -19,7 +20,7 @@ const SECTIONS = [
     color: "#03223f",
     pt: { label: "Diretório", desc: "Membros, famílias, grupos e funções" },
     en: { label: "Directory", desc: "Members, families, groups and roles" },
-    roles: ["admin", "clerk", "pastor"],
+    roles: ["admin", "clerk", "pastor", "ga_leader"],
     live: true,
   },
   {
@@ -29,7 +30,7 @@ const SECTIONS = [
     color: "#065f46",
     pt: { label: "Escalas", desc: "Portaria, flores e agenda de oração 24h" },
     en: { label: "Schedules", desc: "Door duty, flowers and 24h prayer agenda" },
-    roles: ["admin", "clerk", "pastor", "ga_leader", "team_leader", "treasurer"],
+    roles: ["admin", "clerk", "pastor", "ga_leader", "treasurer"],
     live: true,
   },
   {
@@ -39,7 +40,9 @@ const SECTIONS = [
     color: "#7c3aed",
     pt: { label: "Culto Profético", desc: "Lista de louvores, catálogo e histórico" },
     en: { label: "Prophetic Service", desc: "Praise song lists, catalogue and history" },
-    roles: ["admin", "clerk", "pastor", "ga_leader", "team_leader", "treasurer"],
+    roles: ["admin", "clerk", "pastor", "ga_leader", "treasurer"],
+    // team leaders only reach it when they lead the Grupo de Louvor (they manage the praise lists)
+    alsoIf: (user) => (user?.teamLeads || []).includes(GL_TEAM),
     live: true,
   },
   {
@@ -70,7 +73,7 @@ export default function HubHome({ user, lang }) {
   const userRoles = user?.sysRoles || (user?.sysRole ? [user.sysRole] : []);
 
   const visible = SECTIONS.filter((s) =>
-    s.roles.some((r) => userRoles.includes(r))
+    s.roles.some((r) => userRoles.includes(r)) || (s.alsoIf && userRoles.includes("team_leader") && s.alsoIf(user))
   );
 
   return (

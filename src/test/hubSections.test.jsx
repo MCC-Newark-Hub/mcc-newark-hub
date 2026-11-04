@@ -44,6 +44,12 @@ describe("Diretório section (items moved out of Eventos)", () => {
     }
   });
 
+  it("gives a GA leader just the Visão Geral (limited to their groups by scopeFor)", () => {
+    withUser({ sysRole: "ga_leader", sysRoles: ["ga_leader"], gaIds: ["g1"] }, <CMSSection lang="pt" />);
+    expect(screen.getByText("conteúdo-visao-geral")).toBeTruthy();
+    expect(screen.queryByText("conteúdo-diretorio")).toBeNull();
+  });
+
   it("keeps the placeholder for profiles with no Diretório role", () => {
     withUser({ sysRole: "team_leader", sysRoles: ["team_leader"] }, <CMSSection lang="pt" />);
     expect(screen.queryByText("conteúdo-visao-geral")).toBeNull();

@@ -10,13 +10,14 @@ import ImmigrationReport from "@/components/directory/ImmigrationReport";
 import { AdminDirectory, AdminGA, AdminImport } from "@/views/AdminView";
 
 // Diretório: members, families, groups and functions — the tools that used to sit in the Eventos menu.
-// The tools are admin-only (as they were). Pastors and church secretaries get just the Visão Geral, limited to the
-// churches their access allows (see scopeFor); any other profile that reaches /cms gets the placeholder.
+// The tools are admin-only (as they were). Pastors, church secretaries and GA leaders get just the Visão Geral, limited
+// to what their access allows (see scopeFor: churches, or a GA leader's own groups); any other profile that reaches
+// /cms gets the placeholder.
 export default function CMSSection({ lang }) {
   const props = useAppDataContext() || {};
   const roles = props.user?.sysRoles?.length ? props.user.sysRoles : [props.user?.sysRole];
   if (roles.includes("admin")) return <CMSAdmin props={props} lang={lang} />;
-  if (roles.includes("pastor") || roles.includes("clerk")) return <CMSOverviewOnly lang={lang} />;
+  if (roles.includes("pastor") || roles.includes("clerk") || roles.includes("ga_leader")) return <CMSOverviewOnly lang={lang} />;
   return <CMSPlaceholder lang={lang} />;
 }
 

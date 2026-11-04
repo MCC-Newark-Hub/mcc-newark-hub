@@ -25,10 +25,30 @@ describe("Home: Prophetic Service is its own module", () => {
     expect(screen.getByText("Prophetic Service")).toBeTruthy();
   });
 
-  it("every staff profile gets the card, but only the profile's own cards show", () => {
+  it("other staff profiles get the card, but only the profile's own cards show", () => {
     renderHome({ name: "Tesoureiro", sysRoles: ["treasurer"] });
     expect(screen.getByText("Culto Profético")).toBeTruthy();
     expect(screen.getByText("Escalas")).toBeTruthy();
     expect(screen.queryByText("Configurações")).toBeNull();   // admin only
   });
 });
+
+describe("Home: cards by profile", () => {
+  const cards = () => ["Eventos", "Diretório", "Escalas", "Culto Profético", "Configurações"].filter((t) => screen.queryByText(t));
+
+  it("a team leader sees only Eventos", () => {
+    renderHome({ name: "Líder", sysRoles: ["team_leader"], teamLeads: ["Segurança"] });
+    expect(cards()).toEqual(["Eventos"]);
+  });
+
+  it("the Grupo de Louvor leader also keeps Culto Profético (the praise lists)", () => {
+    renderHome({ name: "Líder GL", sysRoles: ["team_leader"], teamLeads: ["Grupo de Louvor"] });
+    expect(cards()).toEqual(["Eventos", "Culto Profético"]);
+  });
+
+  it("a GA leader also sees the Diretório", () => {
+    renderHome({ name: "Líder GA", sysRoles: ["ga_leader"], gaIds: ["g1"] });
+    expect(cards()).toEqual(["Eventos", "Diretório", "Escalas", "Culto Profético"]);
+  });
+});
+
