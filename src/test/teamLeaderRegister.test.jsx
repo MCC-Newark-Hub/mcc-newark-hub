@@ -26,7 +26,8 @@ const renderLeader = (teamLeads, addReg = vi.fn()) => {
 describe("Professoras leader registers their team", () => {
   it("has the register button on the Equipe tab and registers only the unregistered teacher", () => {
     const addReg = renderLeader(["Professoras"]);
-    fireEvent.click(screen.getAllByRole("button", { name: "Equipe" }).at(-1)); // the CIA leader opens on "CIA — Classes"
+    expect(screen.getAllByRole("button", { name: "Equipe" })).toHaveLength(1); // one Equipe tab, not two
+    fireEvent.click(screen.getByRole("button", { name: "Equipe" })); // the CIA leader opens on "CIA — Classes"
     fireEvent.click(screen.getByRole("button", { name: /Inscrever membros da equipe \(1\)/ }));
     fireEvent.click(screen.getByLabelText(/Paula Professora/));
     fireEvent.click(screen.getByRole("button", { name: "Inscrever 1" }));

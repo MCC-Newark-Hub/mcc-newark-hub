@@ -214,8 +214,9 @@ function TeamLeaderView(props) {
             <p style={{ color: "#6b7280", fontSize: 13 }}>{t.teamReadOnly}</p>
           </div>
 
-          {/* Top-level view selector — CIA leaders don't need Membros com Funções */}
-          <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: "2px solid var(--border)", paddingBottom: 0 }}>
+          {/* Top-level view selector — CIA leaders don't need Membros com Funções, and with Equipe alone
+              there is nothing to choose (their own tabs below already have an Equipe) */}
+          {!isCIALeader && <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: "2px solid var(--border)", paddingBottom: 0 }}>
             {[{ id: "equipe", label: "Equipe" }, ...(!isCIALeader ? [{ id: "funcoes", label: "Membros com Funções" }] : [])].map(({ id, label }) => (
               <button
                 key={id}
@@ -231,7 +232,7 @@ function TeamLeaderView(props) {
                 {label}
               </button>
             ))}
-          </div>
+          </div>}
 
           {mainView === "funcoes" && !isCIALeader && (
             <MemberFunctionsView
