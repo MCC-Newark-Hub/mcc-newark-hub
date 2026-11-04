@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { registrableTeamMembers, teamRegistrationMode, teamMemberReg } from "@/lib/teamRegistration";
-import { PAUSED_WAITLIST_REASON } from "@/lib/pause";
 
 const members = [
   { id: "a", name: "Ana", category: "Adulto", church: "Newark, NJ", familyId: "F1" },
@@ -33,11 +32,16 @@ describe("registrableTeamMembers", () => {
 });
 
 describe("teamRegistrationMode", () => {
-  it("is open normally, closed when locked or fully paused, waitlist when paused with the waitlist", () => {
+  it("is open normally and during a pause (either mode), unless the admin turned the leaders off", () => {
     expect(teamRegistrationMode({})).toEqual({ blocked: null });
+    expect(teamRegistrationMode({ registration_paused: true })).toEqual({ blocked: null, paused: true });
+    expect(teamRegistrationMode({ registration_paused: true, registration_pause_mode: "waitlist", leaders_register_when_paused: true })).toEqual({ blocked: null, paused: true });
+    expect(teamRegistrationMode({ registration_paused: true, leaders_register_when_paused: false }).blocked).toBe("paused");
+  });
+
+  it("is always blocked once registrations are closed", () => {
     expect(teamRegistrationMode({ registrations_locked: true, registration_paused: true }).blocked).toBe("locked");
-    expect(teamRegistrationMode({ registration_paused: true }).blocked).toBe("paused");
-    expect(teamRegistrationMode({ registration_paused: true, registration_pause_mode: "waitlist" })).toEqual({ blocked: null, forceWaitlist: true, waitlistReason: PAUSED_WAITLIST_REASON });
+    expect(teamRegistrationMode({ registrations_locked: true, leaders_register_when_paused: true }).blocked).toBe("locked");
   });
 });
 
@@ -46,6 +50,5 @@ describe("teamMemberReg", () => {
     const r = teamMemberReg(members[0], "Secretaria");
     expect(r).toMatchObject({ memberId: "a", memberName: "Ana", team: "Secretaria", familyId: null, paid: false, exempt: false });
     expect(r.note).toContain("Secretaria");
-    expect(r.forceWaitlist).toBeUndefined();
   });
 });
