@@ -30,6 +30,7 @@ import PublicLayout from "@/hub/PublicLayout";
 // Sections
 import EventsSection from "@/sections/events/EventsSection";
 import CMSSection from "@/sections/cms/CMSSection";
+import AssistanceSection from "@/sections/assistance/AssistanceSection";
 import ScheduleSection from "@/sections/schedule/ScheduleSection";
 import WorshipSection from "@/sections/worship/WorshipSection";
 import SettingsSection from "@/sections/settings/SettingsSection";
@@ -42,6 +43,7 @@ import RegistrationLookup from "@/views/RegistrationLookup";
 import SetlistPublicView from "@/views/SetlistPublicView";
 import WorshipListPublicView from "@/views/WorshipListPublicView";
 import DoorPublicView from "@/views/DoorPublicView";
+import CensusPublicView from "@/views/CensusPublicView";
 import PublicStatsView from "@/views/PublicStatsView";
 import PrayerPublicView from "@/views/PrayerPublicView";
 
@@ -164,6 +166,11 @@ export default function App() {
                 <Route key={p} path={`${p}/:month?`} element={<DoorPublicView lang={lang} setLang={setLang} />} />
               ))}
 
+              {/* Public: service census (Frequência de Culto) — outside PublicLayout so it stays open in maintenance mode */}
+              {["/frequencia", "/attendance"].map((p) => (
+                <Route key={p} path={p} element={<CensusPublicView lang={lang} setLang={setLang} />} />
+              ))}
+
               {/* Public: registration numbers for the big screen at church — outside PublicLayout so it stays open in maintenance mode */}
               <Route path="/events/painel/:eventId?" element={<PublicStatsView lang={lang} setLang={setLang} />} />
               {/* The first links (/painel, /dashboard) keep working */}
@@ -236,6 +243,7 @@ export default function App() {
                   <Route index element={<HubHome user={user} lang={lang} />} />
                   <Route path="/events" element={<EventsSection {...shared} />} />
                   <Route path="/cms" element={<CMSSection lang={lang} />} />
+                  <Route path="/assistance" element={<AssistanceSection lang={lang} />} />
                   <Route path="/schedule" element={<ScheduleSection lang={lang} />} />
                   <Route path="/worship" element={<WorshipSection lang={lang} />} />
                   <Route path="/settings" element={<SettingsSection lang={lang} />} />
