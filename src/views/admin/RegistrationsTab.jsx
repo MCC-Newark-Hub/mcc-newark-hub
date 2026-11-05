@@ -13,7 +13,8 @@ import { resendConfirmation } from "@/lib/resendConfirmation";
 import { matchesRegNumber } from "@/lib/regNumber";
 import { useSortable } from "@/hooks/useSortable";
 import { eventRequiresContact, needsOwnContact, hasFullContact } from "@/lib/contact";
-import { fetchContactStatus } from "@/lib/contactApi";
+import { fetchContactStatus, staffGetContacts } from "@/lib/contactApi";
+import { contactExportRows, CONTACT_EXPORT_HEADERS, toCsv } from "@/lib/contactExport";
 
 const norm = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
@@ -84,6 +85,20 @@ export default function RegistrationsTab(props) {
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
     const a = document.createElement("a");
     a.href = url; a.download = `crachas-${(event?.name || "evento").replace(/\s+/g,"-")}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+  const [exportingContacts, setExportingContacts] = useState(false);
+  const exportContactsCSV = async () => {
+    setExportingContacts(true);
+    const ids = [...new Set(regs.filter((r) => r.eventId === event?.id && !r.cancelled).map((r) => r.memberId).filter(Boolean))];
+    const contacts = {};
+    for (let i = 0; i < ids.length; i += 1000) Object.assign(contacts, await staffGetContacts(ids.slice(i, i + 1000)));
+    setExportingContacts(false);
+    if (ids.length && !Object.keys(contacts).length) { notify(t.contactsCsvEmpty); return; }
+    const csv = toCsv(CONTACT_EXPORT_HEADERS, contactExportRows(regs, event?.id, contacts, liveChurchOf));
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = `contatos-${(event?.name || "evento").replace(/\s+/g, "-")}.csv`; a.click();
     URL.revokeObjectURL(url);
   };
   const restriction = getRegistrationRestriction(event, isFull);
@@ -172,6 +187,7 @@ export default function RegistrationsTab(props) {
             </>
           )}
           <button className="btn btn-ghost btn-sm" onClick={exportBadgeCSV} title="Exportar CSV para impressão de crachás no Canva">🪪 Crachás CSV</button>
+          <button className="btn btn-ghost btn-sm" onClick={exportContactsCSV} disabled={exportingContacts} title={t.contactsCsvTitle}>📇 {exportingContacts ? "…" : t.contactsCsv}</button>
           {event?.registrations_locked && (
             <span style={{ fontSize: 12, fontWeight: 700, color: "#dc2626", padding: "6px 10px", background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 6 }}>🔒 Encerrado</span>
           )}
