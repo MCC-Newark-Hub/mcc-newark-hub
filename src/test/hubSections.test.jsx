@@ -6,7 +6,7 @@ import { AppDataContext } from "@/context/AppDataContext";
 
 // The real tabs are big and have their own data needs — only where they are mounted matters here.
 vi.mock("@/views/AdminView", () => ({
-  AdminDirectory: () => <div>conteúdo-diretorio</div>,
+  AdminDirectory: ({ title, tabs }) => <div>{`conteúdo-diretorio:${title}:${(tabs || []).join(",")}`}</div>,
   AdminGA: () => <div>conteúdo-ga</div>,
   AdminImport: () => <div>conteúdo-importar</div>,
   AdminUsers: () => <div>conteúdo-usuarios</div>,
@@ -21,12 +21,14 @@ const admin = { sysRole: "admin", sysRoles: ["admin"] };
 const clerk = { sysRole: "clerk", sysRoles: ["clerk"] };
 
 describe("Diretório section (items moved out of Eventos)", () => {
-  it("opens the admin on the Visão Geral, with Diretório, Grupos de Assistência, Funções and Importar next to it", () => {
+  it("opens the admin on the Visão Geral, with the data grouped in Estrutura, Membros and Voluntários", () => {
     withUser(admin, <CMSSection lang="pt" />);
     expect(screen.getByText("conteúdo-visao-geral")).toBeTruthy();
-    fireEvent.click(screen.getAllByText("Diretório")[0]);
-    expect(screen.getByText("conteúdo-diretorio")).toBeTruthy();
-    fireEvent.click(screen.getAllByText("Grupos de Assistência")[0]);
+    for (const [menu, tabs] of [["Estrutura", "org_chart,church_groups,churches,groups"], ["Membros", "members,families"], ["Voluntários", "teams_dir,teams,instruments,voice_types"]]) {
+      fireEvent.click(screen.getAllByText(menu)[0]);
+      expect(screen.getByText(`conteúdo-diretorio:${menu}:${tabs}`)).toBeTruthy();
+    }
+    fireEvent.click(screen.getAllByText("Inscrições por GA")[0]);
     expect(screen.getByText("conteúdo-ga")).toBeTruthy();
     fireEvent.click(screen.getAllByText("Funções")[0]);
     expect(screen.getByText("conteúdo-funcoes")).toBeTruthy();
@@ -38,8 +40,9 @@ describe("Diretório section (items moved out of Eventos)", () => {
     for (const user of [clerk, { sysRole: "pastor", sysRoles: ["pastor"] }]) {
       const { unmount } = withUser(user, <CMSSection lang="pt" />);
       expect(screen.getByText("conteúdo-visao-geral")).toBeTruthy();
-      expect(screen.queryByText("Grupos de Assistência")).toBeNull();
-      expect(screen.queryByText("conteúdo-diretorio")).toBeNull();
+      expect(screen.queryByText("Inscrições por GA")).toBeNull();
+      expect(screen.queryByText("Estrutura")).toBeNull();
+      expect(screen.queryByText(/conteúdo-diretorio/)).toBeNull();
       unmount();
     }
   });
@@ -47,7 +50,7 @@ describe("Diretório section (items moved out of Eventos)", () => {
   it("gives a GA leader just the Visão Geral (limited to their groups by scopeFor)", () => {
     withUser({ sysRole: "ga_leader", sysRoles: ["ga_leader"], gaIds: ["g1"] }, <CMSSection lang="pt" />);
     expect(screen.getByText("conteúdo-visao-geral")).toBeTruthy();
-    expect(screen.queryByText("conteúdo-diretorio")).toBeNull();
+    expect(screen.queryByText(/conteúdo-diretorio/)).toBeNull();
   });
 
   it("keeps the placeholder for profiles with no Diretório role", () => {

@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { regAcessibilidade } from "@/lib/acessibilidade";
 import { CHURCH_LIST, addDays } from "@/constants";
 import { sb } from "@/lib/supabase";
 import { APP_USER_COLUMNS } from "@/lib/appUsers";
@@ -25,6 +26,7 @@ export function mapMember(m) {
     gaId: m.ga_id,
     allergies: m.allergies || '',
     specialNeeds: m.special_needs || '',
+    acessibilidade: !!m.acessibilidade,
     notes: m.notes || '',
     isGuest: m.is_guest || false,
     invitedBy: m.invited_by || '',
@@ -425,6 +427,9 @@ export function useAppData({ getUserRef, notify }) {
       registered_at: today,
       registered_by: byName,
     };
+    // A child in the Acessibilidade class (member record) is registered there from the start.
+    var regMember = data.memberId ? (members || []).find((m) => m.id === data.memberId) : null;
+    if (data.acessibilidade !== undefined ? data.acessibilidade : regAcessibilidade(regMember, data.category)) dbRow.acessibilidade = true;
     var r = mapReg({ ...dbRow, id: "tmp-" + regNumber, reg_number: regNumber });
     setRegs(function (p) {
       return [...p, r];
