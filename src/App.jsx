@@ -28,6 +28,7 @@ import HubShell from "@/hub/HubShell";
 import HubHome from "@/hub/HubHome";
 import AuthGate from "@/hub/AuthGate";
 import PublicLayout from "@/hub/PublicLayout";
+import SectionGate from "@/hub/SectionGate";
 
 // Sections
 import EventsSection from "@/sections/events/EventsSection";
@@ -259,12 +260,12 @@ export default function App() {
                   <HubShell user={user} logout={logout} lang={lang} setLang={setLang} theme={theme} toggleTheme={toggleTheme} />
                 }>
                   <Route index element={<HubHome user={user} lang={lang} />} />
-                  <Route path="/events" element={<EventsSection {...shared} />} />
-                  <Route path="/cms" element={<CMSSection lang={lang} />} />
-                  <Route path="/assistance" element={<AssistanceSection lang={lang} />} />
-                  <Route path="/schedule" element={<ScheduleSection lang={lang} />} />
-                  <Route path="/worship" element={<WorshipSection lang={lang} />} />
-                  <Route path="/settings" element={<SettingsSection lang={lang} />} />
+                  <Route path="/events" element={<SectionGate id="events" user={user} lang={lang}><EventsSection {...shared} /></SectionGate>} />
+                  <Route path="/cms" element={<SectionGate id="cms" user={user} lang={lang}><CMSSection lang={lang} /></SectionGate>} />
+                  <Route path="/assistance" element={<SectionGate id="assistance" user={user} lang={lang}><AssistanceSection lang={lang} /></SectionGate>} />
+                  <Route path="/schedule" element={<SectionGate id="schedule" user={user} lang={lang}><ScheduleSection lang={lang} /></SectionGate>} />
+                  <Route path="/worship" element={<SectionGate id="worship" user={user} lang={lang}><WorshipSection lang={lang} /></SectionGate>} />
+                  <Route path="/settings" element={<SectionGate id="settings" user={user} lang={lang}><SettingsSection lang={lang} /></SectionGate>} />
                 </Route>
               </Route>
 

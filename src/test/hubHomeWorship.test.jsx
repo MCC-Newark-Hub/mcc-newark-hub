@@ -46,8 +46,13 @@ describe("Home: cards by profile", () => {
     expect(cards()).toEqual(["Eventos", "Culto Profético"]);
   });
 
-  it("a GA leader also sees the Diretório", () => {
+  it("a GA leader sees Eventos and Diretório — no Escalas, no Culto Profético", () => {
     renderHome({ name: "Líder GA", sysRoles: ["ga_leader"], gaIds: ["g1"] });
+    expect(cards()).toEqual(["Eventos", "Diretório"]);
+  });
+
+  it("a GA leader who is also a secretary keeps what the secretary sees", () => {
+    renderHome({ name: "Líder GA", sysRoles: ["ga_leader", "clerk"], gaIds: ["g1"] });
     expect(cards()).toEqual(["Eventos", "Diretório", "Escalas", "Culto Profético"]);
   });
 });

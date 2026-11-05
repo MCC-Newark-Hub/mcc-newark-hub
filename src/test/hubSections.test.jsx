@@ -36,8 +36,17 @@ describe("Diretório section (items moved out of Eventos)", () => {
     expect(screen.getByText("conteúdo-importar")).toBeTruthy();
   });
 
-  it("gives pastors and church secretaries only the Visão Geral — none of the admin tools", () => {
-    for (const user of [clerk, { sysRole: "pastor", sysRoles: ["pastor"] }]) {
+  it("gives pastors only the Visão Geral — none of the admin tools", () => {
+    withUser({ sysRole: "pastor", sysRoles: ["pastor"] }, <CMSSection lang="pt" />);
+    expect(screen.getByText("conteúdo-visao-geral")).toBeTruthy();
+    expect(screen.queryByText("Inscrições por GA")).toBeNull();
+    expect(screen.queryByText("Estrutura")).toBeNull();
+    expect(screen.queryByText(/Membros/)).toBeNull();
+    expect(screen.queryByText(/conteúdo-diretorio/)).toBeNull();
+  });
+
+  it("gives secretaries and GA leaders their scoped tabs, never the admin tools (see roleVisibility.test)", () => {
+    for (const user of [clerk, { sysRole: "ga_leader", sysRoles: ["ga_leader"], gaIds: ["g1"] }]) {
       const { unmount } = withUser(user, <CMSSection lang="pt" />);
       expect(screen.getByText("conteúdo-visao-geral")).toBeTruthy();
       expect(screen.queryByText("Inscrições por GA")).toBeNull();
@@ -45,12 +54,6 @@ describe("Diretório section (items moved out of Eventos)", () => {
       expect(screen.queryByText(/conteúdo-diretorio/)).toBeNull();
       unmount();
     }
-  });
-
-  it("gives a GA leader just the Visão Geral (limited to their groups by scopeFor)", () => {
-    withUser({ sysRole: "ga_leader", sysRoles: ["ga_leader"], gaIds: ["g1"] }, <CMSSection lang="pt" />);
-    expect(screen.getByText("conteúdo-visao-geral")).toBeTruthy();
-    expect(screen.queryByText(/conteúdo-diretorio/)).toBeNull();
   });
 
   it("keeps the placeholder for profiles with no Diretório role", () => {

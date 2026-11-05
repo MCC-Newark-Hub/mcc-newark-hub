@@ -15,7 +15,8 @@ function familyGas(family, members, gas) {
   return ids.map((id) => (gas || []).find((g) => g.id === id)).filter(Boolean);
 }
 
-export default function FamiliesPanel({ members, families, setFamilies, gas, showGroup, showChurch, notify, logAudit }) {
+// canDelete=false (GA leader in the Diretório) keeps create and edit but hides every delete.
+export default function FamiliesPanel({ members, families, setFamilies, gas, showGroup, showChurch, notify, logAudit, canDelete = true }) {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("name");   // "name" | "group" | "church"
   const [groupBy, setGroupBy] = useState("none"); // "none" | "group" | "church"
@@ -134,7 +135,7 @@ export default function FamiliesPanel({ members, families, setFamilies, gas, sho
       <td>
         <div style={{ display: "flex", gap: 6 }}>
           <button className="btn btn-ghost btn-xs" onClick={() => openEdit(f, { name: f.name, selectedMembers: (f.memberIds || []).map((mid) => (members || []).find((m) => m.id === mid)).filter(Boolean) })}><Pencil size={12} /></button>
-          <button className="btn btn-danger btn-xs" onClick={() => setDeleting({ ids: [f.id], label: f.name })}><Trash2 size={12} /></button>
+          {canDelete && <button className="btn btn-danger btn-xs" aria-label="Excluir família" onClick={() => setDeleting({ ids: [f.id], label: f.name })}><Trash2 size={12} /></button>}
         </div>
       </td>
     </tr>
@@ -167,7 +168,7 @@ export default function FamiliesPanel({ members, families, setFamilies, gas, sho
 
         <div style={{ display: "flex", gap: 10, marginLeft: "auto", alignItems: "center" }}>
           <button className="btn btn-primary btn-sm" style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={() => openNew({ name: "", selectedMembers: [] })}><Plus size={14} /> Nova Família</button>
-          {(families || []).length > 0 && (
+          {canDelete && (families || []).length > 0 && (
             <button className="btn btn-danger btn-sm" style={{ display: "flex", alignItems: "center", gap: 6 }}
               onClick={() => setDeleting({ ids: (families || []).map((f) => f.id).filter(Boolean), label: "" })}>
               <Trash2 size={13} /> Excluir TODAS ({(families || []).length})
@@ -224,7 +225,7 @@ export default function FamiliesPanel({ members, families, setFamilies, gas, sho
         onCancel={() => setDeleting(null)}
         onConfirm={() => deleteFamilies(deleting.ids)} />}
 
-      {selected.length > 0 && (
+      {canDelete && selected.length > 0 && (
         <BulkBar selected={selected.length} total={allIds.length} label="famílias"
           onSelectAll={() => selAll(allIds)} onClearAll={clearSel}
           onDeleteSelected={() => setDeleting({ ids: selected, label: "" })} />
