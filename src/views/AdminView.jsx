@@ -35,6 +35,8 @@ import MemberFunctionsView from "@/components/MemberFunctionsView";
 import { syncRegistrationNames, syncMemberToRegistrations } from "@/lib/syncMemberName";
 import { groupByFamily, familyIdOf } from "@/lib/family";
 import PauseControl from "@/components/PauseControl";
+import AcessibilidadeField from "@/components/directory/AcessibilidadeField";
+import { isCiaCategory } from "@/lib/acessibilidade";
 import { leadersMayRegisterWhenPaused } from "@/lib/teamRegistration";
 
 // Accent-insensitive search: "joao" matches "João"
@@ -1209,8 +1211,8 @@ function makeTh(sk, sd, toggle) {
 
 // ── Directory ─────────────────────────────────────────────────────────────────
 
-export function AdminDirectory({ churches, setChurches, members, setMembers, families, setFamilies, gas, setGas, rosters, setRosters, dbTeams, setDbTeams, dbInstruments, setDbInstruments, dbVoiceTypes, setDbVoiceTypes, dbCategories, dbFunctions, dbImmigrationStatuses, events, regs, setRegs, notify, logAudit }) {
-  const TABS = [
+export function AdminDirectory({ churches, setChurches, members, setMembers, families, setFamilies, gas, setGas, rosters, setRosters, dbTeams, setDbTeams, dbInstruments, setDbInstruments, dbVoiceTypes, setDbVoiceTypes, dbCategories, dbFunctions, dbImmigrationStatuses, events, regs, setRegs, notify, logAudit , tabs: onlyTabs, title = "Diretório" }) {
+  const ALL_TABS = [
     { id: "churches",    label: "Igrejas",               count: churches?.length },
     { id: "church_groups", label: "Polos e Áreas" },
     { id: "org_chart",    label: "Organograma" },
@@ -1222,7 +1224,9 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
     { id: "instruments", label: "Instrumentos",          count: dbInstruments?.length },
     { id: "voice_types", label: "Vozes",                 count: dbVoiceTypes?.length },
   ];
-  const [tab, setTab]         = useState("churches");
+  // The Diretório menu shows a few of these at a time (Estrutura, Membros, Voluntários), in its own order.
+  const TABS = onlyTabs ? onlyTabs.map((id) => ALL_TABS.find((tb) => tb.id === id)).filter(Boolean) : ALL_TABS;
+  const [tab, setTab]         = useState(TABS[0].id);
   const [search, setSearch]   = useState("");
   const [groupBy, setGroupBy] = useState(""); // "" | "church" | "ga" | "family"
   const [filterType, setFilterType] = useState(""); // "" | "members" | "visitors"
@@ -1296,7 +1300,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
     clearSel();
   };
 
-  const mapMember  = (m) => ({ id: m.id, name: m.name, firstName: m.first_name || m.firstName || '', lastName: m.last_name || m.lastName || '', badgeName: m.badge_name || m.badgeName, gender: m.gender, category: m.category, church: m.church, role: m.role || "", roles: m.roles || (m.role ? [m.role] : []), familyId: m.family_id || m.familyId, gaId: m.ga_id || m.gaId, allergies: m.allergies || '', specialNeeds: m.special_needs || m.specialNeeds || '', notes: m.notes || '', isGuest: m.is_guest || m.isGuest || false, invitedBy: m.invited_by || m.invitedBy || '', translationLanguages: m.translation_languages || m.translationLanguages || [], voiceType: m.voice_type || m.voiceType || '', instruments: m.instruments || [], emergencyContact: m.emergency_contact || m.emergencyContact || '', emergencyPhone: m.emergency_phone || m.emergencyPhone || '' });
+  const mapMember  = (m) => ({ id: m.id, name: m.name, firstName: m.first_name || m.firstName || '', lastName: m.last_name || m.lastName || '', badgeName: m.badge_name || m.badgeName, gender: m.gender, category: m.category, church: m.church, role: m.role || "", roles: m.roles || (m.role ? [m.role] : []), familyId: m.family_id || m.familyId, gaId: m.ga_id || m.gaId, allergies: m.allergies || '', specialNeeds: m.special_needs || m.specialNeeds || '', notes: m.notes || '', isGuest: m.is_guest || m.isGuest || false, invitedBy: m.invited_by || m.invitedBy || '', translationLanguages: m.translation_languages || m.translationLanguages || [], voiceType: m.voice_type || m.voiceType || '', instruments: m.instruments || [], emergencyContact: m.emergency_contact || m.emergencyContact || '', emergencyPhone: m.emergency_phone || m.emergencyPhone || '', acessibilidade: !!(m.acessibilidade) });
   const mapFamily  = (f) => ({ id: f.id, name: f.name, memberIds: f.member_ids || f.memberIds || [] });
   const mapGA      = (g) => ({ id: g.id, name: g.name, church: g.church, leaderId: g.leader_id || g.leaderId, description: g.description || "" });
   const mapRoster  = (r) => ({ id: r.id, eventId: r.event_id || r.eventId, team: r.team, leaderId: r.leader_id || r.leaderId, memberIds: r.member_ids || r.memberIds || [] });
@@ -1304,21 +1308,16 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <h2 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 22, fontWeight: 700 }}>Diretório</h2>
+        <h2 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 22, fontWeight: 700 }}>{title}</h2>
       </div>
-      <div style={{ background: "var(--bg2)", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 12, color: "var(--muted)", display: "flex", gap: 8, alignItems: "flex-start" }}>
-        <span style={{ flexShrink: 0 }}>ℹ️</span>
-        <span>O <strong>Diretório</strong> gerencia os dados de referência: membros, igrejas, famílias, grupos e equipes. Para gerenciar <strong>inscrições, presenças e relatórios</strong> use as abas do menu lateral (Inscrições, Equipes, Aprovações, etc.).</span>
-      </div>
-      <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 16 }}>Visualize e edite todos os dados de referência do sistema.</p>
 
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
+      {TABS.length > 1 && <div role="tablist" style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "8px 0 16px" }}>
         {TABS.map((tb) => (
           <button key={tb.id} className={`btn btn-sm ${tab === tb.id ? "btn-primary" : "btn-ghost"}`} onClick={() => switchTab(tb.id)}>
             {tb.label}{tb.count != null && <span style={{ opacity: .65, fontWeight: 400, marginLeft: 4 }}>({tb.count})</span>}
           </button>
         ))}
-      </div>
+      </div>}
 
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 14, flexWrap: "wrap" }}>
       <div className="sb" style={{ maxWidth: 340 }}>
@@ -1649,7 +1648,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
             <td style={{ fontSize: 11, color: "var(--muted)", maxWidth: 160 }}>{m.notes ? m.notes.slice(0, 40) + (m.notes.length > 40 ? '…' : '') : '—'}</td>
             <td>
               <div style={{ display: "flex", gap: 6 }}>
-                <button className="btn btn-ghost btn-xs" onClick={() => openEdit(m, { firstName: m.firstName || '', lastName: m.lastName || '', name: m.name, badgeName: m.badgeName || "", gender: m.gender || "M", category: m.category, church: m.church || "", roles: m.roles || (m.role ? [m.role] : []), role: m.role || "", familyId: familyIdOf(m, families) || "", gaId: m.gaId || "", allergies: m.allergies || '', specialNeeds: m.specialNeeds || '', notes: m.notes || '', isGuest: m.isGuest || false, invitedBy: m.invitedBy || '', translationLanguages: m.translationLanguages || [], voiceType: m.voiceType || '', voiceLowestNote: m.voiceLowestNote || '', voiceHighestNote: m.voiceHighestNote || '', instruments: m.instruments || [], immigrationStatus: m.immigrationStatus || '' })}><Pencil size={12} /></button>
+                <button className="btn btn-ghost btn-xs" onClick={() => openEdit(m, { firstName: m.firstName || '', lastName: m.lastName || '', name: m.name, badgeName: m.badgeName || "", gender: m.gender || "M", category: m.category, church: m.church || "", roles: m.roles || (m.role ? [m.role] : []), role: m.role || "", familyId: familyIdOf(m, families) || "", gaId: m.gaId || "", allergies: m.allergies || '', specialNeeds: m.specialNeeds || '', acessibilidade: !!m.acessibilidade, notes: m.notes || '', isGuest: m.isGuest || false, invitedBy: m.invitedBy || '', translationLanguages: m.translationLanguages || [], voiceType: m.voiceType || '', voiceLowestNote: m.voiceLowestNote || '', voiceHighestNote: m.voiceHighestNote || '', instruments: m.instruments || [], immigrationStatus: m.immigrationStatus || '' })}><Pencil size={12} /></button>
                 <button className="btn btn-danger btn-xs" onClick={() => setDeleting({ ids: [m.id], label: m.name })}><Trash2 size={12} /></button>
               </div>
             </td>
@@ -1822,6 +1821,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
                     </div>
                     <div><label>Alergias</label><textarea rows={2} value={formData.allergies || ""} onChange={(e) => setFormData({ ...formData, allergies: e.target.value })} placeholder="Ex: amendoim, látex…" style={{ resize: "vertical" }} /></div>
                     <div><label>Necessidades Especiais</label><textarea rows={2} value={formData.specialNeeds || ""} onChange={(e) => setFormData({ ...formData, specialNeeds: e.target.value })} placeholder="Ex: cadeira de rodas…" style={{ resize: "vertical" }} /></div>
+                    <AcessibilidadeField category={formData.category || "Adulto"} checked={formData.acessibilidade} onChange={(v) => setFormData({ ...formData, acessibilidade: v })} />
                     <div><label>Notas</label><textarea rows={2} value={formData.notes || ""} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} style={{ resize: "vertical" }} /></div>
                     <div>
                       <label>Situação Imigratória</label>
@@ -1853,7 +1853,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
                       if (!formData.name?.trim() && !formData.firstName?.trim()) { notify("Nome obrigatório."); return; }
                       if (churches.find((c) => c.display === formData.church)?.is_hub && !formData.gaId) { notify("Grupo é obrigatório para igrejas do Pólo."); return; }
                       const fullName = formData.name?.trim() || ((formData.firstName || '') + ' ' + (formData.lastName || '')).trim();
-                      const row = { name: fullName, first_name: formData.firstName || null, last_name: formData.lastName || null, badge_name: formData.badgeName || fullName, gender: formData.gender || "M", category: formData.category || "Adulto", church: formData.church || "", roles: formData.roles || [], role: (formData.roles || [])[0] || "", family_id: formData.familyId || null, ga_id: formData.gaId || null, allergies: formData.allergies || null, special_needs: formData.specialNeeds || null, notes: formData.notes || null, is_guest: formData.isGuest || false, invited_by: formData.isGuest ? (formData.invitedBy || null) : null, translation_languages: formData.translationLanguages || [], voice_type: formData.voiceType || null, ...(formData.voiceLowestNote ? { voice_lowest_note: formData.voiceLowestNote } : {}), ...(formData.voiceHighestNote ? { voice_highest_note: formData.voiceHighestNote } : {}), ...(formData.instruments?.length ? { instruments: formData.instruments } : {}), ...(formData.immigrationStatus ? { immigration_status: formData.immigrationStatus } : {}) };
+                      const row = { name: fullName, first_name: formData.firstName || null, last_name: formData.lastName || null, badge_name: formData.badgeName || fullName, gender: formData.gender || "M", category: formData.category || "Adulto", church: formData.church || "", roles: formData.roles || [], role: (formData.roles || [])[0] || "", family_id: formData.familyId || null, ga_id: formData.gaId || null, allergies: formData.allergies || null, special_needs: formData.specialNeeds || null, acessibilidade: isCiaCategory(formData.category || "Adulto") && !!formData.acessibilidade, notes: formData.notes || null, is_guest: formData.isGuest || false, invited_by: formData.isGuest ? (formData.invitedBy || null) : null, translation_languages: formData.translationLanguages || [], voice_type: formData.voiceType || null, ...(formData.voiceLowestNote ? { voice_lowest_note: formData.voiceLowestNote } : {}), ...(formData.voiceHighestNote ? { voice_highest_note: formData.voiceHighestNote } : {}), ...(formData.instruments?.length ? { instruments: formData.instruments } : {}), ...(formData.immigrationStatus ? { immigration_status: formData.immigrationStatus } : {}) };
                       if (isNew) {
                         const nums = (members || []).map((m) => parseInt((m.id || "").replace(/^M/, ""), 10)).filter((n) => !isNaN(n));
                         const next = nums.length > 0 ? Math.max(...nums) + 1 : 1;
@@ -1863,7 +1863,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
                       }
                       saveRow("members", row, isNew, members, setMembers, mapMember);
                       if (!isNew) {
-                        syncMemberToRegistrations({ memberId: editing.id, memberName: fullName, badgeName: row.badge_name, category: row.category, church: row.church, setRegs });
+                        syncMemberToRegistrations({ memberId: editing.id, memberName: fullName, badgeName: row.badge_name, category: row.category, church: row.church, acessibilidade: row.acessibilidade, setRegs });
                       }
                     }}>{saving ? "Salvando…" : "Salvar"}</button>
                   </div>

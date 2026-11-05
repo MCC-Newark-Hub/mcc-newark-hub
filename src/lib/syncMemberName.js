@@ -1,11 +1,15 @@
 import { sb } from "@/lib/supabase";
+import { isCiaCategory } from "@/lib/acessibilidade";
 
 // Registrations snapshot member data at registration time. Call this after
 // any member update so their existing registrations stay in sync.
-export async function syncMemberToRegistrations({ memberId, memberName, badgeName, category, church, setRegs }) {
+// `acessibilidade` (the member's mark) turns the Acessibilidade class on/off on their registrations,
+// only while they are in a CIA category (`category`, or each registration's own).
+export async function syncMemberToRegistrations({ memberId, memberName, badgeName, category, church, acessibilidade, setRegs }) {
   if (!memberId) return;
 
   const patch = {};
+  if (acessibilidade !== undefined) patch.acessibilidade = !!acessibilidade && (category === undefined || isCiaCategory(category));
   if (memberName  !== undefined) patch.member_name = memberName;
   if (badgeName   !== undefined) patch.badge_name  = badgeName;
   if (category    !== undefined) patch.category    = category;
@@ -24,6 +28,7 @@ export async function syncMemberToRegistrations({ memberId, memberName, badgeNam
           ...(badgeName  !== undefined ? { badgeName }  : {}),
           ...(category   !== undefined ? { category }   : {}),
           ...(church     !== undefined ? { church }     : {}),
+          ...(acessibilidade !== undefined ? { acessibilidade: !!acessibilidade && isCiaCategory(category ?? r.category) } : {}),
         };
       })
     );

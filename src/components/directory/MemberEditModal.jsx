@@ -7,6 +7,8 @@ import SearchSelect from "@/components/SearchSelect";
 import RolesMultiSelect from "@/components/directory/RolesMultiSelect";
 import { syncMemberToRegistrations } from "@/lib/syncMemberName";
 import StaffContactEditor from "@/components/StaffContactEditor";
+import AcessibilidadeField from "@/components/directory/AcessibilidadeField";
+import { isCiaCategory } from "@/lib/acessibilidade";
 
 // Church-locked member editor: the acting user's church is always the value written to
 // `members.church`, regardless of what's shown/typed elsewhere — mirrors GroupsPanel's
@@ -37,6 +39,7 @@ export default function MemberEditModal({
 
   const MINOR_CATEGORIES = ["0-3", "Criança", "Intermediário", "Adolescente"];
   const isMinor = MINOR_CATEGORIES.includes(editingMember.category);
+  const isCia = isCiaCategory(editingMember.category);
 
   const saveMember = async () => {
     const fn = editingMember.firstName.trim();
@@ -62,6 +65,7 @@ export default function MemberEditModal({
         ga_id: editingMember.gaId || null,
         allergies: editingMember.allergies || null,
         special_needs: editingMember.specialNeeds || null,
+        acessibilidade: isCia && !!editingMember.acessibilidade,
         notes: editingMember.notes || null,
         is_guest: editingMember.isGuest || false,
         invited_by: editingMember.isGuest ? (editingMember.invitedBy || null) : null,
@@ -78,7 +82,7 @@ export default function MemberEditModal({
         if (error) throw error;
         setMembers((prev) => prev.map((m) => (m.id === editingMember.id ? mapMember({ ...m, ...row, id: editingMember.id }) : m)));
         if (setRegs) {
-          syncMemberToRegistrations({ memberId: editingMember.id, memberName: fullName, badgeName: row.badge_name, category: row.category, church: row.church, setRegs });
+          syncMemberToRegistrations({ memberId: editingMember.id, memberName: fullName, badgeName: row.badge_name, category: row.category, church: row.church, acessibilidade: row.acessibilidade, setRegs });
         }
         logAudit?.("member_updated", "member", editingMember.id, fullName, null);
       } else {
@@ -251,6 +255,7 @@ export default function MemberEditModal({
           <label>Necessidades Especiais</label>
           <textarea rows={2} value={editingMember.specialNeeds} onChange={(e) => setEditingMember({ ...editingMember, specialNeeds: e.target.value })} style={{ resize: "vertical" }} />
         </div>
+        <AcessibilidadeField category={editingMember.category} checked={editingMember.acessibilidade} onChange={(v) => setEditingMember({ ...editingMember, acessibilidade: v })} />
         <div>
           <label>Contato de Emergência{isMinor ? " *" : ""}</label>
           <input

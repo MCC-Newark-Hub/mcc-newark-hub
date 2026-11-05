@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BookOpen, Building2, Star, Upload, LayoutDashboard, FileSpreadsheet } from "lucide-react";
+import { BookOpen, Building2, Star, Upload, LayoutDashboard, FileSpreadsheet, Network, Users, HeartHandshake } from "lucide-react";
 import { useAppDataContext } from "@/context/AppDataContext";
 import { useTopbarContent } from "@/context/TopbarContext";
 import Sidebar from "@/components/Sidebar";
@@ -30,15 +30,22 @@ function CMSOverviewOnly({ lang }) {
   );
 }
 
+// The Diretório's data, grouped (tab ids of AdminDirectory, in the order shown).
+const DIRECTORY_GROUPS = [
+  { id: "estrutura", pt: "Estrutura", en: "Structure", icon: <Network size={16} />, tabs: ["org_chart", "church_groups", "churches", "groups"] },
+  { id: "membros", pt: "Membros", en: "Members", icon: <Users size={16} />, tabs: ["members", "families"] },
+  { id: "voluntarios", pt: "Voluntários", en: "Volunteers", icon: <HeartHandshake size={16} />, tabs: ["teams_dir", "teams", "instruments", "voice_types"] },
+];
+
 function CMSAdmin({ props, lang }) {
   const pt = lang !== "en";
   const [sec, setSec] = useState("overview");
   useTopbarContent({ title: pt ? "Diretório" : "Directory" });
   const navItems = [
     { id: "overview", icon: <LayoutDashboard size={16} />, label: pt ? "Visão Geral" : "Overview" },
-    { id: "directory", icon: <BookOpen size={16} />, label: pt ? "Diretório" : "Directory" },
+    ...DIRECTORY_GROUPS.map((g) => ({ id: g.id, icon: g.icon, label: pt ? g.pt : g.en })),
     { id: "reports", icon: <FileSpreadsheet size={16} />, label: pt ? "Relatórios" : "Reports" },
-    { id: "ga", icon: <Building2 size={16} />, label: pt ? "Grupos de Assistência" : "Assistance groups" },
+    { id: "ga", icon: <Building2 size={16} />, label: pt ? "Inscrições por GA" : "Registrations by GA" },
     { id: "funcoes", icon: <Star size={16} />, label: pt ? "Funções" : "Functions" },
     { id: "import", icon: <Upload size={16} />, label: pt ? "Importar" : "Import" },
   ];
@@ -49,7 +56,7 @@ function CMSAdmin({ props, lang }) {
         <div className="main-scroll">
           <div className="page-pad">
             {sec === "overview" && <OverviewPanel />}
-            {sec === "directory" && <AdminDirectory {...props} />}
+            {DIRECTORY_GROUPS.filter((g) => g.id === sec).map((g) => <AdminDirectory key={g.id} {...props} tabs={g.tabs} title={pt ? g.pt : g.en} />)}
             {sec === "reports" && (
               <>
                 <ReportsPanel />
