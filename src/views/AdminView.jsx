@@ -36,6 +36,7 @@ import { syncRegistrationNames, syncMemberToRegistrations } from "@/lib/syncMemb
 import { groupByFamily, familyIdOf } from "@/lib/family";
 import PauseControl from "@/components/PauseControl";
 import AcessibilidadeField from "@/components/directory/AcessibilidadeField";
+import StaffContactEditor from "@/components/StaffContactEditor";
 import { isCiaCategory } from "@/lib/acessibilidade";
 import { leadersMayRegisterWhenPaused } from "@/lib/teamRegistration";
 
@@ -1692,6 +1693,12 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
                         placeholder="Buscar igreja…"
                       />
                     </div>
+                    {/* Phone and e-mail live apart from the member row (migration 039): own loader and Save button */}
+                    {isNew ? (
+                      <p style={{ fontSize: 11, color: "var(--muted)", margin: 0 }}>Telefone e e-mail podem ser adicionados depois de salvar o membro.</p>
+                    ) : (
+                      <StaffContactEditor memberId={editing.id} lang="pt" />
+                    )}
                     <RolesMultiSelect
                       roles={formData.roles}
                       onChange={(roles) => setFormData({ ...formData, roles })}
