@@ -2,6 +2,8 @@ import { useState } from "react";
 import { UserPlus } from "lucide-react";
 import { fill } from "@/i18n/strings";
 import { registrableTeamMembers, teamRegistrationMode, teamMemberReg } from "@/lib/teamRegistration";
+import { useStaffContacts } from "@/hooks/useStaffContacts";
+import StaffContactFields from "@/components/StaffContactFields";
 
 // The app styles every <label> as a small uppercase form caption; these are checkbox rows.
 const rowStyle = { display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "6px 0", margin: 0, textTransform: "none", letterSpacing: "normal", color: "var(--text)", cursor: "pointer" };
@@ -14,13 +16,16 @@ export default function TeamRegisterPanel({ event, team, rosters, regs, members,
   const [selected, setSelected] = useState([]);
   const candidates = registrableTeamMembers({ rosters, regs, members, eventId: event?.id, team });
   const mode = teamRegistrationMode(event);
+  const chosen = candidates.filter((m) => selected.includes(m.id));
+  const contact = useStaffContacts(event, chosen);
   if (!addReg || candidates.length === 0) return null;
 
   const toggle = (id) => setSelected((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
-  const chosen = candidates.filter((m) => selected.includes(m.id));
   const blockedText = mode.blocked === "locked" ? t.teamRegLocked : mode.blocked ? t.teamRegPaused : null;
 
   const register = () => {
+    if (!contact.valid) return;
+    contact.saveAll().then((failed) => { if (failed) notify?.(t.staffContactSaveFailed); });
     // addReg is called in one synchronous loop: its counter ref gives each person their own number.
     for (const m of chosen) addReg(teamMemberReg(m, team));
     logAudit?.("team_leader_registered", "roster", team, team, { memberIds: chosen.map((m) => m.id), duringPause: !!mode.paused });
@@ -52,7 +57,8 @@ export default function TeamRegisterPanel({ event, team, rosters, regs, members,
                   <span>{m.name} <span style={{ color: "var(--muted)", fontSize: 11 }}>({m.category})</span></span>
                 </label>
               ))}
-              <button className="btn btn-ok btn-sm" style={{ marginTop: 8 }} disabled={chosen.length === 0} onClick={register}>
+              {chosen.length > 0 && <div style={{ marginTop: 8 }}><StaffContactFields contact={contact} t={t} /></div>}
+              <button className="btn btn-ok btn-sm" style={{ marginTop: 8 }} disabled={chosen.length === 0 || !contact.valid} onClick={register}>
                 {fill(t.teamRegSubmit, { n: chosen.length })}
               </button>
             </>

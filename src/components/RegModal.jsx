@@ -8,6 +8,8 @@ import { restrictionLabel, restrictionApprovalType } from "@/lib/registrationAcc
 import FeeBox from "./FeeBox";
 import ChurchSearch from "./ChurchSearch";
 import SearchSelect from "./SearchSelect";
+import StaffContactFields from "./StaffContactFields";
+import { useStaffContacts, NEW_PERSON } from "@/hooks/useStaffContacts";
 
 // Accent-insensitive search: "joao" matches "João"
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -66,6 +68,16 @@ function RegModal({
     gaId: "",
     invitedByMemberId: "",
   });
+
+  // Events that require contact: the young people / adults being registered here give
+  // their phone and e-mail too, unless the directory already has them.
+  const contactPeople =
+    mode === "member" ? (sel?.id ? [sel] : [])
+    : mode === "family" ? famIds.map((mid) => members.find((x) => x.id === mid)).filter(Boolean)
+    : mode === "manual" && f.memberName ? [{ id: NEW_PERSON, name: f.memberName, category: f.category }]
+    : [];
+  const contact = useStaffContacts(event, contactPeople);
+  const saveContacts = (idMap) => contact.saveAll(idMap).then((failed) => { if (failed) console.error("staff registration: contact not saved"); });
 
   const avail = members.filter((m) => !existingRegs.find((r) => r.memberId === m.id));
   const results =
@@ -131,6 +143,7 @@ function RegModal({
       return;
     }
     if (setMembers) setMembers((prev) => [...prev, mapMember(data)]);
+    saveContacts({ [NEW_PERSON]: data.id });
     trySave({ memberId: data.id, ...f });
   };
 
@@ -482,10 +495,12 @@ function RegModal({
                     ⚠️ {t.exemptNote}
                   </div>
                 )}
+                <StaffContactFields contact={contact} t={t} showNames={false} />
                 <button
                   className="btn btn-primary"
-                  disabled={!sel?.church}
+                  disabled={!sel?.church || !contact.valid}
                   onClick={() => {
+                    saveContacts();
                     if (f.exempt && !isAutoExempt) {
                       onRequestOverride({
                         type: "exemption",
@@ -637,9 +652,12 @@ function RegModal({
                         </div>
                       </div>
                     </div>
+                    <StaffContactFields contact={contact} t={t} />
                     <button
                       className="btn btn-primary"
+                      disabled={!contact.valid}
                       onClick={() => {
+                        saveContacts();
                         const sharedFamilyId = selFam.id || ("FAM-" + Date.now());
                         famIds.forEach((mid) => {
                           const m = members.find((x) => x.id === mid);
@@ -897,10 +915,11 @@ function RegModal({
               </div>
             </div>
             <FeeBox fee={manFee} isExempt={["Pastor", "Ungido"].includes(f.role) || f.exempt} />
+            <StaffContactFields contact={contact} t={t} showNames={false} />
             {manualError && <p style={{ color: "#c0392b", fontSize: 12 }}>{manualError}</p>}
             <button
               className="btn btn-primary"
-              disabled={!f.memberName || !f.church || creatingMember}
+              disabled={!f.memberName || !f.church || creatingMember || !contact.valid}
               onClick={saveManual}
             >
               {creatingMember ? "…" : t.confirmReg}
