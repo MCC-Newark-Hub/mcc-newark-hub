@@ -46,3 +46,17 @@ export const contactStatusMap = (rows) =>
   Object.fromEntries((rows || []).map((r) => [r.member_id, { hasPhone: !!r.has_phone, hasEmail: !!r.has_email }]));
 
 export const hasFullContact = (status) => !!(status?.hasPhone && status?.hasEmail);
+
+// Staff registration (desk, team leaders) for an event that requires contact: which of
+// these people still need a phone or e-mail typed in, and whether what was typed is enough.
+// `status` is contactStatusMap's output, `values` is { [personId]: { phone, email } }.
+export function staffContactCheck({ event, people, status = {}, values = {} }) {
+  if (!eventRequiresContact(event)) return { needed: [], errors: {}, valid: true };
+  const needed = (people || []).filter((p) => p && needsOwnContact(p) && !hasFullContact(status[p.id]));
+  const errors = {};
+  for (const p of needed) {
+    const e = contactErrors(values[p.id] || {}, { required: true, onFile: status[p.id] || {} });
+    if (Object.keys(e).length) errors[p.id] = e;
+  }
+  return { needed, errors, valid: Object.keys(errors).length === 0 };
+}
