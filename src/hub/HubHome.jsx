@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Calendar, BookOpen, Settings, Clock, GraduationCap, Music, HeartHandshake } from "lucide-react";
-import { GL_TEAM } from "@/lib/praiseLists";
+import { canSeeSection } from "@/lib/sectionAccess";
 
 const SECTIONS = [
   {
@@ -10,7 +10,6 @@ const SECTIONS = [
     color: "#8B0000",
     pt: { label: "Eventos", desc: "Inscrições, equipes, check-in e relatórios" },
     en: { label: "Events", desc: "Registrations, teams, check-in and reports" },
-    roles: ["admin", "clerk", "pastor", "ga_leader", "team_leader", "treasurer"],
     live: true,
   },
   {
@@ -20,7 +19,6 @@ const SECTIONS = [
     color: "#03223f",
     pt: { label: "Diretório", desc: "Membros, famílias, grupos e funções" },
     en: { label: "Directory", desc: "Members, families, groups and roles" },
-    roles: ["admin", "clerk", "pastor", "ga_leader"],
     live: true,
   },
   {
@@ -30,7 +28,6 @@ const SECTIONS = [
     color: "#b45309",
     pt: { label: "Assistência", desc: "Frequência dos cultos e acompanhamento" },
     en: { label: "Care", desc: "Service attendance and pastoral follow-up" },
-    roles: ["admin", "clerk", "pastor"],
     live: true,
   },
   {
@@ -40,7 +37,6 @@ const SECTIONS = [
     color: "#065f46",
     pt: { label: "Escalas", desc: "Portaria, flores e agenda de oração 24h" },
     en: { label: "Schedules", desc: "Door duty, flowers and 24h prayer agenda" },
-    roles: ["admin", "clerk", "pastor", "ga_leader", "treasurer"],
     live: true,
   },
   {
@@ -50,9 +46,6 @@ const SECTIONS = [
     color: "#7c3aed",
     pt: { label: "Culto Profético", desc: "Lista de louvores, catálogo e histórico" },
     en: { label: "Prophetic Service", desc: "Praise song lists, catalogue and history" },
-    roles: ["admin", "clerk", "pastor", "ga_leader", "treasurer"],
-    // team leaders only reach it when they lead the Grupo de Louvor (they manage the praise lists)
-    alsoIf: (user) => (user?.teamLeads || []).includes(GL_TEAM),
     live: true,
   },
   {
@@ -62,7 +55,6 @@ const SECTIONS = [
     color: "#6d28d9",
     pt: { label: "Aprendiz", desc: "Projeto Aprendiz — em breve" },
     en: { label: "Apprentice", desc: "Apprentice Project — coming soon" },
-    roles: ["admin", "clerk", "pastor"],
     live: false,
   },
   {
@@ -72,7 +64,6 @@ const SECTIONS = [
     color: "#4b5563",
     pt: { label: "Configurações", desc: "Usuários, PINs e auditoria" },
     en: { label: "Settings", desc: "Users, PINs and audit log" },
-    roles: ["admin"],
     live: true,
   },
 ];
@@ -80,11 +71,8 @@ const SECTIONS = [
 export default function HubHome({ user, lang }) {
   const navigate = useNavigate();
   const pt = lang !== "en";
-  const userRoles = user?.sysRoles || (user?.sysRole ? [user.sysRole] : []);
-
-  const visible = SECTIONS.filter((s) =>
-    s.roles.some((r) => userRoles.includes(r)) || (s.alsoIf && userRoles.includes("team_leader") && s.alsoIf(user))
-  );
+  // Who sees which tile lives in sectionAccess (the routes check the same list).
+  const visible = SECTIONS.filter((s) => canSeeSection(user, s.id));
 
   return (
     <div style={{ minHeight: "calc(100vh - 56px)", background: "var(--bg)", padding: "40px 20px" }}>

@@ -56,6 +56,8 @@ Uses React Router v6. `<BrowserRouter>` in `src/main.jsx`; full route tree in `s
 | `/apprentice` | ApprenticeSection — Projeto Aprendiz (TBD) |
 | `/settings` | SettingsSection — users, PINs, audit (Phase 5+) |
 
+Who may open each section (Home tiles and the `SectionGate` around every route) is one list: `SECTION_ROLES` / `canSeeSection` in `src/lib/sectionAccess.js`. Change it there, never per tile.
+
 **Staff view mapping** (inside EventsSection, by `sysRole`):
 
 | sysRole | View |

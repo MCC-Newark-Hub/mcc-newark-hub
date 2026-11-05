@@ -31,6 +31,25 @@ export function scopeFor(user, gas = []) {
   return { all: false, cities: own ? [own] : [] };
 }
 
+// The slice of the directory a secretary (their church) or a GA leader (their groups) may see and edit.
+export function scopedDirectory({ user, members = [], families = [], gas = [] }, kind) {
+  let list, myGas;
+  if (kind === "ga_leader") {
+    const gaIds = user?.gaIds || [];
+    list = members.filter((m) => gaIds.includes(m.gaId));
+    myGas = gas.filter((g) => gaIds.includes(g.id));
+  } else {
+    const cities = scopeFor(user, gas).cities.map((c) => c.toLowerCase());
+    const inScope = (church) => cities.includes(cityOf(church).toLowerCase());
+    list = members.filter((m) => inScope(m.church));
+    myGas = gas.filter((g) => inScope(g.church));
+  }
+  const ids = new Set(list.map((m) => m.id));
+  const myFamilies = families.filter((f) => (f.memberIds || []).some((id) => ids.has(id)) || list.some((m) => m.familyId === f.id));
+  const church = user?.church || myGas[0]?.church || "";
+  return { list, families: myFamilies, gas: myGas, church };
+}
+
 // Directory churches (display names) the scope allows.
 export function churchesInScope(churches, scope) {
   const names = (churches || []).map((c) => c.display || c).filter((d) => d && !isUnsetChurch(d));
