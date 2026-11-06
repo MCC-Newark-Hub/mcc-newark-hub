@@ -9,6 +9,9 @@ vi.mock("@/lib/praiseData", () => ({
   createList: vi.fn(), updateList: vi.fn(), deleteList: vi.fn(), addListItem: vi.fn(), removeListItem: vi.fn(), saveItemPositions: vi.fn(),
   createSong: vi.fn(), updateSong: vi.fn(), deleteSong: vi.fn(), mergeSongs: vi.fn(), mergeLists: vi.fn(),
 }));
+vi.mock("@/lib/serviceGroupsData", () => ({
+  fetchServiceGroups: () => Promise.resolve({ data: { groups: [], workers: [], schedule: [] }, error: null }),
+}));
 const audit = vi.fn();
 vi.mock("@/lib/auditEvent", async (orig) => ({ ...(await orig()), logAuditEvent: (e) => audit(e) }));
 const notify = vi.fn();

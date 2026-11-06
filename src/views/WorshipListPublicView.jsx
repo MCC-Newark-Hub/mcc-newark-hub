@@ -11,6 +11,8 @@ import { STRINGS, fill } from "@/i18n/strings";
 import {
   fetchSongs, fetchSuggestDays, fetchListsByDate, fetchListFor, fetchRecentLists, createList, updateList, addListItem, removeListItem, saveItemPositions,
 } from "@/lib/praiseData";
+import { fetchServiceGroups } from "@/lib/serviceGroupsData";
+import { groupForService, sameGroupName } from "@/lib/serviceGroups";
 import { serviceTypesFor, dateKey, isListLocked, isFinalizeEnabled, moveItem, renumber, songLabel, listPath } from "@/lib/praiseLists";
 
 const NAME_KEY = "mcc_worship_name";
@@ -135,6 +137,38 @@ export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreat
     });
     return () => { cancelled = true; };
   }, [date, type, church]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Responsible group from Culto Profético › Grupos: fills "Grupo responsável" on a list not saved yet and shows
+  // the group's leader and workers. Missing tables or a failed load leave the form exactly as it was.
+  const [groupLoad, setGroupLoad] = useState({ church: null, data: null });
+  useEffect(() => {
+    if (!church) return undefined;
+    let cancelled = false;
+    Promise.resolve()
+      .then(() => fetchServiceGroups(church))
+      .then(({ data, error }) => { if (!cancelled) setGroupLoad({ church, data: error ? null : data }); })
+      .catch(() => { if (!cancelled) setGroupLoad({ church, data: null }); });
+    return () => { cancelled = true; };
+  }, [church]);
+  const groupData = groupLoad.church === church ? groupLoad.data : null;
+  const scheduled = useMemo(() => groupForService(groupData, church, date, type), [groupData, church, date, type]);
+
+  // The name this form filled in by itself: replaced when the slot (or its group) changes, never what the person
+  // typed. Adjusted during render rather than in an effect, so the field never flashes the old group.
+  const fillKey = loading || list ? null : `${key}|${scheduled?.group.id || ""}`;
+  const [filledKey, setFilledKey] = useState(null);
+  const [autoGroup, setAutoGroup] = useState("");
+  if (fillKey && fillKey !== filledKey) {
+    setFilledKey(fillKey);
+    const current = header.group_name.trim();
+    if (!current || current === autoGroup) {
+      const next = scheduled?.group.name || "";
+      setAutoGroup(next);
+      if (next !== current) setHeader((h) => ({ ...h, group_name: next }));
+    }
+  }
+
+  const showGroupPeople = !!scheduled && sameGroupName(header.group_name, scheduled.group.name);
 
   const fail = (text = tt.praiseSaveFailed) => setNotice({ kind: "error", text });
   const rememberName = (v) => { setEnteredBy(v); if (!admin) writeJSON(NAME_KEY, v); };
@@ -291,8 +325,21 @@ export function ServiceListForm({ tt, lang, today, songs, songsById, onSongCreat
             <ChurchSelect value={header.church} onChange={(v) => { setHeader((h) => ({ ...h, church: v })); if (!admin) writeJSON(CHURCH_KEY, v); }} disabled={!canEdit} tt={tt} />
           </div>
           <div>
-            <label style={labelStyle} htmlFor="worship-group">{tt.praiseGroup}</label>
-            <input id="worship-group" value={header.group_name} onChange={setField("group_name")} style={inputStyle} disabled={!canEdit} maxLength={120} />
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ flex: "2 1 220px" }}>
+                <label style={labelStyle} htmlFor="worship-group">{tt.praiseGroup}</label>
+                <input id="worship-group" value={header.group_name} onChange={setField("group_name")} style={inputStyle} disabled={!canEdit} maxLength={120} />
+              </div>
+              {showGroupPeople && scheduled.leaderName && (
+                <div style={{ flex: "1 1 160px" }}>
+                  <label style={labelStyle} htmlFor="worship-group-leader">{tt.praiseGroupLeader}</label>
+                  <input id="worship-group-leader" value={scheduled.leaderName} readOnly tabIndex={-1} style={{ ...inputStyle, background: "var(--bg)" }} />
+                </div>
+              )}
+            </div>
+            {showGroupPeople && scheduled.workerNames.length > 0 && (
+              <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>{`${tt.praiseGroupWorkers}: ${scheduled.workerNames.join(", ")}`}</p>
+            )}
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <div style={{ flex: "1 1 200px" }}>

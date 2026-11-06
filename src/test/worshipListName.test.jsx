@@ -10,6 +10,9 @@ vi.mock("@/lib/praiseData", () => ({
   fetchListsByDate: vi.fn(), fetchRecentLists: vi.fn(), createList: vi.fn(), updateList: vi.fn(),
   addListItem: vi.fn(), removeListItem: vi.fn(), saveItemPositions: vi.fn(), createSong: vi.fn(),
 }));
+vi.mock("@/lib/serviceGroupsData", () => ({
+  fetchServiceGroups: () => Promise.resolve({ data: { groups: [], workers: [], schedule: [] }, error: null }),
+}));
 const audit = vi.fn();
 vi.mock("@/lib/auditEvent", async (orig) => ({ ...(await orig()), logAuditEvent: (e) => audit(e) }));
 
