@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { afterEach } from "vitest";
 import { AppDataContext } from "@/context/AppDataContext";
 
 const fetchA = vi.fn();
@@ -9,8 +10,7 @@ vi.mock("@/lib/gaAttendanceData", () => ({
   fetchAttendance: (...a) => fetchA(...a), saveAttendance: (...a) => saveA(...a),
   listAttendance: (...a) => listA(...a), deleteAttendance: vi.fn(),
 }));
-vi.mock("@/lib/auditEvent", () => ({ logAuditEvent: vi.fn(), staffActor: (u) => ({ name: u?.name, id: u?.id, role: "ga_leader" }) }));
-vi.mock("@/lib/prayerSlots", async (orig) => ({ ...(await orig()), todayLocal: () => "2026-11-01" })); // a Sunday
+vi.mock("@/lib/auditEvent", async (orig) => ({ ...(await orig()), logAuditEvent: vi.fn() }));
 
 import GaAttendanceTab from "@/sections/assistance/GaAttendanceTab";
 
@@ -25,11 +25,15 @@ const renderTab = (user) => render(
 const leader = { id: 5, name: "Leonard", sysRoles: ["ga_leader"], gaIds: ["g1"] };
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2026, 10, 1, 10, 0)); // a Sunday morning
   fetchA.mockReset().mockResolvedValue({ data: null, error: null });
   saveA.mockReset();
   listA.mockReset().mockResolvedValue({ data: [], error: null });
   notify.mockReset();
 });
+
+afterEach(() => vi.useRealTimers());
 
 describe("GaAttendanceTab — Chamada", () => {
   it("a leader with no groups gets a friendly message and no query", () => {
@@ -119,5 +123,59 @@ describe("GaAttendanceTab — Acompanhamento", () => {
     renderTab(leader);
     fireEvent.click(screen.getByText("Acompanhamento"));
     expect(await screen.findByText("Ainda não há chamadas deste grupo. Faça a primeira na aba Chamada.")).toBeTruthy();
+  });
+});
+
+describe("GaAttendanceTab — review fixes", () => {
+  const confirm = vi.fn();
+  beforeEach(() => { confirm.mockReset(); window.confirm = confirm; });
+
+  it("a visitor typed but not added is saved too", async () => {
+    saveA.mockResolvedValue({ data: { id: "r1", roster_ids: ["a", "b"], present_ids: [], visitors: ["Maria"], entered_by_name: "Leonard", updated_at: "2026-11-01T15:00:00Z" }, error: null });
+    renderTab(leader);
+    await screen.findByLabelText("Ana");
+    fireEvent.change(screen.getByPlaceholderText("Nome do visitante"), { target: { value: "Maria" } });
+    fireEvent.click(screen.getByText("Salvar chamada"));
+    await waitFor(() => expect(saveA).toHaveBeenCalled());
+    expect(saveA.mock.calls[0][0].visitors).toEqual(["Maria"]);
+  });
+
+  it("under Ver como, the admin's id is recorded with the admin's name", async () => {
+    saveA.mockResolvedValue({ data: { id: "r1", roster_ids: [], present_ids: [], visitors: [], entered_by_name: "x", updated_at: "2026-11-01T15:00:00Z" }, error: null });
+    renderTab({ ...leader, viewedBy: { id: 1, name: "Admin Geral" } });
+    fireEvent.click(await screen.findByLabelText("Ana"));
+    fireEvent.click(screen.getByText("Salvar chamada"));
+    await waitFor(() => expect(saveA).toHaveBeenCalled());
+    expect(saveA.mock.calls[0][0]).toMatchObject({ entered_by_user_id: 1, entered_by_name: "Admin Geral (como Leonard)" });
+  });
+
+  it("if another leader saved meanwhile, nothing is overwritten: their marks are merged in and the leader is told", async () => {
+    fetchA.mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({ data: { id: "r9", roster_ids: ["a", "b"], present_ids: ["b"], visitors: ["José"], notes: "", entered_by_name: "Outro", updated_at: "2026-11-01T15:05:00Z" }, error: null });
+    saveA.mockResolvedValue({ data: null, error: "changed" });
+    renderTab(leader);
+    fireEvent.click(await screen.findByLabelText("Ana"));
+    fireEvent.click(screen.getByText("Salvar chamada"));
+    await waitFor(() => expect(notify).toHaveBeenCalledWith("Outro responsável salvou esta chamada agora. Juntamos as marcações dele com as suas — confira e salve de novo."));
+    expect(screen.getByLabelText("Ana").checked).toBe(true);
+    expect(screen.getByLabelText("Bruno").checked).toBe(true);
+    expect(screen.getByText("José")).toBeTruthy();
+    expect(screen.getByText(/Lançada por Outro/)).toBeTruthy();
+  });
+
+  it("switching the service with unsaved marks asks first, and cancel keeps them", async () => {
+    renderTab(leader);
+    fireEvent.click(await screen.findByLabelText("Ana"));
+    confirm.mockReturnValue(false);
+    fireEvent.click(screen.getByText("Acompanhamento"));
+    expect(confirm).toHaveBeenCalled();
+    expect(screen.getByLabelText("Ana").checked).toBe(true);
+  });
+
+  it("with nothing changed it switches without asking", async () => {
+    renderTab(leader);
+    await screen.findByLabelText("Ana");
+    fireEvent.click(screen.getByText("Acompanhamento"));
+    expect(confirm).not.toHaveBeenCalled();
   });
 });

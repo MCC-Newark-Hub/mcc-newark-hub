@@ -3,6 +3,7 @@
 // gaAttendanceData.js).
 import { serviceTypesFor } from "@/lib/praiseLists";
 import { rolesOf } from "@/lib/sectionAccess";
+import { serviceDateOptions } from "@/lib/census";
 
 export const ATTENDANCE_DAYS_BACK = 14;
 export const RECENT_COUNT = 8;
@@ -36,6 +37,26 @@ export function attendanceDateAllowed(date, today, { isAdmin = false } = {}) {
 
 // Same services as the Frequência: Sunday has EBD and Noite, every other day only Noite.
 export const attendanceTypesFor = (date) => serviceTypesFor(date);
+
+// From 2pm on a Sunday the EBD is over, so the attendance opens on the Noite.
+export const NOITE_FROM_HOUR = 14;
+
+// What the tab opens on: the service day as in the Frequência (until 4am, last night's) and, on a Sunday, the EBD in
+// the morning and the Noite from the afternoon on.
+export function defaultAttendance(now = new Date()) {
+  const { initial: date } = serviceDateOptions(now);
+  const types = attendanceTypesFor(date);
+  const sameDayMorning = date === localDate(now) && now.getHours() < NOITE_FROM_HOUR;
+  return { date, type: types.length > 1 && sameDayMorning ? types[0] : "noite" };
+}
+
+const localDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+// The calendar day of a timestamp where the leader is (a Sunday-night save is still Sunday, not Monday in UTC).
+export function localDay(ts) {
+  const d = new Date(ts || "");
+  return Number.isNaN(d.getTime()) ? "" : localDate(d);
+}
 
 export const isAttendanceAdmin = (user) => rolesOf(user).includes("admin");
 

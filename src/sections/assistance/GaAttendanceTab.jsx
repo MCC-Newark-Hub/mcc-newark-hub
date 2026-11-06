@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { STRINGS } from "@/i18n/strings";
 import { useAppDataContext } from "@/context/AppDataContext";
 import { todayLocal } from "@/lib/prayerSlots";
 import { groupGasByChurch } from "@/lib/gaGroups";
-import { gasInScope, rosterFor, attendanceTypesFor, attendanceDateAllowed, isAttendanceAdmin, addDays, ATTENDANCE_DAYS_BACK } from "@/lib/gaAttendance";
+import { gasInScope, rosterFor, attendanceTypesFor, attendanceDateAllowed, isAttendanceAdmin, addDays, ATTENDANCE_DAYS_BACK, defaultAttendance } from "@/lib/gaAttendance";
 import GaAttendanceForm from "./GaAttendanceForm";
 import GaFollowUp from "./GaFollowUp";
 
@@ -16,10 +16,18 @@ export default function GaAttendanceTab({ lang }) {
   const today = todayLocal();
   const groups = useMemo(() => gasInScope(user, gas), [user, gas]);
 
+  const [start] = useState(() => defaultAttendance(new Date()));
   const [gaId, setGaId] = useState("");
   const [view, setView] = useState("take");
-  const [date, setDate] = useState(today);
-  const [type, setType] = useState("");
+  const [date, setDate] = useState(start.date);
+  const [type, setType] = useState(start.type);
+  // Unsaved marks: any switch (group, view, date, service) remounts the form, so ask first.
+  const dirty = useRef(false);
+  const leaving = (fn) => (...args) => {
+    if (dirty.current && !window.confirm(tt.gaDiscard)) return;
+    dirty.current = false;
+    fn(...args);
+  };
 
   const ga = groups.find((g) => g.id === gaId) || groups[0];
   const roster = useMemo(() => (ga ? rosterFor(ga.id, members) : []), [ga, members]);
@@ -40,7 +48,7 @@ export default function GaAttendanceTab({ lang }) {
     <div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 16 }}>
         {groups.length > 1 && (
-          <select aria-label={tt.gaGroup} value={ga.id} onChange={(e) => setGaId(e.target.value)} style={sel}>
+          <select aria-label={tt.gaGroup} value={ga.id} onChange={leaving((e) => setGaId(e.target.value))} style={sel}>
             {isAdmin
               ? groupGasByChurch(groups, members).map((c) => (
                 <optgroup key={c.church || "—"} label={c.church || "—"}>
@@ -51,8 +59,8 @@ export default function GaAttendanceTab({ lang }) {
           </select>
         )}
         <div role="tablist" style={{ display: "flex", gap: 6 }}>
-          <button role="tab" aria-selected={view === "take"} style={seg(view === "take")} onClick={() => setView("take")}>{tt.gaViewTake}</button>
-          <button role="tab" aria-selected={view === "follow"} style={seg(view === "follow")} onClick={() => setView("follow")}>{tt.gaViewFollow}</button>
+          <button role="tab" aria-selected={view === "take"} style={seg(view === "take")} onClick={leaving(() => setView("take"))}>{tt.gaViewTake}</button>
+          <button role="tab" aria-selected={view === "follow"} style={seg(view === "follow")} onClick={leaving(() => setView("follow"))}>{tt.gaViewFollow}</button>
         </div>
       </div>
 
@@ -63,15 +71,15 @@ export default function GaAttendanceTab({ lang }) {
               {tt.censusDate}
               <input type="date" aria-label={tt.censusDate} value={date} max={today}
                 min={isAdmin ? undefined : addDays(today, -ATTENDANCE_DAYS_BACK)}
-                onChange={(e) => setDate(e.target.value)} style={sel} />
+                onChange={leaving((e) => setDate(e.target.value))} style={sel} />
             </label>
             {types.map((t) => (
-              <button key={t} style={seg(t === activeType)} aria-pressed={t === activeType} onClick={() => setType(t)}>{typeLabel[t] || t}</button>
+              <button key={t} style={seg(t === activeType)} aria-pressed={t === activeType} onClick={leaving(() => setType(t))}>{typeLabel[t] || t}</button>
             ))}
           </div>
           {!dateOk && <p role="alert" style={{ color: "var(--muted)", fontSize: 13 }}>{tt.gaDateWindow}</p>}
           <GaAttendanceForm key={`${ga.id}|${date}|${activeType}`} ga={ga} date={date} type={activeType} roster={roster}
-            canSave={dateOk} lang={lang} />
+            canSave={dateOk} lang={lang} onDirty={(v) => { dirty.current = v; }} />
         </>
       )}
       {view === "follow" && <GaFollowUp key={ga.id} ga={ga} roster={roster} lang={lang} />}

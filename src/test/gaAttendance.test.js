@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { STRINGS } from "@/i18n/strings";
 import {
   addDays, attendanceDateAllowed, attendanceTypesFor, gasInScope, rosterFor, shownRoster,
-  cleanVisitors, cleanPresent, followUp, sinceLabel, isAttendanceAdmin,
+  cleanVisitors, cleanPresent, followUp, sinceLabel, isAttendanceAdmin, defaultAttendance, localDay,
 } from "@/lib/gaAttendance";
 
 const tt = STRINGS.pt;
@@ -111,5 +111,20 @@ describe("sinceLabel", () => {
     expect(sinceLabel(21, tt)).toBe("há 3 semanas");
     expect(sinceLabel(70, tt)).toBe("há 2 meses");
     expect(sinceLabel(21, STRINGS.en)).toBe("3 weeks ago");
+  });
+});
+
+describe("review fixes: defaults and local day", () => {
+  it("Sunday morning opens the EBD; Sunday afternoon and night the Noite; weekdays the Noite", () => {
+    expect(defaultAttendance(new Date(2026, 10, 1, 10, 0))).toEqual({ date: "2026-11-01", type: "ebd" });
+    expect(defaultAttendance(new Date(2026, 10, 1, 19, 30))).toEqual({ date: "2026-11-01", type: "noite" });
+    expect(defaultAttendance(new Date(2026, 10, 4, 10, 0))).toEqual({ date: "2026-11-04", type: "noite" });
+  });
+  it("after midnight (before 4am) it is still last night's service", () => {
+    expect(defaultAttendance(new Date(2026, 10, 2, 1, 15))).toEqual({ date: "2026-11-01", type: "noite" });
+  });
+  it("a timestamp shows the local day, not the UTC one", () => {
+    expect(localDay(new Date(2026, 10, 1, 23, 30).toISOString())).toBe("2026-11-01");
+    expect(localDay("")).toBe("");
   });
 });

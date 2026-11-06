@@ -23,8 +23,10 @@ const one = ({ data, error }) => {
   return row ? { data: row, error: null } : { data: null, error: "not_found" };
 };
 
-// One row per GA + service: saving a service already marked (by another leader of the group, too) updates it.
-export async function saveAttendance(row) {
+// One row per GA + service. A new one is inserted; one loaded from the database is updated only if nobody saved it
+// since (updated_at unchanged). Either way, someone else's save in between comes back as error "changed", so it is
+// never silently overwritten.
+export async function saveAttendance(row, { loadedAt } = {}) {
   const roster = [...new Set(row.roster_ids || [])];
   const fields = {
     ga_id: row.ga_id, church: row.church, service_date: row.service_date, service_type: row.service_type,
@@ -33,7 +35,15 @@ export async function saveAttendance(row) {
     entered_by_user_id: row.entered_by_user_id != null ? String(row.entered_by_user_id) : null,
     entered_by_name: String(row.entered_by_name || "").slice(0, 120), updated_at: new Date().toISOString(),
   };
-  return one(await sb.from("ga_attendance").upsert(fields, { onConflict: "ga_id,service_date,service_type" }).select(COLS));
+  if (row.id) {
+    let query = sb.from("ga_attendance").update(fields).eq("id", row.id);
+    if (loadedAt) query = query.eq("updated_at", loadedAt);
+    const res = one(await query.select(COLS));
+    return res.error === "not_found" ? { data: null, error: "changed" } : res;
+  }
+  const res = await sb.from("ga_attendance").insert(fields).select(COLS);
+  if (res.error?.code === "23505") return { data: null, error: "changed" };
+  return one(res);
 }
 
 export async function deleteAttendance(id) {
