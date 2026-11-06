@@ -107,7 +107,8 @@ Mobile-first; reads members, GAs and the user from `useAppDataContext()`. Two vi
 - On GA / date / type change, loads that attendance. Existing → pre-filled, with "Lançada por {name} em {date}".
 - Member list: large checkbox rows (member name), "Marcar todos" /
   "Desmarcar todos". Members recorded on a past roster but no longer in the GA are not shown on new attendances.
-  Opening an old attendance shows its own roster (names from the directory; unknown ids as "Membro removido").
+  Opening an existing attendance shows its own saved roster (people who left the GA since stay on it; names from the
+  directory, unknown ids as "Membro removido") plus whoever is in the GA now, unmarked; saving stores that union.
 - Visitors: text input + "Adicionar", list with remove buttons.
 - Notes (optional) and **Salvar**: awaits the write (the leader needs to know it saved), toasts success or the error
   and keeps what was marked on failure. Admin also gets **Excluir** on an existing attendance (with confirm).
