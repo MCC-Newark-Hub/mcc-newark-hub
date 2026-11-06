@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { regAcessibilidade } from "@/lib/acessibilidade";
 import { CHURCH_LIST, addDays } from "@/constants";
 import { sb } from "@/lib/supabase";
@@ -7,6 +7,7 @@ import { pickCurrentEvent } from "@/lib/eventId";
 import { buildRegNumber, noteRegNumber, parseRegNumber, regCounters } from "@/lib/regNumber";
 import { regFeeFlags } from "@/lib/regFee";
 import { waitlistToPromote, PAUSE_FULL, PAUSE_WAITLIST } from "@/lib/pause";
+import { mergeFreshRegs } from "@/lib/regRefresh";
 
 // ── DB → app object mappers ───────────────────────────────────────────────────
 export function mapMember(m) {
@@ -247,8 +248,42 @@ export function useAppData({ getUserRef, notify }) {
     };
   }, []);
 
+  // ── Catch-up reload of registrations and approvals ─────────────────────────
+  // Realtime only delivers changes while the connection is up. A phone that locks or
+  // switches apps drops it, and whatever happened meanwhile never arrives: a team leader
+  // then sees someone as "not registered" who registered an hour ago. So reload both
+  // tables when the page comes back to the screen and when the channel reconnects.
+  const lastRefreshRef = useRef(0);
+  // Uses only setters and refs, so it never changes (safe in effects and as a prop).
+  const refreshRegs = useCallback(async function (force) {
+    if (!force && Date.now() - lastRefreshRef.current < 5000) return;
+    lastRefreshRef.current = Date.now();
+    const [regRes, aprRes] = await Promise.all([
+      sb.from("registrations").select("*").order("created_at"),
+      sb.from("approvals").select("*").order("created_at"),
+    ]);
+    if (!regRes.error && regRes.data) {
+      const fresh = regRes.data.map(mapReg);
+      fresh.forEach(function (r) { noteRegNumber(counterRef.current, r); });
+      setRegs(function (p) { return mergeFreshRegs(p, fresh); });
+    } else if (regRes.error) console.error("registrations refresh failed:", regRes.error);
+    if (!aprRes.error && aprRes.data) setApprovals(aprRes.data.map(mapApproval));
+  }, []);
+
+  useEffect(function () {
+    const onVisible = function () { if (document.visibilityState === "visible") refreshRegs(); };
+    const onOnline = function () { refreshRegs(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onOnline);
+    return function () {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onOnline);
+    };
+  }, [refreshRegs]);
+
   // ── Real-time subscriptions ───────────────────────────────────────────────
   useEffect(function () {
+    var subscribedOnce = false;
     const channel = sb
       .channel("db-changes")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "registrations" }, function (payload) {
@@ -285,10 +320,15 @@ export function useAppData({ getUserRef, notify }) {
         setEvents(function (p) { return p.map(function (e) { return e.id === updated.id ? { ...e, capacity: updated.capacity } : e; }); });
         setEventState(function (cur) { return cur && cur.id === updated.id ? { ...cur, capacity: updated.capacity } : cur; });
       })
-      .subscribe();
+      .subscribe(function (status) {
+        // The first SUBSCRIBED follows the initial load; later ones are reconnects.
+        if (status !== "SUBSCRIBED") return;
+        if (subscribedOnce) refreshRegs(true);
+        subscribedOnce = true;
+      });
 
     return function () { sb.removeChannel(channel); };
-  }, []);
+  }, [refreshRegs]);
 
   // ── Derived state ─────────────────────────────────────────────────────────
   const activeRegs = useMemo(
@@ -1073,6 +1113,7 @@ export function useAppData({ getUserRef, notify }) {
     setEvent,
     regs,
     setRegs,
+    refreshRegs,
     members,
     setMembers,
     families,
