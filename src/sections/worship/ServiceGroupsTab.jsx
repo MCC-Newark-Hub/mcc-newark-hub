@@ -66,13 +66,20 @@ export default function ServiceGroupsTab({ lang }) {
     setSaving(true);
     const { data: res, error } = await saveServiceGroup(f, f.workers);
     setSaving(false);
-    if (error) { say(tt.sgSaveFailed); return; }
-    setData((d) => ({
-      ...d,
-      groups: [...d.groups.filter((g) => g.id !== res.group.id), res.group].sort((a, b) => a.name.localeCompare(b.name, "pt")),
-      workers: [...d.workers.filter((w) => w.group_id !== res.group.id), ...res.workers],
-    }));
-    logAuditEvent({ actor, action: f.id ? "service_group_updated" : "service_group_created", entityType: "service_group", entityId: res.group.id, entityLabel: res.group.name, details: { church, leader: res.group.leader_name, workers: res.workers.map((w) => w.name), active: res.group.is_active } });
+    if (res?.group) {
+      setData((d) => ({
+        ...d,
+        groups: [...d.groups.filter((g) => g.id !== res.group.id), res.group].sort((a, b) => a.name.localeCompare(b.name, "pt")),
+        workers: [...d.workers.filter((w) => w.group_id !== res.group.id), ...res.workers],
+      }));
+    }
+    if (error) {
+      say(error.code === "duplicate_name" ? tt.sgNameTaken : tt.sgSaveFailed);
+      // the group itself was saved: keep the form open on it, so trying again updates it instead of adding a copy
+      if (res?.group && !f.id) setForm({ ...f, id: res.group.id });
+      return;
+    }
+    logAuditEvent({ actor, action: f.id ? "service_group_updated" : "service_group_created", entityType: "service_group", entityId: res.group.id, entityLabel: res.group.name, details: { church: res.group.church, leader: res.group.leader_name, workers: res.workers.map((w) => w.name), active: res.group.is_active } });
     setForm(null);
   };
 
@@ -91,7 +98,7 @@ export default function ServiceGroupsTab({ lang }) {
     <div style={{ display: "grid", gap: 20 }}>
       <div style={{ maxWidth: 320 }}>
         <label style={labelStyle} htmlFor="sg-church">{tt.sgChurch}</label>
-        <select id="sg-church" value={church} onChange={(e) => setChurch(e.target.value)} disabled={lockedToOwn && editable.length === 1} style={inputStyle}>
+        <select id="sg-church" value={church} onChange={(e) => { setForm(null); setChurch(e.target.value); }} disabled={lockedToOwn && editable.length === 1} style={inputStyle}>
           {!church && <option value="">{tt.sgPickChurch}</option>}
           {(lockedToOwn ? editable : allChurches).map((c) => <option key={c} value={c}>{c}</option>)}
         </select>

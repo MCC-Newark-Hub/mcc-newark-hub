@@ -15,7 +15,9 @@ export async function fetchServiceGroups(church) {
   return { data: { groups: g.data || [], workers: (w.data || []).filter((x) => ids.has(x.group_id)), schedule: s.data || [] }, error: null };
 }
 
-// Creates or updates a group, then replaces its workers (in the order given).
+// Creates or updates a group, then replaces its workers (in the order given). When only the workers fail, the saved
+// group still comes back (so a retry updates it instead of inserting a copy) and, on an edit, the old workers are put
+// back. A name already used in the church comes back as { code: "duplicate_name" }.
 export async function saveServiceGroup(group, workers) {
   const row = {
     church: group.church,
@@ -27,17 +29,26 @@ export async function saveServiceGroup(group, workers) {
   const res = group.id
     ? await sb.from("service_groups").update(row).eq("id", group.id).select().single()
     : await sb.from("service_groups").insert(row).select().single();
+  if (res.error?.code === "23505") return { data: null, error: { code: "duplicate_name", message: res.error.message } };
   if (res.error || !res.data) return { data: null, error: res.error || { message: "group not saved" } };
   const saved = res.data;
+  let old = [];
   if (group.id) {
+    const prev = await sb.from("service_group_workers").select("*").eq("group_id", saved.id);
+    if (prev.error) return { data: { group: saved, workers: [] }, error: prev.error };
+    old = prev.data || [];
     const del = await sb.from("service_group_workers").delete().eq("group_id", saved.id);
-    if (del.error) return { data: null, error: del.error };
+    if (del.error) return { data: { group: saved, workers: old }, error: del.error };
   }
   const rows = (workers || []).map((w, i) => ({ group_id: saved.id, member_id: w.member_id || null, name: String(w.name).trim(), position: i }));
   if (!rows.length) return { data: { group: saved, workers: [] }, error: null };
   const ins = await sb.from("service_group_workers").insert(rows).select();
-  if (ins.error) return { data: null, error: ins.error };
-  return { data: { group: saved, workers: ins.data || rows }, error: null };
+  if (!ins.error) return { data: { group: saved, workers: ins.data || rows }, error: null };
+  if (old.length) {
+    const back = await sb.from("service_group_workers").insert(old);
+    if (back.error) { console.error("service group workers restore error:", back.error); old = []; }
+  }
+  return { data: { group: saved, workers: old }, error: ins.error };
 }
 
 export async function deleteServiceGroup(id) {

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { STRINGS } from "@/i18n/strings";
-import { fetchServiceGroups, setScheduleSlot } from "@/lib/serviceGroupsData";
+import { fetchServiceGroups, setScheduleSlot, saveServiceGroup } from "@/lib/serviceGroupsData";
 
 vi.mock("@/lib/serviceGroupsData", () => ({
   fetchServiceGroups: vi.fn(), saveServiceGroup: vi.fn(), deleteServiceGroup: vi.fn(), setScheduleSlot: vi.fn(),
@@ -77,5 +77,41 @@ describe("ServiceGroupsTab", () => {
     ctx = { user: { sysRoles: ["admin"] }, notify: vi.fn(), members: [], churches: CHURCHES };
     render(<ServiceGroupsTab lang="pt" />);
     expect(await screen.findByText(tt.sgLoadFailed)).toBeTruthy();
+  });
+
+  it("closes an open group form when the church changes", async () => {
+    ctx = { user: { sysRoles: ["admin"] }, notify: vi.fn(), members: [], churches: CHURCHES };
+    render(<ServiceGroupsTab lang="pt" />);
+    fireEvent.click(await screen.findByText(tt.sgNewGroup));
+    expect(screen.getByLabelText(tt.sgName)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(tt.sgChurch), { target: { value: "New York, NY" } });
+    await waitFor(() => expect(fetchServiceGroups).toHaveBeenCalledWith("New York, NY"));
+    expect(screen.queryByLabelText(tt.sgName)).toBeNull();
+  });
+
+  it("keeps the new group's id after a partial save, so the retry is an update", async () => {
+    const notify = vi.fn();
+    ctx = { user: { sysRoles: ["admin"] }, notify, members: [], churches: CHURCHES };
+    saveServiceGroup.mockResolvedValueOnce({ data: { group: { id: "g9", church: "Newark, NJ", name: "Newark 3", is_active: true }, workers: [] }, error: { message: "workers" } });
+    saveServiceGroup.mockResolvedValueOnce({ data: { group: { id: "g9", church: "Newark, NJ", name: "Newark 3", is_active: true }, workers: [] }, error: null });
+    render(<ServiceGroupsTab lang="pt" />);
+    fireEvent.click(await screen.findByText(tt.sgNewGroup));
+    fireEvent.change(screen.getByLabelText(tt.sgName), { target: { value: "Newark 3" } });
+    fireEvent.click(screen.getByText(tt.sgSave));
+    await waitFor(() => expect(notify).toHaveBeenCalledWith(tt.sgSaveFailed));
+    fireEvent.click(screen.getByText(tt.sgSave));
+    await waitFor(() => expect(saveServiceGroup).toHaveBeenCalledTimes(2));
+    expect(saveServiceGroup.mock.calls[1][0].id).toBe("g9");
+  });
+
+  it("says the name is taken when the database refuses a duplicate", async () => {
+    const notify = vi.fn();
+    ctx = { user: { sysRoles: ["admin"] }, notify, members: [], churches: CHURCHES };
+    saveServiceGroup.mockResolvedValueOnce({ data: null, error: { code: "duplicate_name" } });
+    render(<ServiceGroupsTab lang="pt" />);
+    fireEvent.click(await screen.findByText(tt.sgNewGroup));
+    fireEvent.change(screen.getByLabelText(tt.sgName), { target: { value: "Newark 3" } });
+    fireEvent.click(screen.getByText(tt.sgSave));
+    await waitFor(() => expect(notify).toHaveBeenCalledWith(tt.sgNameTaken));
   });
 });

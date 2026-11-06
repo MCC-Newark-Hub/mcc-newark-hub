@@ -86,4 +86,36 @@ describe("serviceGroupsData", () => {
     expect(calls[1]).toMatchObject({ table: "service_group_schedule", op: "delete" });
     expect(calls[1].filters).toEqual([["church", "Newark, NJ"], ["slot", "mon"]]);
   });
+
+  it("returns the saved group when only the workers fail on create, so a retry updates it", async () => {
+    handler = (q) => {
+      if (q.table === "service_groups" && q.op === "insert") return { data: { id: "g9", ...q.args }, error: null };
+      if (q.table === "service_group_workers" && q.op === "insert") return { data: null, error: { message: "dup" } };
+      return { data: [], error: null };
+    };
+    const { data, error } = await saveServiceGroup({ church: "Newark, NJ", name: "Newark 3", is_active: true }, [{ member_id: "m2", name: "Bia" }]);
+    expect(error).toBeTruthy();
+    expect(data.group.id).toBe("g9");
+    expect(data.workers).toEqual([]);
+  });
+
+  it("puts the old workers back when replacing them fails on edit", async () => {
+    const OLD = [{ id: "w1", group_id: "g1", member_id: "m1", name: "Ana", position: 0 }];
+    handler = (q) => {
+      if (q.table === "service_groups" && q.op === "update") return { data: { id: "g1", name: "Newark 1" }, error: null };
+      if (q.table === "service_group_workers" && q.op === "select") return { data: OLD, error: null };
+      if (q.table === "service_group_workers" && q.op === "insert" && q.args !== OLD) return { data: null, error: { message: "dup" } };
+      return { data: [], error: null };
+    };
+    const { data, error } = await saveServiceGroup({ id: "g1", church: "Newark, NJ", name: "Newark 1", is_active: true }, [{ member_id: "m2", name: "Bia" }]);
+    expect(error).toBeTruthy();
+    expect(calls.some((c) => c.table === "service_group_workers" && c.op === "insert" && c.args === OLD)).toBe(true);
+    expect(data.workers).toEqual(OLD);
+  });
+
+  it("reports a name already used in the church as duplicate_name", async () => {
+    handler = (q) => (q.table === "service_groups" ? { data: null, error: { code: "23505", message: "unique" } } : { data: [], error: null });
+    const { error } = await saveServiceGroup({ church: "Newark, NJ", name: "Newark 1", is_active: true }, []);
+    expect(error.code).toBe("duplicate_name");
+  });
 });
