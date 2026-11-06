@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Home, LogOut, Clock, Moon, Sun, HelpCircle, MoreHorizontal, Eye } from "lucide-react";
 import ICMLogo from "@/components/ICMLogo";
 import HelpModal from "@/components/HelpModal";
+import RoleBar from "./RoleBar";
 import { SwitchRoleContext, SeeAsContext } from "@/context/switchRole";
 import { STRINGS } from "@/i18n/strings";
 
@@ -62,6 +63,7 @@ export default function HubTopbar({ user, logout, lang, setLang, theme, toggleTh
   );
 
   return (
+    <>
     <div className="topbar" style={{ display: "flex", alignItems: "center", gap: 12, padding: "0 20px", position: "relative" }}>
       {showHelp && <HelpModal lang={lang} path={helpPath} onClose={() => setShowHelp(false)} />}
 
@@ -152,5 +154,7 @@ export default function HubTopbar({ user, logout, lang, setLang, theme, toggleTh
         )}
       </div>
     </div>
+    <RoleBar lang={lang} />
+    </>
   );
 }

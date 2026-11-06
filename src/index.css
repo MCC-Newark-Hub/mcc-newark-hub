@@ -237,6 +237,9 @@ label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase
 .topbar-desktop-controls{display:flex;align-items:center;gap:10px;}
 .topbar-more-btn{display:none;}
 .topbar-pending-dot{display:none;}
+/* Phones: the profiles of someone with more than one, under the blue bar (src/hub/RoleBar.jsx) */
+.role-bar{display:none;}
+@media(prefers-reduced-motion:reduce){.role-bar-link{transition:none;}.role-bar-link:active{transform:none;}}
 
 /* ── RESPONSIVE ── */
 .bottom-nav{display:none;}
@@ -252,6 +255,14 @@ label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase
   .topbar-more-btn{display:flex;}
   .topbar-pending-full{display:none;}
   .topbar-pending-dot{display:block;}
+  .role-bar{display:flex;align-items:center;gap:8px;position:sticky;top:52px;z-index:49;background:var(--topbar-bg);border-top:1px solid rgba(255,255,255,.12);padding:4px 14px 6px;box-shadow:0 2px 8px rgba(0,0,0,.2);}
+  .role-bar-label{flex:none;font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:rgba(255,255,255,.7);}
+  .role-bar-links{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;min-width:0;}
+  .role-bar-links::-webkit-scrollbar{display:none;}
+  .role-bar-link{flex:none;min-height:44px;padding:0 16px;border-radius:99px;border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;font:600 13px 'Montserrat',sans-serif;cursor:pointer;white-space:nowrap;transition:transform 120ms ease-out;}
+  .role-bar-link:active{transform:scale(.97);}
+  .role-bar-link.active{background:#fff;color:var(--icm-navy-deep);border-color:#fff;cursor:default;}
+  .role-bar-link:focus-visible{outline:2px solid #fff;outline-offset:2px;}
   .main-scroll{padding:14px;padding-bottom:80px;}
   .sidebar-desktop{display:none;}
   .bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--sidebar-bg);border-top:1px solid var(--border);z-index:100;padding:4px 0;overflow-x:auto;-webkit-overflow-scrolling:touch;justify-content:space-around;scrollbar-width:none;}
