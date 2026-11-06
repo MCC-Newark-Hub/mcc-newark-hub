@@ -47,6 +47,21 @@ export const contactStatusMap = (rows) =>
 
 export const hasFullContact = (status) => !!(status?.hasPhone && status?.hasEmail);
 
+// What a person typed on the public form, split by what the directory already has:
+// `fill` goes to fill_member_contact (empty on file), `change` to request_contact_change
+// (on file: staff approve it). Blank fields are left out; null when nothing is left.
+export function splitContactChange({ phone, email } = {}, onFile = {}) {
+  const p = normalizePhone(phone);
+  const e = normalizeEmail(email);
+  const pick = (hasPhone, hasEmail) => {
+    const out = {};
+    if (p && hasPhone) out.phone = p;
+    if (e && hasEmail) out.email = e;
+    return Object.keys(out).length ? out : null;
+  };
+  return { fill: pick(!onFile.hasPhone, !onFile.hasEmail), change: pick(!!onFile.hasPhone, !!onFile.hasEmail) };
+}
+
 // Staff registration (desk, team leaders) for an event that requires contact: which of
 // these people still need a phone or e-mail typed in, and whether what was typed is enough.
 // `status` is contactStatusMap's output, `values` is { [personId]: { phone, email } }.

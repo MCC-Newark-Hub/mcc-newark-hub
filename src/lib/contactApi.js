@@ -1,6 +1,7 @@
 // Reading and saving members' phone and e-mail (see migration 039).
-// Public pages: contact_status (on file or not, no values) and fill_member_contact
-// (fills only what is missing). Staff: /api/member-contacts (values; can change them).
+// Public pages: contact_status (on file or not, no values), fill_member_contact
+// (fills only what is missing) and request_contact_change (migration 051: a change
+// to what is on file, which staff approve). Staff: /api/member-contacts (values; can change them).
 import { sb } from "@/lib/supabase";
 import { authHeaders } from "@/lib/session";
 import { contactStatusMap, normalizeEmail, normalizePhone } from "@/lib/contact";
@@ -23,6 +24,15 @@ export async function fillContact(memberId, { phone, email }) {
   const e = normalizeEmail(email);
   if (!memberId || (!p && !e)) return null;
   const { error } = await sb.rpc("fill_member_contact", { p_member_id: memberId, p_phone: p || null, p_email: e || null });
+  return error ? error.message : null;
+}
+
+// Asks staff to change a phone / e-mail already on file. Returns null on success, or an error message.
+export async function requestContactChange(memberId, { phone, email }, eventId) {
+  const p = normalizePhone(phone);
+  const e = normalizeEmail(email);
+  if (!memberId || (!p && !e)) return null;
+  const { error } = await sb.rpc("request_contact_change", { p_member_id: memberId, p_phone: p || null, p_email: e || null, p_event_id: eventId || null });
   return error ? error.message : null;
 }
 
@@ -53,4 +63,23 @@ export async function staffGetContacts(memberIds) {
 // Saves (or clears, with "") a member's phone and e-mail. Throws on failure.
 export async function staffSetContact(memberId, { phone, email }) {
   return (await staffCall({ action: "set", memberId, phone: phone || "", email: email || "" })).contact;
+}
+
+// Pending change requests for these members, for signed-in staff:
+// [{ id, memberId, memberName, phone, email, currentPhone, currentEmail, createdAt }].
+// [] when unavailable (e.g. `npm run dev`).
+export async function staffContactRequests(memberIds) {
+  const ids = [...new Set((memberIds || []).filter(Boolean))];
+  if (!ids.length) return [];
+  try {
+    return (await staffCall({ action: "requests", memberIds: ids })).requests || [];
+  } catch (err) {
+    console.error("contact requests read failed:", err);
+    return [];
+  }
+}
+
+// Approves (the new values go to the directory) or rejects a change request. Throws on failure.
+export async function staffResolveContactRequest(id, approve) {
+  return staffCall({ action: "resolve", id, approve: !!approve });
 }

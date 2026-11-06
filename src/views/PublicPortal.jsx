@@ -15,8 +15,8 @@ import { findSimilarMembers } from "@/lib/similarity";
 import { genMemberId } from "@/lib/genMemberId";
 import { syncRegistrationNames } from "@/lib/syncMemberName";
 import ContactFields from "@/components/ContactFields";
-import { contactTargets, contactErrors, eventRequiresContact, normalizeEmail } from "@/lib/contact";
-import { fetchContactStatus, fillContact } from "@/lib/contactApi";
+import { contactTargets, contactErrors, eventRequiresContact, normalizeEmail, splitContactChange } from "@/lib/contact";
+import { fetchContactStatus, fillContact, requestContactChange } from "@/lib/contactApi";
 import { pauseModeOf, PAUSE_WAITLIST, PAUSED_WAITLIST_REASON } from "@/lib/pause";
 
 // Accent-insensitive search: "joao" matches "João"
@@ -585,10 +585,18 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
         }
       }
     }
-    // Save the contacts typed here to the directory (fills only what is missing).
+    // Save the contacts typed here: what is missing fills the directory; a change to
+    // what is on file waits for staff (request_contact_change).
     for (const m of contactPeople) {
-      const err = await fillContact(memberIdOf[m.id], contacts[m.id] || {});
-      if (err) console.error("fill_member_contact failed:", err);
+      const { fill, change } = splitContactChange(contacts[m.id], contactStatus[m.id]);
+      if (fill) {
+        const err = await fillContact(memberIdOf[m.id], fill);
+        if (err) console.error("fill_member_contact failed:", err);
+      }
+      if (change) {
+        const err = await requestContactChange(memberIdOf[m.id], change, event?.id);
+        if (err) console.error("request_contact_change failed:", err);
+      }
     }
     const firstEmail = contactPeople.map((m) => normalizeEmail(contacts[m.id]?.email)).find(Boolean) || "";
     setSubmitting(false);
@@ -1288,6 +1296,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
                     status={contactStatus}
                     errors={contactErrs}
                     required={contactRequired}
+                    allowChange
                     lang={lang}
                   />
                 </div>

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  contactTargets, contactErrors, eventRequiresContact, isValidEmail, isValidPhone, contactStatusMap, hasFullContact,
+  contactTargets, contactErrors, eventRequiresContact, isValidEmail, isValidPhone, contactStatusMap, hasFullContact, splitContactChange,
 } from "../lib/contact.js";
 
 const p = (id, category) => ({ id, name: id, category });
@@ -53,5 +53,21 @@ describe("contactStatusMap", () => {
     expect(map).toEqual({ M1: { hasPhone: true, hasEmail: false } });
     expect(hasFullContact(map.M1)).toBe(false);
     expect(hasFullContact(undefined)).toBe(false);
+  });
+});
+
+describe("splitContactChange", () => {
+  it("fills what is empty on file and asks staff to change what is on file", () => {
+    expect(splitContactChange({ phone: " 973 555 0101 ", email: "Ana@X.com" }, {}))
+      .toEqual({ fill: { phone: "973 555 0101", email: "ana@x.com" }, change: null });
+    expect(splitContactChange({ phone: "9735550101", email: "ana@x.com" }, { hasPhone: true }))
+      .toEqual({ fill: { email: "ana@x.com" }, change: { phone: "9735550101" } });
+    expect(splitContactChange({ email: "new@x.com" }, { hasPhone: true, hasEmail: true }))
+      .toEqual({ fill: null, change: { email: "new@x.com" } });
+  });
+
+  it("leaves blank fields out", () => {
+    expect(splitContactChange({}, { hasPhone: true, hasEmail: true })).toEqual({ fill: null, change: null });
+    expect(splitContactChange(undefined, undefined)).toEqual({ fill: null, change: null });
   });
 });
