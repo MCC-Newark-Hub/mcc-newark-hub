@@ -10,6 +10,7 @@ import ChurchSearch from "./ChurchSearch";
 import SearchSelect from "./SearchSelect";
 import StaffContactFields from "./StaffContactFields";
 import { useStaffContacts, NEW_PERSON } from "@/hooks/useStaffContacts";
+import { musicRow } from "@/lib/musicianFields";
 
 // Accent-insensitive search: "joao" matches "João"
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -131,8 +132,8 @@ function RegModal({
       gender: "M",
       category: f.category,
       church: f.church,
-      role: f.role,
-      roles: f.role ? [f.role] : [],
+      ...musicRow(f.role ? [f.role] : []),
+      role: musicRow(f.role ? [f.role] : []).roles[0] || "",
       ga_id: f.gaId || null,
     };
     const { data, error } = await sb.from("members").insert(row).select().single();

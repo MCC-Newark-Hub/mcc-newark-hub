@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useT } from "@/i18n/strings";
 import MemberFunctionsView from "@/components/MemberFunctionsView";
+import { INSTRUMENTS, VOICE_TYPES } from "@/lib/musicianFields";
 
 const norm = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
 import { STATUS_CFG, SERVICE_TEAMS, deadlineStatus } from "@/constants";
@@ -667,8 +668,6 @@ function TeamLeaderView(props) {
 
           {/* Louvor tab */}
           {isPraiseLeader && praiseTab === "louvor" ? (() => {
-            const VOICE_TYPES = ["Soprano", "Mezzo-Soprano", "Contralto", "Tenor", "Barítono", "Baixo"];
-            const INSTRUMENTS = ["Violão", "Guitarra", "Contrabaixo", "Teclado", "Bateria", "Percussão", "Flauta", "Violino", "Trompete", "Saxofone"];
             const roster = rosters.find((r) => r.eventId === event?.id && r.team === "Grupo de Louvor");
             const assignments = roster?.assignments || {};
             const mids = roster?.memberIds || [];
