@@ -9,6 +9,9 @@ vi.mock("@/lib/praiseData", () => ({
   fetchListsByDate: vi.fn(), fetchRecentLists: vi.fn(), createList: vi.fn(), updateList: vi.fn(),
   addListItem: vi.fn(), removeListItem: vi.fn(), saveItemPositions: vi.fn(), createSong: vi.fn(),
 }));
+vi.mock("@/lib/serviceGroupsData", () => ({
+  fetchServiceGroups: () => Promise.resolve({ data: { groups: [], workers: [], schedule: [] }, error: null }),
+}));
 
 const tt = STRINGS.pt;
 const SONG = { id: "s1", code: "CL-004", title: "Quando te prostrares", category: "coletanea", status: "active" };

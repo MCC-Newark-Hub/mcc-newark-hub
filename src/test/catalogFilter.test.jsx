@@ -15,6 +15,9 @@ vi.mock("@/lib/praiseData", () => ({
   fetchRecentLists: vi.fn(() => Promise.resolve({ data: [], error: null })),
   updateSong: vi.fn(), deleteSong: vi.fn(), updateList: vi.fn(), deleteList: vi.fn(), createSong: vi.fn(),
 }));
+vi.mock("@/lib/serviceGroupsData", () => ({
+  fetchServiceGroups: () => Promise.resolve({ data: { groups: [], workers: [], schedule: [] }, error: null }),
+}));
 vi.mock("@/context/AppDataContext", () => ({ useAppDataContext: () => ({ user: { name: "Admin", sysRoles: ["admin"], teamLeads: [] }, notify: vi.fn() }) }));
 vi.mock("@/views/WorshipListPublicView", () => ({ ServiceListForm: () => null }));
 
