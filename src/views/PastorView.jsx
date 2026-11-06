@@ -350,7 +350,7 @@ function PastorView(props) {
                 </div>}
               </div>
             )}
-            {sec === "resumo" && <RegistrationDashboard regs={regs} wlRegs={wlRegs} exRegs={exRegs} event={event} members={props.members} churches={props.churches} lang={lang} />}
+            {sec === "resumo" && <RegistrationDashboard regs={regs} wlRegs={wlRegs} exRegs={exRegs} event={event} members={props.members} churches={props.churches} lang={lang} showPace />}
             {sec === "regs" && <RegistrationsTab {...props} initialFilter={regsInitialFilter} />}
             {sec === "approvals" && <ApprovalsPanel approvals={approvals} resolveApproval={resolveApproval} event={event} activeCount={activeCount} />}
             {sec === "reports" && <ReportsTab regs={regs} event={event} wlRegs={wlRegs} exRegs={exRegs} lang={lang} members={props.members} gas={props.gas} showFinancials={showFinancials} rosters={props.rosters} dbTeams={props.dbTeams} />}

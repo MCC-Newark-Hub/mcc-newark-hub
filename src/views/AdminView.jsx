@@ -71,7 +71,7 @@ function AdminView(props) {
         <div className="main-scroll">
           <div className="page-pad">
             {sec === "overview" && <AdminOverview {...props} setSec={setSec} navToRegs={navToRegs} />}
-            {sec === "resumo" && <RegistrationDashboard regs={props.regs} wlRegs={props.wlRegs} exRegs={props.exRegs} event={props.event} members={props.members} churches={props.churches} lang={props.lang} />}
+            {sec === "resumo" && <RegistrationDashboard regs={props.regs} wlRegs={props.wlRegs} exRegs={props.exRegs} event={props.event} members={props.members} churches={props.churches} lang={props.lang} showPace />}
             {sec === "tesouraria" && <TesourariaSection event={props.event} regs={props.regs} updateReg={props.updateReg} notify={props.notify} logAudit={props.logAudit} readOnly={false} dbExpenseCategories={props.dbExpenseCategories} dbIncomeTypes={props.dbIncomeTypes} />}
             {sec === "regs" && <RegistrationsTab {...props} initialFilter={regsInitialFilter} />}
             {sec === "teams" && <TeamsTab {...props} />}

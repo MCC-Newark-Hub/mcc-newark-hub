@@ -3,6 +3,7 @@ import { MonitorPlay } from "lucide-react";
 import { CATEGORIES } from "@/constants";
 import { useT } from "@/i18n/strings";
 import { SEMINARY_TEACHER_ROLE } from "@/lib/memberRoles";
+import RegistrationPace from "./RegistrationPace";
 
 const CIA_CATS = ["0-3", "Criança", "Intermediário"];
 
@@ -24,7 +25,8 @@ const memberById = (members) => Object.fromEntries((members || []).map((m) => [m
 const isSeminaryProfessor = (r, membersMap) =>
   ((membersMap[r.memberId] || {}).roles || []).includes(SEMINARY_TEACHER_ROLE);
 
-export default function RegistrationDashboard({ regs, wlRegs, event, members, churches }) {
+// showPace: the registration-pace panel, for admins and pastors only (not secretaries, for now).
+export default function RegistrationDashboard({ regs, wlRegs, event, members, churches, showPace = false }) {
   const tt = useT();
   const membersMap = memberById(members);
   const [expandedCh, setExpandedCh] = useState({});
@@ -182,6 +184,8 @@ export default function RegistrationDashboard({ regs, wlRegs, event, members, ch
           ))}
         </div>
       </div>
+
+      {showPace && <RegistrationPace regs={regs} event={event} />}
 
       {/* ── Hierarchical breakdown ─────────────────────────────────────── */}
       <div className="card" style={{ padding: 0, overflow: "hidden", marginBottom: 14 }}>
