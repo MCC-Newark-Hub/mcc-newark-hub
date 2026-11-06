@@ -15,6 +15,7 @@ import { useSortable } from "@/hooks/useSortable";
 import { eventRequiresContact, needsOwnContact, hasFullContact } from "@/lib/contact";
 import { fetchContactStatus, staffGetContacts } from "@/lib/contactApi";
 import { contactExportRows, CONTACT_EXPORT_HEADERS, toCsv } from "@/lib/contactExport";
+import ContactChangeRequests from "@/components/ContactChangeRequests";
 
 const norm = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
@@ -194,6 +195,7 @@ export default function RegistrationsTab(props) {
           <button className="btn btn-primary" onClick={() => setShowReg(true)}>{t.addNew}</button>
         </div>
       </div>
+      <ContactChangeRequests memberIds={all.filter((r) => !r.cancelled).map((r) => r.memberId)} notify={notify} />
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <div className="sb" style={{ flex: 1, minWidth: 160 }}>
           <span className="si-icon">🔍</span>
