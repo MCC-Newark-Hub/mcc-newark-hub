@@ -53,6 +53,7 @@ Uses React Router v6. `<BrowserRouter>` in `src/main.jsx`; full route tree in `s
 | `/cms` | CMSSection — church/member management (Phase 4+) |
 | `/assistance` | AssistanceSection — Assistência/Care: Frequência (service census) tab; GA attendance, visits and prayer requests to come |
 | `/schedule` | ScheduleSection — door/flower rotations, prayer agenda (Phase 3+) |
+| `/worship` | WorshipSection — Culto Profético: Listas de louvores (lists, catalogue, history) and Grupos (responsible group per weekly service) |
 | `/apprentice` | ApprenticeSection — Projeto Aprendiz (TBD) |
 | `/settings` | SettingsSection — users, PINs, audit (Phase 5+) |
 
@@ -119,7 +120,7 @@ Pastors and Ungidos are automatically marked `exempt: true, fee: 0` at registrat
 
 ### Supabase Tables
 
-`churches`, `members`, `families`, `assistance_groups`, `events`, `registrations`, `rosters`, `teams`, `approvals`, `app_users`, `app_settings`, `audit_log`, `prayer_periods`, `schedule_oracao`, `door_workers`, `door_months`, `door_assignments`, `church_groups`, `church_group_members`, `service_census`
+`churches`, `members`, `families`, `assistance_groups`, `events`, `registrations`, `rosters`, `teams`, `approvals`, `app_users`, `app_settings`, `audit_log`, `prayer_periods`, `schedule_oracao`, `door_workers`, `door_months`, `door_assignments`, `church_groups`, `church_group_members`, `service_census`, `service_groups`, `service_group_workers`, `service_group_schedule`
 
 **Critical — new tables**: RLS must be **explicitly disabled** on every new table or all writes will silently fail with no error. Always add:
 

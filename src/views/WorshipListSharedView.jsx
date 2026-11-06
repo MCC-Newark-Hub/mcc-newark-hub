@@ -4,6 +4,8 @@ import ICMLogo from "@/components/ICMLogo";
 import { STRINGS } from "@/i18n/strings";
 import { fetchListById, fetchSongsByIds } from "@/lib/praiseData";
 import { songNumberLabel } from "@/lib/praiseLists";
+import { fetchServiceGroups } from "@/lib/serviceGroupsData";
+import { groupForService, sameGroupName } from "@/lib/serviceGroups";
 import { churchCity } from "@/lib/prayerSlots";
 import { exportImage, exportPdf } from "@/lib/exportElement";
 
@@ -27,7 +29,7 @@ function headerDate(date, lang) {
 // Read-only page of a published list: the one sent to the Grupo de Louvor.
 export default function WorshipListSharedView({ id, lang = "pt", setLang }) {
   const tt = STRINGS[lang === "en" ? "en" : "pt"];
-  const [state, setState] = useState({ status: "loading", list: null, songs: new Map() });
+  const [state, setState] = useState({ status: "loading", list: null, songs: new Map(), scheduled: null });
   const [exporting, setExporting] = useState(null); // "image" | "pdf" | null
   const [exportError, setExportError] = useState(false);
   const cardRef = useRef(null);
@@ -37,20 +39,27 @@ export default function WorshipListSharedView({ id, lang = "pt", setLang }) {
     (async () => {
       const { data: list, error } = await fetchListById(id);
       if (cancelled) return;
-      if (error || !list) { setState({ status: error ? "error" : "missing", list: null, songs: new Map() }); return; }
-      if (!list.published_at) { setState({ status: "unpublished", list, songs: new Map() }); return; }
+      if (error || !list) { setState({ status: error ? "error" : "missing", list: null, songs: new Map(), scheduled: null }); return; }
+      if (!list.published_at) { setState({ status: "unpublished", list, songs: new Map(), scheduled: null }); return; }
       const { data: songs } = await fetchSongsByIds(list.items.map((i) => i.song_id));
       if (cancelled) return;
-      setState({ status: "ready", list, songs: new Map(songs.map((s) => [s.id, s])) });
+      const groups = await Promise.resolve()
+        .then(() => fetchServiceGroups(list.church))
+        .then(({ data, error: groupError }) => (groupError ? null : data))
+        .catch(() => null);
+      if (cancelled) return;
+      setState({ status: "ready", list, songs: new Map(songs.map((s) => [s.id, s])), scheduled: groupForService(groups, list.church, list.service_date, list.service_type) });
     })();
     return () => { cancelled = true; };
   }, [id]);
 
-  const { status, list, songs } = state;
+  const { status, list, songs, scheduled } = state;
   const message = { loading: tt.praiseLoading, error: tt.praiseLoadFailed, missing: tt.praiseListNotFound, unpublished: tt.praiseNotPublished }[status];
 
-  // Who led/preached is for the person entering the list, not for the sheet sent to the Grupo de Louvor.
-  const details = list?.group_name || null;
+  // The sheet sent to the Grupo de Louvor names the responsible group, and its leader when the group is the one on
+  // the weekly schedule. Who led the praise / preached stays off the sheet.
+  const groupLeader = scheduled && sameGroupName(list?.group_name, scheduled.group.name) ? scheduled.leaderName : "";
+  const details = list?.group_name ? (groupLeader ? `${list.group_name} · ${tt.praiseGroupLeader}: ${groupLeader}` : list.group_name) : null;
 
   const cell = { border: `2px solid ${NAVY}`, padding: "14px 12px" };
 

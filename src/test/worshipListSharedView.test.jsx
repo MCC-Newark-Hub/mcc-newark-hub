@@ -2,8 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import WorshipListSharedView from "@/views/WorshipListSharedView";
 import { fetchListById, fetchSongsByIds } from "@/lib/praiseData";
+import { fetchServiceGroups } from "@/lib/serviceGroupsData";
+import { STRINGS } from "@/i18n/strings";
 
 vi.mock("@/lib/praiseData", () => ({ fetchListById: vi.fn(), fetchSongsByIds: vi.fn() }));
+vi.mock("@/lib/serviceGroupsData", () => ({ fetchServiceGroups: vi.fn() }));
 vi.mock("@/components/ICMLogo", () => ({ default: () => null }));
 
 const fakeCanvas = { width: 10, height: 10, toDataURL: () => "data:image/png;base64,AAA", toBlob: (cb) => cb(new Blob(["x"], { type: "image/png" })) };
@@ -24,7 +27,10 @@ const SONGS = [
 ];
 
 describe("WorshipListSharedView", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fetchServiceGroups.mockResolvedValue({ data: { groups: [], workers: [], schedule: [] }, error: null });
+  });
 
   it("shows a published list like the paper one: title, weekday - date, number and hymn name", async () => {
     fetchListById.mockResolvedValue({ data: LIST, error: null });
@@ -102,5 +108,26 @@ describe("WorshipListSharedView", () => {
     fetchListById.mockResolvedValue({ data: null, error: null });
     render(<WorshipListSharedView id="nope" lang="pt" />);
     expect(await screen.findByText("Lista não encontrada.")).toBeTruthy();
+  });
+
+  it("adds the leader when the list's group is the scheduled one", async () => {
+    fetchListById.mockResolvedValue({ data: LIST, error: null });
+    fetchSongsByIds.mockResolvedValue({ data: SONGS, error: null });
+    fetchServiceGroups.mockResolvedValue({ data: {
+      groups: [{ id: "g1", church: "New York, NY", name: "Grupo A", leader_name: "Marta", is_active: true }],
+      workers: [{ id: "w1", group_id: "g1", name: "Caio", position: 0 }],
+      schedule: [{ church: "New York, NY", slot: "noite", group_id: "g1" }],
+    }, error: null });
+    render(<WorshipListSharedView id="l1" lang="pt" />);
+    expect(await screen.findByText(`Grupo A · ${STRINGS.pt.praiseGroupLeader}: Marta`)).toBeTruthy();
+    expect(screen.queryByText(/Caio/)).toBeNull(); // workers are not on the sheet
+  });
+
+  it("shows only the group name when it is not the scheduled group or groups fail to load", async () => {
+    fetchListById.mockResolvedValue({ data: LIST, error: null });
+    fetchSongsByIds.mockResolvedValue({ data: SONGS, error: null });
+    fetchServiceGroups.mockRejectedValue(new Error("no table"));
+    render(<WorshipListSharedView id="l1" lang="pt" />);
+    expect(await screen.findByText("Grupo A")).toBeTruthy();
   });
 });
