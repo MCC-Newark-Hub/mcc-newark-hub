@@ -1245,7 +1245,8 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
       )}
 
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-        <table className="table" style={{ tableLayout: "fixed" }}>
+        <div className="table-wrap">
+        <table className="table table-stack" style={{ tableLayout: "fixed" }}>
           <colgroup>
             <col style={{ width: 36 }} />
             <col style={{ width: 40 }} />
@@ -1273,11 +1274,11 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
           <tbody>
             {sortData(dbUsers, sk, sd).map((u) => (
               <tr key={u.id} style={{ opacity: u.active === false ? 0.55 : 1, background: sel.includes(u.id) ? "var(--sidebar-active-bg)" : "" }}>
-                <td><input type="checkbox" aria-label={`Selecionar ${u.name}`} checked={sel.includes(u.id)} onChange={() => toggleSel(u.id)} /></td>
-                <td>
+                <td className="ts-check"><input type="checkbox" aria-label={`Selecionar ${u.name}`} checked={sel.includes(u.id)} onChange={() => toggleSel(u.id)} /></td>
+                <td className="ts-hide">
                   <div className="avatar" style={{ width: 28, height: 28, fontSize: 10 }}>{u.initials || u.name?.slice(0, 2).toUpperCase()}</div>
                 </td>
-                <td style={{ fontWeight: 600 }}>{u.name}{u.active === false && <span className="badge badge-gray" style={{ marginLeft: 6 }}>Inativa</span>}</td>
+                <td className="ts-title" style={{ fontWeight: 600 }}>{u.name}{u.active === false && <span className="badge badge-gray" style={{ marginLeft: 6 }}>Inativa</span>}</td>
                 <td>
                   {(u.sys_roles?.length ? u.sys_roles : [u.sys_role || u.sysRole]).map((r) => (
                     <span key={r} className="badge badge-blue" style={{ marginRight: 2 }}>{ROLE_LABELS[r] || r}</span>
@@ -1286,7 +1287,7 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
                     <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2 }}>↳ padrão: {ROLE_LABELS[u.primary_role] || u.primary_role}</div>
                   )}
                 </td>
-                <td style={{ fontSize: 12, color: "var(--muted)" }}>
+                <td className="ts-break" style={{ fontSize: 12, color: "var(--muted)" }}>
                   {u.church || "—"}
                   {(u.sys_role === "ga_leader" || u.sysRole === "ga_leader") && (u.ga_ids || u.gaIds || []).length > 0 && (
                     <div style={{ marginTop: 2 }}>
@@ -1297,12 +1298,12 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
                     </div>
                   )}
                 </td>
-                <td>
+                <td className="ts-actions">
                   <button className="btn btn-ghost btn-sm" style={{ display: "flex", alignItems: "center", gap: 4 }} onClick={() => generatePin(u)} disabled={pinBusy === u.id}>
                     <KeyRound size={13} /> {pinBusy === u.id ? "Gerando…" : "Novo PIN"}
                   </button>
                 </td>
-                <td>
+                <td className="ts-actions">
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     <button className="btn btn-ghost btn-sm" onClick={() => startEdit(u)}>Editar</button>
                     <button className="btn btn-ghost btn-sm" onClick={() => setActive(u, u.active === false)}>{u.active === false ? "Reativar" : "Desativar"}</button>
@@ -1315,6 +1316,7 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
@@ -1658,8 +1660,8 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
               )}
             </div>
             <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-              <div style={{ overflow: "auto", maxHeight: "calc(100vh - 320px)" }}>
-              <table className="table">
+              <div className="table-scroll" style={{ overflow: "auto", maxHeight: "calc(100vh - 320px)" }}>
+              <table className="table table-stack">
                 <thead style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--card-bg, #fff)" }}>
                   <tr>
                     <th style={{ width: 36 }}>
@@ -1673,8 +1675,8 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
                   {(() => {
                     const renderChurchRow = (c) => (
                       <tr key={c.id || c.display} style={{ background: c.id && selected.includes(c.id) ? "var(--sidebar-active-bg)" : "" }}>
-                        <td><input type="checkbox" disabled={!c.id} checked={!!(c.id && selected.includes(c.id))} onChange={() => c.id && toggleSel(c.id)} /></td>
-                        <td style={{ fontWeight: 500 }}>
+                        <td className="ts-check"><input type="checkbox" disabled={!c.id} checked={!!(c.id && selected.includes(c.id))} onChange={() => c.id && toggleSel(c.id)} /></td>
+                        <td className="ts-title" style={{ fontWeight: 500 }}>
                         {c.display}
                         {c.is_hub && <span className="badge badge-green" style={{ marginLeft: 6 }}>Pólo</span>}
                         {c.church_type === "Ponto de Pregação" && <span className="badge badge-yellow" style={{ marginLeft: 6 }}>Ponto</span>}
@@ -1683,12 +1685,12 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
                         <td style={{ fontSize: 12 }}>{c.city || "—"}</td>
                         <td><span className="badge badge-gray">{c.state_code || c.stateCode || "—"}</span></td>
                         <td><span className="badge badge-blue">{c.country_code || c.code || "—"}</span></td>
-                        <td style={{ fontSize: 12 }}>{(members || []).find((m) => m.id === c.pastor_id)?.name || "—"}</td>
-                        <td>
+                        <td data-label="Pastor" style={{ fontSize: 12 }}>{(members || []).find((m) => m.id === c.pastor_id)?.name || "—"}</td>
+                        <td className="ts-actions-cell">
                           <div style={{ display: "flex", gap: 6 }}>
-                            <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.address || c.display)}`} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-xs" title="Ver no Maps">🗺</a>
-                            <button className="btn btn-ghost btn-xs" onClick={() => openEdit(c, { display: c.display, city: c.city || "", stateCode: c.state_code || "", stateName: c.state_name || "", countryCode: c.country_code || c.code || "EUA", country: c.country || "", address: c.address || "", churchName: c.church_name || "", pastorId: c.pastor_id || null, isHub: c.is_hub || false, churchType: c.church_type || "Igreja", propertyOwnership: c.property_ownership || "" })}><Pencil size={12} /></button>
-                            {c.id && <button className="btn btn-danger btn-xs" onClick={() => setDeleting({ ids: [c.id], label: c.display })}><Trash2 size={12} /></button>}
+                            <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.address || c.display)}`} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-xs" title="Ver no Maps" aria-label="Ver no Maps">🗺</a>
+                            <button className="btn btn-ghost btn-xs" onClick={() => openEdit(c, { display: c.display, city: c.city || "", stateCode: c.state_code || "", stateName: c.state_name || "", countryCode: c.country_code || c.code || "EUA", country: c.country || "", address: c.address || "", churchName: c.church_name || "", pastorId: c.pastor_id || null, isHub: c.is_hub || false, churchType: c.church_type || "Igreja", propertyOwnership: c.property_ownership || "" })} aria-label="Editar"><Pencil size={12} /></button>
+                            {c.id && <button className="btn btn-danger btn-xs" onClick={() => setDeleting({ ids: [c.id], label: c.display })} aria-label="Excluir"><Trash2 size={12} /></button>}
                           </div>
                         </td>
                       </tr>
@@ -1784,18 +1786,18 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
         );
         const renderMemberRow = (m) => (
           <tr key={m.id} style={{ background: selected.includes(m.id) ? "var(--sidebar-active-bg)" : "" }}>
-            <td><input type="checkbox" checked={selected.includes(m.id)} onChange={() => toggleSel(m.id)} /></td>
-            <td style={{ fontWeight: 500 }}>
+            <td className="ts-check"><input type="checkbox" checked={selected.includes(m.id)} onChange={() => toggleSel(m.id)} /></td>
+            <td className="ts-title" style={{ fontWeight: 500 }}>
               <span>{(m.firstName && m.lastName) ? `${m.firstName} ${m.lastName}` : m.name}</span>
               {m.isGuest && <span className="badge badge-gray" style={{ fontSize: 9, marginLeft: 5, verticalAlign: "middle" }}>Visitante</span>}
               {missingHubGroup(m, churches) && <NoGroupTag />}
             </td>
-            <td style={{ color: "var(--muted)", fontSize: 12 }}>{m.badgeName}</td>
+            <td className="ts-hide" style={{ color: "var(--muted)", fontSize: 12 }}>{m.badgeName}</td>
             <td><span className="badge badge-gray">{m.gender}</span></td>
             <td><span className="badge badge-blue">{m.category}</span></td>
             <td style={{ fontSize: 12 }}>{m.church}</td>
-            <td style={{ fontSize: 12 }}>{m.gaName ? <span className="badge badge-gray" style={{ fontSize: 10 }}>{m.gaName}</span> : <span style={{ color: "var(--muted)" }}>—</span>}</td>
-            <td style={{ fontSize: 12 }}>{m.familyName ? <span className="badge badge-gray" style={{ fontSize: 10 }}>{m.familyName}</span> : <span style={{ color: "var(--muted)" }}>—</span>}</td>
+            <td className={m.gaName ? undefined : "ts-hide"} style={{ fontSize: 12 }}>{m.gaName ? <span className="badge badge-gray" style={{ fontSize: 10 }}>{m.gaName}</span> : <span style={{ color: "var(--muted)" }}>—</span>}</td>
+            <td className={m.familyName ? undefined : "ts-hide"} style={{ fontSize: 12 }}>{m.familyName ? <span className="badge badge-gray" style={{ fontSize: 10 }}>{m.familyName}</span> : <span style={{ color: "var(--muted)" }}>—</span>}</td>
             <td style={{ fontSize: 12 }}>
               {(() => {
                 const roles = m.roles && m.roles.length > 0 ? m.roles : (m.role ? [m.role] : []);
@@ -1806,11 +1808,11 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
                 </div>;
               })()}
             </td>
-            <td style={{ fontSize: 11, color: "var(--muted)", maxWidth: 160 }}>{m.notes ? m.notes.slice(0, 40) + (m.notes.length > 40 ? '…' : '') : '—'}</td>
-            <td>
+            <td className="ts-hide" style={{ fontSize: 11, color: "var(--muted)", maxWidth: 160 }}>{m.notes ? m.notes.slice(0, 40) + (m.notes.length > 40 ? '…' : '') : '—'}</td>
+            <td className="ts-actions-cell">
               <div style={{ display: "flex", gap: 6 }}>
                 <button className="btn btn-ghost btn-xs" onClick={() => editMember(m)} title="Editar" aria-label={`Editar ${m.name}`}><Pencil size={12} /></button>
-                <button className="btn btn-danger btn-xs" onClick={() => setDeleting({ ids: [m.id], label: m.name })}><Trash2 size={12} /></button>
+                <button className="btn btn-danger btn-xs" title="Excluir" aria-label={`Excluir ${m.name}`} onClick={() => setDeleting({ ids: [m.id], label: m.name })}><Trash2 size={12} /></button>
               </div>
             </td>
           </tr>
@@ -2182,8 +2184,8 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
               </div>
             ) : (
             <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-              <div style={{ overflow: "auto", maxHeight: "calc(100vh - 320px)" }}>
-                <table className="table" style={{ minWidth: 640 }}>
+              <div className="table-scroll" style={{ overflow: "auto", maxHeight: "calc(100vh - 320px)" }}>
+                <table className="table table-stack" style={{ minWidth: 640 }}>
                   <thead style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--card-bg, #fff)" }}>
                     <tr>
                       <th style={{ width: 36 }}>
@@ -2334,8 +2336,8 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
               </button>
             </div>
             <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-              <div style={{ overflow: "auto", maxHeight: "calc(100vh - 320px)" }}>
-                <table className="table" style={{ minWidth: 560 }}>
+              <div className="table-scroll" style={{ overflow: "auto", maxHeight: "calc(100vh - 320px)" }}>
+                <table className="table table-stack ts-auto" style={{ minWidth: 560 }}>
                   <thead style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--card-bg, #fff)" }}>
                     <tr>
                       <th style={{ width: 36 }}>
@@ -2431,8 +2433,8 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
               <button className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={() => openNew({ name: "", sortOrder: (dbInstruments || []).length })}><Plus size={14} /> Novo Instrumento</button>
             </div>
             <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-              <div style={{ overflow: "auto", maxHeight: "calc(100vh - 320px)" }}>
-              <table className="table">
+              <div className="table-scroll" style={{ overflow: "auto", maxHeight: "calc(100vh - 320px)" }}>
+              <table className="table table-stack ts-auto-title">
                 <thead style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--card-bg, #fff)" }}><tr>{sortTh("name", "Nome")}{sortTh("order", "Ordem", { width: 80 })}<th style={{ width: 90 }}></th></tr></thead>
                 <tbody>
                   {list.map((i) => (
@@ -2512,8 +2514,8 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
               <button className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={() => openNew({ name: "", gender: "F", minNote: "", maxNote: "", sortOrder: (dbVoiceTypes || []).length })}><Plus size={14} /> Nova Voz</button>
             </div>
             <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-              <div style={{ overflow: "auto", maxHeight: "calc(100vh - 320px)" }}>
-              <table className="table">
+              <div className="table-scroll" style={{ overflow: "auto", maxHeight: "calc(100vh - 320px)" }}>
+              <table className="table table-stack ts-auto-title">
                 <thead style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--card-bg, #fff)" }}><tr><th>Nome</th><th style={{ width: 90 }}>Gênero</th><th style={{ width: 80 }}>Nota mín.</th><th style={{ width: 80 }}>Nota máx.</th><th style={{ width: 90 }}></th></tr></thead>
                 <tbody>
                   {[{ label: "Femininas", gender: "F" }, { label: "Masculinas", gender: "M" }].flatMap(({ label, gender }) => {
@@ -2648,8 +2650,8 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
               )}
             </div>
             <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-              <div style={{ overflow: "auto", maxHeight: "calc(100vh - 320px)" }}>
-              <table className="table">
+              <div className="table-scroll" style={{ overflow: "auto", maxHeight: "calc(100vh - 320px)" }}>
+              <table className="table table-stack ts-auto">
                 <thead style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--card-bg, #fff)" }}>
                   <tr>
                     <th style={{ width: 36 }}>

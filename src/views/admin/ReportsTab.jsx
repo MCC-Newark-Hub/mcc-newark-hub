@@ -612,7 +612,7 @@ export default function ReportsTab({ regs, event, wlRegs, exRegs, lang, members,
               </span>
             </div>
             <div className="table-wrap">
-              <table className="table">
+              <table className="table table-stack ts-auto-title">
                 <thead>
                   <tr>
                     <th>{t.memberName}</th>
@@ -661,7 +661,7 @@ export default function ReportsTab({ regs, event, wlRegs, exRegs, lang, members,
                 Pode nunca pagar — não conta no total a receber.
               </div>
               <div className="table-wrap">
-                <table className="table">
+                <table className="table table-stack ts-auto">
                   <thead>
                     <tr>
                       <th>#</th>
@@ -717,7 +717,7 @@ export default function ReportsTab({ regs, event, wlRegs, exRegs, lang, members,
             <p style={{ padding: 24, color: "#6b7280", textAlign: "center" }}>{t.emptyWaitlist}</p>
           ) : (
             <div className="table-wrap">
-              <table className="table">
+              <table className="table table-stack ts-auto">
                 <thead>
                   <tr>
                     <th>{t.position}</th>
@@ -765,7 +765,7 @@ export default function ReportsTab({ regs, event, wlRegs, exRegs, lang, members,
             <span className="badge badge-yellow">{expiringView.length}</span>
           </div>
           <div className="table-wrap">
-            <table className="table">
+            <table className="table table-stack ts-auto-title">
               <thead>
                 <tr>
                   <th>{t.memberName}</th>
@@ -811,7 +811,7 @@ export default function ReportsTab({ regs, event, wlRegs, exRegs, lang, members,
             <span className="badge badge-gray">{cancelledNonpaymentView.length}</span>
           </div>
           <div className="table-wrap">
-            <table className="table">
+            <table className="table table-stack ts-auto-title">
               <thead>
                 <tr>
                   <th>{t.memberName}</th>
@@ -845,7 +845,7 @@ export default function ReportsTab({ regs, event, wlRegs, exRegs, lang, members,
       {type === "roster" && (
         <div className="card" style={{ padding: 0, overflow: "hidden" }}>
           <div className="table-wrap">
-            <table className="table">
+            <table className="table table-stack ts-auto">
               <thead>
                 <tr>
                   <th>{t.regNum}</th>
@@ -994,7 +994,7 @@ export default function ReportsTab({ regs, event, wlRegs, exRegs, lang, members,
                 <p style={{ padding: 20, color: '#2d8a4e', textAlign: 'center', fontSize: 13 }}>Todos confirmados!</p>
               ) : (
                 <div className="table-wrap">
-                  <table className="table">
+                  <table className="table table-stack ts-auto">
                     <thead><tr><th>{t.regNum}</th><th>{t.memberName}</th><th>{t.cat}</th><th>{t.churchH}</th></tr></thead>
                     <tbody>
                       {unknown.map((r) => (
@@ -1082,7 +1082,7 @@ export default function ReportsTab({ regs, event, wlRegs, exRegs, lang, members,
                       </span>
                     </div>
                     <div className="table-wrap">
-                      <table className="table">
+                      <table className="table table-stack ts-auto-title">
                         <thead>
                           <tr>
                             <th>{t.memberName}</th>
@@ -1274,7 +1274,7 @@ export default function ReportsTab({ regs, event, wlRegs, exRegs, lang, members,
                     <p style={{ padding: "12px 16px", color: "var(--muted)", fontSize: 13 }}>Nenhum inscrito nesta classe.</p>
                   ) : (
                     <div style={{ overflowX: "auto" }}>
-                      <table className="table" style={{ minWidth: ciaCols.church || ciaCols.status ? 420 : 260 }}>
+                      <table className="table table-stack ts-auto" style={{ minWidth: ciaCols.church || ciaCols.status ? 420 : 260 }}>
                         <thead>
                           <tr>
                             <th style={{ width: 36 }}>#</th>
