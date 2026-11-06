@@ -9,6 +9,7 @@ import { clearSession, getSessionToken, saveSession } from "@/lib/session";
 import { viewAs, seeAs, canSeeAs, actingName } from "@/lib/roleView";
 import { mapAppUser } from "@/lib/appUsers";
 import SeeAsPicker from "@/components/SeeAsPicker";
+import { requestSeeAs } from "@/lib/seeAsApi";
 
 const ROLE_LABELS = {
   admin: "Administrador",
@@ -143,10 +144,32 @@ export default function App() {
     return true;
   };
 
-  const startSeeAs = (id) => { setSeeAsPicker(false); saveSeeAs({ id, role: null }); navigate("/"); };
-  const stopSeeAs = () => { saveSeeAs(null); navigate("/"); };
+  // The server checks the admin and logs the start and the end (api/see-as.js); no PIN is asked or shown.
+  const seeAsMessages = {
+    admin_only: lang === "en" ? "Only an administrator can use View as." : "Só o administrador pode usar o Ver como.",
+    not_signed_in: lang === "en" ? "Your session expired. Sign in again." : "Sua sessão expirou. Entre de novo.",
+    user_not_found: lang === "en" ? "This user is no longer active." : "Esse usuário não está mais ativo.",
+  };
+  const endSeeAs = () => {
+    if (seeAsRow && authUser) requestSeeAs("stop", authUser, mapAppUser(seeAsRow));
+  };
+  const startSeeAs = async (id) => {
+    const row = (appData.dbUsers || []).find((u) => String(u.id) === String(id));
+    if (!row || !authUser) return;
+    const result = await requestSeeAs("start", authUser, mapAppUser(row));
+    if (result.error) {
+      notify(seeAsMessages[result.error] || (lang === "en" ? "Could not start View as. Try again." : "Não foi possível abrir o Ver como. Tente de novo."));
+      return;
+    }
+    endSeeAs(); // switching straight from one user to another closes the first one in the log
+    setSeeAsPicker(false);
+    saveSeeAs({ id, role: null });
+    navigate("/");
+  };
+  const stopSeeAs = () => { endSeeAs(); saveSeeAs(null); navigate("/"); };
 
   const logout = () => {
+    endSeeAs();
     saveSeeAs(null);
     authLogout();
     clearSession();
@@ -301,7 +324,7 @@ export default function App() {
             {user?.viewedBy && (
               <div role="status" className="see-as-bar">
                 <span>👁 {lang === "en" ? "Viewing as" : "Vendo como"} <strong>{user.name}</strong> · {ROLE_LABELS[user.sysRole] || user.sysRole}</span>
-                <button className="btn btn-sm" onClick={stopSeeAs}>{lang === "en" ? "Exit" : "Sair"}</button>
+                <button className="btn btn-sm" onClick={stopSeeAs}>{lang === "en" ? "Back to admin" : "Voltar ao admin"}</button>
               </div>
             )}
           </div>

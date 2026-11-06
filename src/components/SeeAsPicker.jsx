@@ -19,8 +19,8 @@ export default function SeeAsPicker({ dbUsers, currentId, roleLabel, lang, onPic
         <h3 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 18, marginBottom: 4 }}>{en ? "View as" : "Ver como"}</h3>
         <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12 }}>
           {en
-            ? "See the portal exactly as this person sees it. Anything you do meanwhile is recorded under your name."
-            : "Veja o portal exatamente como essa pessoa vê. O que você fizer enquanto isso fica registrado no seu nome."}
+            ? "See the portal exactly as this person sees it, without their PIN. The start and the end go to the audit log, and anything you do meanwhile is recorded under your name."
+            : "Veja o portal exatamente como essa pessoa vê, sem o PIN dela. O início e o fim ficam na auditoria, e o que você fizer enquanto isso fica registrado no seu nome."}
         </p>
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={en ? "Search by name…" : "Buscar pelo nome…"} aria-label={en ? "Search by name" : "Buscar pelo nome"} autoFocus style={{ marginBottom: 10 }} />
         <div style={{ maxHeight: "50vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>

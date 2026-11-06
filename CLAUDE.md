@@ -134,7 +134,7 @@ Also: always verify UPDATE/DELETE actually changed rows by chaining `.select()` 
 
 ### Serverless Functions
 
-`api/` contains Vercel serverless functions: `login.js`, `me.js`, `user-pin.js`, `send-confirmation.js`, `daily-backup.js`, `auto-cancel-overdue.js`. These use server-side env vars (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, plus `PIN_PEPPER` and `SESSION_SECRET` for sign-in) — distinct from the client-side `VITE_SUPABASE_URL` / `VITE_SUPABASE_KEY`. Keep both pairs in sync in `.env`; they point at the same project but are separate variables.
+`api/` contains Vercel serverless functions: `login.js`, `me.js`, `user-pin.js`, `see-as.js` (admin "Ver como": admin check + audit log), `send-confirmation.js`, `daily-backup.js`, `auto-cancel-overdue.js`. These use server-side env vars (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, plus `PIN_PEPPER` and `SESSION_SECRET` for sign-in) — distinct from the client-side `VITE_SUPABASE_URL` / `VITE_SUPABASE_KEY`. Keep both pairs in sync in `.env`; they point at the same project but are separate variables.
 
 ### Deployment
 
