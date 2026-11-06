@@ -22,8 +22,8 @@ describe("Home: Assistência", () => {
     renderHome({ name: "Sec", sysRoles: ["clerk"] }, "en");
     expect(screen.getByText("Care")).toBeTruthy();
   });
-  it("is not shown to GA leaders yet", () => {
-    renderHome({ name: "GA", sysRoles: ["ga_leader"] });
-    expect(screen.queryByText("Assistência")).toBeNull();
+  it("GA leaders get the card too (their Chamada do GA)", () => {
+    renderHome({ name: "GA", sysRoles: ["ga_leader"], gaIds: ["g1"] });
+    expect(screen.getByText("Assistência")).toBeTruthy();
   });
 });

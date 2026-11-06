@@ -1,24 +1,28 @@
 import { useState } from "react";
-import { Users } from "lucide-react";
+import { Users, ClipboardCheck } from "lucide-react";
 import { STRINGS } from "@/i18n/strings";
 import { useAppDataContext } from "@/context/AppDataContext";
+import { rolesOf } from "@/lib/sectionAccess";
 import CensusTab from "./CensusTab";
+import GaAttendanceTab from "./GaAttendanceTab";
 
-// Assistência (Care): pastoral follow-up. Starts with the service census; GA attendance, visits and prayer requests
-// arrive as tabs here.
+// Assistência (Care): pastoral follow-up. Each tab lists the profiles that see it: the church census for pastors and
+// clerks, the GA attendance for GA leaders (their groups only); admins see both. Visits and prayer requests arrive as
+// tabs here.
 const TABS = [
-  { id: "census", icon: Users, color: "#b45309", pt: "Frequência", en: "Attendance" },
+  { id: "census", icon: Users, color: "#b45309", pt: "Frequência", en: "Attendance", roles: ["admin", "clerk", "pastor"] },
+  { id: "ga", icon: ClipboardCheck, color: "#0f766e", pt: "Chamada do GA", en: "GA Attendance", roles: ["admin", "ga_leader"] },
 ];
-// Same profiles as the Home tile; anyone else who types /assistance gets a message, not the data.
-const ALLOWED = ["admin", "clerk", "pastor"];
 
 export default function AssistanceSection({ lang }) {
   const pt = lang !== "en";
-  const [tab, setTab] = useState("census");
+  const [tab, setTab] = useState(null);
   const { user } = useAppDataContext() || {};
-  const roles = user?.sysRoles?.length ? user.sysRoles : [user?.sysRole].filter(Boolean);
+  const roles = rolesOf(user);
+  const tabs = TABS.filter((t) => t.roles.some((r) => roles.includes(r)));
+  const active = tabs.find((t) => t.id === tab) || tabs[0];
 
-  if (!roles.some((r) => ALLOWED.includes(r))) {
+  if (!active) {
     return (
       <div style={{ minHeight: "calc(100vh - 56px)", background: "var(--bg)", padding: "48px 24px", textAlign: "center", color: "var(--muted)" }}>
         {STRINGS[pt ? "pt" : "en"].assistNoAccess}
@@ -29,9 +33,9 @@ export default function AssistanceSection({ lang }) {
   return (
     <div style={{ minHeight: "calc(100vh - 56px)", background: "var(--bg)" }}>
       <div style={{ background: "var(--card)", borderBottom: "1px solid var(--border)", padding: "0 24px", display: "flex", gap: 4 }}>
-        {TABS.map((t) => {
+        {tabs.map((t) => {
           const Icon = t.icon;
-          const isActive = t.id === tab;
+          const isActive = t.id === active.id;
           return (
             <button
               key={t.id}
@@ -52,7 +56,8 @@ export default function AssistanceSection({ lang }) {
         })}
       </div>
       <div style={{ maxWidth: 1000, margin: "0 auto", padding: "32px 24px" }}>
-        {tab === "census" && <CensusTab lang={lang} />}
+        {active.id === "census" && <CensusTab lang={lang} />}
+        {active.id === "ga" && <GaAttendanceTab lang={lang} />}
       </div>
     </div>
   );

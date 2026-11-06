@@ -5,7 +5,7 @@ import { GL_TEAM } from "@/lib/praiseLists";
 export const SECTION_ROLES = {
   events: ["admin", "clerk", "pastor", "ga_leader", "team_leader", "treasurer"],
   cms: ["admin", "clerk", "pastor", "ga_leader"],
-  assistance: ["admin", "clerk", "pastor"],
+  assistance: ["admin", "clerk", "pastor", "ga_leader"],
   // GA leaders don't need Escalas or Culto Profético (they still see them through any other role they hold)
   schedule: ["admin", "clerk", "pastor", "treasurer"],
   worship: ["admin", "clerk", "pastor", "treasurer"],
