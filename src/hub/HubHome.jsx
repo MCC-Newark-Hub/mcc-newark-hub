@@ -26,8 +26,8 @@ const SECTIONS = [
     path: "/assistance",
     icon: HeartHandshake,
     color: "#b45309",
-    pt: { label: "Assistência", desc: "Frequência dos cultos e acompanhamento" },
-    en: { label: "Care", desc: "Service attendance and pastoral follow-up" },
+    pt: { label: "Assistência", desc: "Frequência dos cultos, chamada do GA e acompanhamento" },
+    en: { label: "Care", desc: "Service attendance, GA attendance and follow-up" },
     live: true,
   },
   {

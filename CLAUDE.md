@@ -51,7 +51,7 @@ Uses React Router v6. `<BrowserRouter>` in `src/main.jsx`; full route tree in `s
 | `/` | HubHome — section picker tile grid |
 | `/events` | EventsSection — routes to staff view by `user.sysRole` |
 | `/cms` | CMSSection — church/member management (Phase 4+) |
-| `/assistance` | AssistanceSection — Assistência/Care: Frequência (service census) tab; GA attendance, visits and prayer requests to come |
+| `/assistance` | AssistanceSection — Assistência/Care: Frequência (service census; admin, clerk, pastor) and Chamada do GA (GA attendance, table `ga_attendance`; admin, ga_leader for their own groups) tabs; visits and prayer requests to come |
 | `/schedule` | ScheduleSection — door/flower rotations, prayer agenda (Phase 3+) |
 | `/apprentice` | ApprenticeSection — Projeto Aprendiz (TBD) |
 | `/settings` | SettingsSection — users, PINs, audit (Phase 5+) |
@@ -119,7 +119,7 @@ Pastors and Ungidos are automatically marked `exempt: true, fee: 0` at registrat
 
 ### Supabase Tables
 
-`churches`, `members`, `families`, `assistance_groups`, `events`, `registrations`, `rosters`, `teams`, `approvals`, `app_users`, `app_settings`, `audit_log`, `prayer_periods`, `schedule_oracao`, `door_workers`, `door_months`, `door_assignments`, `church_groups`, `church_group_members`, `service_census`
+`churches`, `members`, `families`, `assistance_groups`, `events`, `registrations`, `rosters`, `teams`, `approvals`, `app_users`, `app_settings`, `audit_log`, `prayer_periods`, `schedule_oracao`, `door_workers`, `door_months`, `door_assignments`, `church_groups`, `church_group_members`, `service_census`, `ga_attendance`
 
 **Critical — new tables**: RLS must be **explicitly disabled** on every new table or all writes will silently fail with no error. Always add:
 

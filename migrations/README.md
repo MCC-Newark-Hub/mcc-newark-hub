@@ -35,6 +35,7 @@ Run these files **in order** using the Supabase SQL editor or `psql`. Each migra
 | `035_user_show_financials.sql` | Adds `app_users.show_financials` (default true) and `set_user_show_financials()`, which the Usuários & PINs screen already called. Without it, creating a user fails and the financials toggle is never saved. |
 | `030_lookup_lists.sql` | Creates `immigration_statuses`, `expense_categories` and `income_types` (the lists edited in Configurações › Listas) with RLS disabled, seeded with the values the app already used as fallbacks. Fixes "Could not find the table 'public.immigration_statuses' in the schema cache". Safe to re-run. |
 | `031_user_church_scope.sql` | Adds `app_users.churches` and `set_user_churches()` (the church scope picked in Usuários & PINs, which never reached the database) and seeds Pr Jairo (Newark, Philadelphia) and Pr Dilton (New York). Needed by the Diretório › Visão Geral access rules. Apply **before** deploying. |
+| `047_ga_attendance.sql` | Creates `ga_attendance` (Chamada do GA: one row per GA + date + service type with `roster_ids`, `present_ids` and `visitors` as `text[]`; EBD only on Sundays; present ⊆ roster; ≤ 50 visitors), RLS disabled. Used by Assistência › Chamada do GA; the tab fails without it. Apply **before** deploying the code that uses it. |
 
 ## How to run
 
