@@ -8,6 +8,7 @@ import { buildRegNumber, noteRegNumber, parseRegNumber, regCounters } from "@/li
 import { regFeeFlags } from "@/lib/regFee";
 import { waitlistToPromote, PAUSE_FULL, PAUSE_WAITLIST } from "@/lib/pause";
 import { mergeFreshRegs } from "@/lib/regRefresh";
+import { primaryRole, rolesOf } from "@/lib/memberRoles";
 
 // ── DB → app object mappers ───────────────────────────────────────────────────
 export function mapMember(m) {
@@ -21,8 +22,8 @@ export function mapMember(m) {
     category: m.category,
     church: m.church,
     createdAt: m.created_at || null,
-    role: m.role || '',
-    roles: m.roles || (m.role ? [m.role] : []),
+    role: primaryRole(rolesOf(m)),
+    roles: rolesOf(m),
     familyId: m.family_id,
     gaId: m.ga_id,
     allergies: m.allergies || '',

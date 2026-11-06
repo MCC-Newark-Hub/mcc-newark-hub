@@ -1,24 +1,14 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { ROLE_GROUPS } from "@/constants";
-import { musicPicks, musicRow } from "@/lib/musicianFields";
-import { sb } from "@/lib/supabase";
+import { musicPicks } from "@/lib/musicianFields";
+import { FUNC_GROUPS as SHARED_FUNC_GROUPS, saveMemberPicks } from "@/lib/memberRoles";
 
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
-const FUNC_GROUPS = [
-  { id: "intercessao", label: "Grupo de Intercessão",              roles: ["Grupo de Intercessão", "Grupo de Oração"] },
-  { id: "louvor",      label: "Grupo de Louvor e Instrumentistas", roles: ["Grupo de Louvor", "Instrumentista", "Instrumentista Aprendiz"] },
-  { id: "som",         label: "Som & Projeção",                    roles: ["Operador de Som", "Operador de Projeção"] },
-  { id: "cias",        label: "Prof. de CIAs",                     roles: ["Professor(a) de Crianças", "Professor(a) de Crianças 0-3", "Professor(a) de Intermediários", "Professor(a) de Adolescentes", "Professor(a) - Acessibilidade"] },
-  { id: "jovens",      label: "Prof. de Jovens",                   roles: ["Professor(a) de Jovens"] },
-  { id: "seminario",   label: "Prof. de Seminário",                roles: ["Professor de Seminário"] },
-  { id: "ga",          label: "Responsáveis de GA",                gaLeaders: true },
-  { id: "sec_igreja",  label: "Sec. de Igreja",                    roles: ["Secretário(a) de Igreja"] },
-  { id: "sec_ga",      label: "Sec. de GA",                        roles: ["Secretário(a) de GA"] },
-  { id: "tesouraria",  label: "Tesouraria",                        roles: ["Primeiro Tesoureiro", "Segundo Tesoureiro", "Comissão de Contas"] },
-  { id: "traducao",    label: "Tradutores",                        roles: ["Tradutor", "Intérprete de Libras"] },
-];
+// Same tabs and role names as Diretório › Funções; only the labels are longer here.
+const LABELS = { intercessao: "Grupo de Intercessão", louvor: "Grupo de Louvor e Instrumentistas", ga: "Responsáveis de GA" };
+const FUNC_GROUPS = SHARED_FUNC_GROUPS.map((g) => ({ ...g, label: LABELS[g.id] || g.label }));
 
 export default function MemberFunctionsView({ members, setMembers, gas, notify, churchLock, filterMemberIds }) {
   const readOnly = !setMembers;
@@ -61,19 +51,13 @@ export default function MemberFunctionsView({ members, setMembers, gas, notify, 
   };
 
   const saveRoles = async () => {
-    const row = musicRow(editingRoles);
-    const { data, error } = await sb.from("members").update(row).eq("id", roleEditing.id).select("id");
-    if (error || !data?.length) { notify("Erro: " + (error?.message || "membro não encontrado")); return; }
-    setMembers((p) => p.map((m) => m.id === roleEditing.id ? { ...m, roles: row.roles, voiceType: row.voice_type || "", instruments: row.instruments } : m));
+    if (!(await saveMemberPicks({ member: roleEditing, picks: editingRoles, setMembers, notify }))) return;
     notify("Funções atualizadas!");
     setRoleEditing(null);
   };
 
   const addMemberToGroup = async (member, role) => {
-    const row = musicRow([...musicPicks(member), role]);
-    const { data, error } = await sb.from("members").update(row).eq("id", member.id).select("id");
-    if (error || !data?.length) { notify("Erro: " + (error?.message || "membro não encontrado")); return; }
-    setMembers((p) => p.map((m) => m.id === member.id ? { ...m, roles: row.roles, voiceType: row.voice_type || "", instruments: row.instruments } : m));
+    if (!(await saveMemberPicks({ member, picks: [...musicPicks(member), role], setMembers, notify }))) return;
     notify(`${member.name} adicionado(a) como ${role}!`);
     setMinistryAddSearch("");
   };

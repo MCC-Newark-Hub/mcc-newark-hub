@@ -37,7 +37,7 @@ export const ROLE_OPTIONS = [
   "Grupo de Intercessão",
   "Grupo de Oração",
   "Grupo de Limpeza",
-  "Professor de Seminário",
+  "Professor(a) de Seminário",
   "Professor(a) de Adolescentes",
   "Professor(a) de Crianças",
   "Professor(a) de Intermediários",
@@ -74,9 +74,10 @@ export const ROLE_GROUPS = [
   {
     group: "Professores",
     roles: [
-      "Professor de Seminário",
+      "Professor(a) de Seminário",
       "Professor(a) de Adolescentes",
       "Professor(a) de Crianças",
+      "Professor(a) de Crianças 0-3",
       "Professor(a) de Intermediários",
       "Professor(a) de Jovens",
       "Professor(a) - Acessibilidade",
@@ -294,7 +295,7 @@ export const ROLE_BADGE = {
   Pastor: "badge-purple",
   Ungido: "badge-blue",
   Diácono: "badge-green",
-  "Professor de Seminário": "badge-yellow",
+  "Professor(a) de Seminário": "badge-yellow",
   "": "badge-gray",
 };
 

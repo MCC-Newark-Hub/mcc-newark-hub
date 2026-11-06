@@ -3,6 +3,7 @@ import { useT } from "@/i18n/strings";
 import { sb } from "@/lib/supabase";
 import { fetchEventTeams, importTeamsFromEvent } from "@/lib/rosterImport";
 import { canAssignToTeam } from "@/lib/teamAssignment";
+import { SEMINARY_TEACHER_ROLE } from "@/lib/memberRoles";
 
 const norm = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
 import { SERVICE_TEAMS, STATUS_CFG } from "@/constants";
@@ -622,8 +623,8 @@ export default function TeamsTab({ event, events, regs, members, rosters, setRos
                       <span className={`dot ${cfg.dot}`}></span>
                       <span style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>
                         {m.name}
-                        {(m.roles || []).includes("Professor de Seminário") && (
-                          <span className="badge badge-purple" style={{ fontSize: 9, marginLeft: 5, verticalAlign: "middle" }} title="Professor de Seminário">Prof</span>
+                        {(m.roles || []).includes(SEMINARY_TEACHER_ROLE) && (
+                          <span className="badge badge-purple" style={{ fontSize: 9, marginLeft: 5, verticalAlign: "middle" }} title={SEMINARY_TEACHER_ROLE}>Prof</span>
                         )}
                         {(m.translationLanguages || []).map((lang) => (
                           <span key={lang} className="badge badge-blue" style={{ fontSize: 9, marginLeft: 4, verticalAlign: "middle" }} title={lang}>

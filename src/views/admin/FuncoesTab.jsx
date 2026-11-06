@@ -1,30 +1,9 @@
 import { useState } from "react";
 import { X } from "lucide-react";
-import { sb } from "@/lib/supabase";
-import { INSTRUMENTS, VOICE_TYPES, musicPicks, musicRow } from "@/lib/musicianFields";
+import { musicPicks } from "@/lib/musicianFields";
+import { FUNC_GROUPS, saveMemberPicks, saveMemberRoles } from "@/lib/memberRoles";
 
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-
-const FUNC_GROUPS = [
-  { id: "intercessao", label: "Intercessão",   roles: ["Grupo de Intercessão", "Grupo de Oração"] },
-  { id: "louvor",      label: "Louvor",             roles: ["Grupo de Louvor", "Instrumentista", "Instrumentista Aprendiz"],
-    roleGroups: [
-      { label: "Função",      roles: ["Grupo de Louvor", "Instrumentista", "Instrumentista Aprendiz"] },
-      // Saved in members.voice_type / members.instruments (see musicRow), not in roles.
-      { label: "Vocal",       roles: VOICE_TYPES },
-      { label: "Instrumento", roles: INSTRUMENTS },
-    ]
-  },
-  { id: "som",         label: "Som & Projeção",     roles: ["Operador de Som", "Operador de Projeção"] },
-  { id: "cias",        label: "Prof. de CIAs",      roles: ["Professor(a) de Crianças", "Professor(a) de Crianças 0-3", "Professor(a) de Intermediários", "Professor(a) de Adolescentes", "Professor(a) - Acessibilidade"] },
-  { id: "jovens",      label: "Prof. de Jovens",    roles: ["Professor(a) de Jovens"] },
-  { id: "seminario",   label: "Prof. de Seminário", roles: ["Professor de Seminário"] },
-  { id: "ga",          label: "Resp. de GA",        gaLeaders: true },
-  { id: "sec_igreja",  label: "Sec. de Igreja",     roles: ["Secretário(a) de Igreja"] },
-  { id: "sec_ga",      label: "Sec. de GA",         roles: ["Secretário(a) de GA"] },
-  { id: "tesouraria",  label: "Tesouraria",     roles: ["Primeiro Tesoureiro", "Segundo Tesoureiro", "Comissão de Contas"] },
-  { id: "traducao",    label: "Tradutores",     roles: ["Tradutor", "Intérprete de Libras"] },
-];
 
 export default function FuncoesTab({ members, setMembers, gas, notify, logAudit, churchLock, filterMemberIds }) {
   const [activeGroup, setActiveGroup] = useState("louvor");
@@ -99,13 +78,11 @@ export default function FuncoesTab({ members, setMembers, gas, notify, logAudit,
   const openRoleEdit = (m) => { setRoleEditing(m); setEditingRoles(musicPicks(m)); };
 
   const saveRoles = async () => {
-    const row = musicRow(editingRoles);
-    const { data, error } = await sb.from("members").update(row).eq("id", roleEditing.id).select("id");
-    if (error || !data?.length) { notify("Erro: " + (error?.message || "membro não encontrado")); return; }
-    setMembers((p) => p.map((m) => m.id === roleEditing.id ? { ...m, roles: row.roles, voiceType: row.voice_type || "", instruments: row.instruments } : m));
-    logAudit?.("member_roles_updated", "member", roleEditing.id, roleEditing.name, row);
-    notify("Funções atualizadas!");
+    const member = roleEditing;
     setRoleEditing(null);
+    if (!(await saveMemberPicks({ member, picks: editingRoles, setMembers, notify }))) return;
+    logAudit?.("member_roles_updated", "member", member.id, member.name, { picks: editingRoles });
+    notify("Funções atualizadas!");
   };
 
   const addPool = memberPool.filter((m) => !rawMembers.find((x) => x.id === m.id));
@@ -116,13 +93,10 @@ export default function FuncoesTab({ members, setMembers, gas, notify, logAudit,
   const handleAdd = async (m) => {
     const role = group?.roles?.length === 1 ? group.roles[0] : addRole;
     if (!role) return;
-    const newRoles = [...new Set([...(m.roles || []), role])];
-    const { error } = await sb.from("members").update({ roles: newRoles }).eq("id", m.id).select();
-    if (error) { notify("Erro: " + error.message); return; }
-    setMembers((p) => p.map((x) => x.id === m.id ? { ...x, roles: newRoles } : x));
+    setAddSearch("");
+    if (!(await saveMemberRoles({ member: m, roles: [...(m.roles || []), role], setMembers, notify }))) return;
     logAudit?.("member_role_added", "member", m.id, m.name, { role });
     notify(`${m.name} adicionado(a) como ${role}!`);
-    setAddSearch("");
   };
 
   const allGroupRoles = group?.roleGroups
