@@ -11,7 +11,7 @@ const boxStyle = { width: "auto", margin: 0, flex: "none" };
 
 // "Inscrever membros da equipe": the leader registers the members of their team who have no
 // registration yet. Only the members; each one registers their own family.
-export default function TeamRegisterPanel({ event, team, rosters, regs, members, addReg, notify, logAudit, t }) {
+export default function TeamRegisterPanel({ event, team, rosters, regs, members, addReg, refreshRegs, notify, logAudit, t }) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState([]);
   const candidates = registrableTeamMembers({ rosters, regs, members, eventId: event?.id, team });
@@ -36,7 +36,7 @@ export default function TeamRegisterPanel({ event, team, rosters, regs, members,
 
   return (
     <div className="card" style={{ marginTop: 8, padding: "10px 14px" }}>
-      <button className="btn btn-primary btn-sm" style={{ display: "inline-flex", alignItems: "center", gap: 6 }} onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+      <button className="btn btn-primary btn-sm" style={{ display: "inline-flex", alignItems: "center", gap: 6 }} onClick={() => { if (!open) refreshRegs?.(true); setOpen((o) => !o); }} aria-expanded={open}>
         <UserPlus size={14} /> {t.teamRegButton} ({candidates.length})
       </button>
       {open && (

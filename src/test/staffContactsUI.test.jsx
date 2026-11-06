@@ -36,3 +36,12 @@ describe("team leader registration asks contact when the event requires it", () 
     expect(fillContact).toHaveBeenCalledWith("m1", { phone: "+1 973 555 0100", email: "ana@x.com" });
   });
 });
+
+describe("team leader registration reloads registrations when opened", () => {
+  it("asks for fresh registrations so people registered elsewhere drop out", () => {
+    const refreshRegs = vi.fn();
+    render(<TeamRegisterPanel event={{ id: "e1" }} team="Louvor" rosters={rosters} regs={[]} members={members} addReg={() => {}} refreshRegs={refreshRegs} notify={() => {}} t={t} />);
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(t.teamRegButton) }));
+    expect(refreshRegs).toHaveBeenCalledWith(true);
+  });
+});

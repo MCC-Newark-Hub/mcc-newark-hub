@@ -34,6 +34,7 @@ function TeamLeaderView(props) {
     gas,
     logAudit,
     addReg,
+    refreshRegs,
   } = props;
   const t = useT();
   const [mainView, setMainView] = useState("equipe");
@@ -1038,7 +1039,7 @@ function TeamLeaderView(props) {
                       })}
                     </div>
                   )}
-                  <TeamRegisterPanel event={event} team={team} rosters={rosters} regs={regs} members={members} addReg={addReg} notify={notify} logAudit={logAudit} t={t} />
+                  <TeamRegisterPanel event={event} team={team} rosters={rosters} regs={regs} members={members} addReg={addReg} refreshRegs={refreshRegs} notify={notify} logAudit={logAudit} t={t} />
                 </div>
               );
             }
@@ -1297,7 +1298,7 @@ function TeamLeaderView(props) {
                     {notReg.map((m) => m.name).join(", ")} — {t.reachOut}
                   </div>
                 )}
-                <TeamRegisterPanel event={event} team={team} rosters={rosters} regs={regs} members={members} addReg={addReg} notify={notify} logAudit={logAudit} t={t} />
+                <TeamRegisterPanel event={event} team={team} rosters={rosters} regs={regs} members={members} addReg={addReg} refreshRegs={refreshRegs} notify={notify} logAudit={logAudit} t={t} />
               </div>
             );
           })}
