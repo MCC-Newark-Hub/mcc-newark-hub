@@ -15,6 +15,7 @@ import Modal from "@/components/Modal";
 import KitchenTab from "./admin/KitchenTab";
 import KitchenPlanningTab from "./admin/KitchenPlanningTab";
 import ReportsTab from "./admin/ReportsTab";
+import { SEMINARY_TEACHER_ROLE, saveMemberRoles } from "@/lib/memberRoles";
 
 function TeamLeaderView(props) {
   const {
@@ -86,12 +87,8 @@ function TeamLeaderView(props) {
     const filtered = oldRoles.filter((r) => !CIA_ROLE_OPTIONS.some((o) => o.role === r));
     const newRole = CIA_ROLE_OPTIONS.find((o) => o.cat === newCat)?.role;
     const newRoles = newRole ? [...filtered, newRole] : filtered;
-    setMembers((prev) => prev.map((m) => m.id === member.id ? { ...m, roles: newRoles } : m));
-    sb.from("members").update({ roles: newRoles }).eq("id", member.id)
-      .then(({ error }) => {
-        if (error) { notify("Erro ao atualizar função do professor."); return; }
-        logAudit?.("member_teacher_class_changed", "member", member.id, member.name, { newClass: newCat, newRoles });
-      });
+    saveMemberRoles({ member, roles: newRoles, setMembers, notify })
+      .then((ok) => { if (ok) logAudit?.("member_teacher_class_changed", "member", member.id, member.name, { newClass: newCat, newRoles }); });
     setEditingTeacher(null);
   };
   const [editTeam, setEditTeam] = useState(null);
@@ -1195,8 +1192,8 @@ function TeamLeaderView(props) {
                                 <td style={{ fontWeight: 600 }}>
                                   <span className={`dot ${cfg.dot}`}></span>
                                   {m.name}
-                                  {(m.roles || []).includes("Professor de Seminário") && (
-                                    <span className="badge badge-purple" style={{ fontSize: 9, marginLeft: 5, verticalAlign: "middle" }} title="Professor de Seminário">Prof</span>
+                                  {(m.roles || []).includes(SEMINARY_TEACHER_ROLE) && (
+                                    <span className="badge badge-purple" style={{ fontSize: 9, marginLeft: 5, verticalAlign: "middle" }} title={SEMINARY_TEACHER_ROLE}>Prof</span>
                                   )}
                                   {(m.translationLanguages || []).map((lang) => (
                                     <span key={lang} className="badge badge-blue" style={{ fontSize: 9, marginLeft: 4, verticalAlign: "middle" }} title={lang}>

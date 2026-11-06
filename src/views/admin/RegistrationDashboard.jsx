@@ -2,6 +2,7 @@ import { useState, Fragment } from "react";
 import { MonitorPlay } from "lucide-react";
 import { CATEGORIES } from "@/constants";
 import { useT } from "@/i18n/strings";
+import { SEMINARY_TEACHER_ROLE } from "@/lib/memberRoles";
 
 const CIA_CATS = ["0-3", "Criança", "Intermediário"];
 
@@ -21,7 +22,7 @@ const tdS = { padding: "7px 12px", borderBottom: "1px solid var(--border)", font
 
 const memberById = (members) => Object.fromEntries((members || []).map((m) => [m.id, m]));
 const isSeminaryProfessor = (r, membersMap) =>
-  ((membersMap[r.memberId] || {}).roles || []).includes("Professor de Seminário");
+  ((membersMap[r.memberId] || {}).roles || []).includes(SEMINARY_TEACHER_ROLE);
 
 export default function RegistrationDashboard({ regs, wlRegs, event, members, churches }) {
   const tt = useT();

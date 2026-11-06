@@ -1,23 +1,13 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { ROLE_GROUPS } from "@/constants";
-import { sb } from "@/lib/supabase";
+import { FUNC_GROUPS as SHARED_FUNC_GROUPS, saveMemberRoles } from "@/lib/memberRoles";
 
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
-const FUNC_GROUPS = [
-  { id: "intercessao", label: "Grupo de Intercessão",              roles: ["Grupo de Intercessão", "Grupo de Oração"] },
-  { id: "louvor",      label: "Grupo de Louvor e Instrumentistas", roles: ["Grupo de Louvor", "Instrumentista", "Instrumentista Aprendiz"] },
-  { id: "som",         label: "Som & Projeção",                    roles: ["Operador de Som", "Operador de Projeção"] },
-  { id: "cias",        label: "Prof. de CIAs",                     roles: ["Professor(a) de Crianças", "Professor(a) de Crianças 0-3", "Professor(a) de Intermediários", "Professor(a) de Adolescentes", "Professor(a) - Acessibilidade"] },
-  { id: "jovens",      label: "Prof. de Jovens",                   roles: ["Professor(a) de Jovens"] },
-  { id: "seminario",   label: "Prof. de Seminário",                roles: ["Professor de Seminário"] },
-  { id: "ga",          label: "Responsáveis de GA",                gaLeaders: true },
-  { id: "sec_igreja",  label: "Sec. de Igreja",                    roles: ["Secretário(a) de Igreja"] },
-  { id: "sec_ga",      label: "Sec. de GA",                        roles: ["Secretário(a) de GA"] },
-  { id: "tesouraria",  label: "Tesouraria",                        roles: ["Primeiro Tesoureiro", "Segundo Tesoureiro", "Comissão de Contas"] },
-  { id: "traducao",    label: "Tradutores",                        roles: ["Tradutor", "Intérprete de Libras"] },
-];
+// Same tabs and role names as Diretório › Funções; only the labels are longer here.
+const LABELS = { intercessao: "Grupo de Intercessão", louvor: "Grupo de Louvor e Instrumentistas", ga: "Responsáveis de GA" };
+const FUNC_GROUPS = SHARED_FUNC_GROUPS.map((g) => ({ ...g, label: LABELS[g.id] || g.label }));
 
 export default function MemberFunctionsView({ members, setMembers, gas, notify, churchLock, filterMemberIds }) {
   const readOnly = !setMembers;
@@ -60,20 +50,14 @@ export default function MemberFunctionsView({ members, setMembers, gas, notify, 
   };
 
   const saveRoles = async () => {
-    const { error } = await sb.from("members").update({ roles: editingRoles }).eq("id", roleEditing.id).select();
-    if (error) { notify("Erro: " + error.message); return; }
-    setMembers((p) => p.map((m) => m.id === roleEditing.id ? { ...m, roles: editingRoles } : m));
-    notify("Funções atualizadas!");
+    const member = roleEditing;
     setRoleEditing(null);
+    if (await saveMemberRoles({ member, roles: editingRoles, setMembers, notify })) notify("Funções atualizadas!");
   };
 
   const addMemberToGroup = async (member, role) => {
-    const newRoles = [...new Set([...(member.roles || []), role])];
-    const { error } = await sb.from("members").update({ roles: newRoles }).eq("id", member.id).select();
-    if (error) { notify("Erro: " + error.message); return; }
-    setMembers((p) => p.map((m) => m.id === member.id ? { ...m, roles: newRoles } : m));
-    notify(`${member.name} adicionado(a) como ${role}!`);
     setMinistryAddSearch("");
+    if (await saveMemberRoles({ member, roles: [...(member.roles || []), role], setMembers, notify })) notify(`${member.name} adicionado(a) como ${role}!`);
   };
 
   const addablePool = filterMemberIds

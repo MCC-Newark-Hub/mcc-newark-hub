@@ -22,6 +22,7 @@ import GroupsPanel from "@/components/directory/GroupsPanel";
 import ChurchGroupsPanel from "@/components/directory/ChurchGroupsPanel";
 import OrgChartPanel from "@/components/directory/OrgChartPanel";
 import RolesMultiSelect from "@/components/directory/RolesMultiSelect";
+import { memberRoleFields, primaryRole, rolesOf } from "@/lib/memberRoles";
 import RegistrationsTab from "./admin/RegistrationsTab";
 import TeamsTab from "./admin/TeamsTab";
 import EventsTab from "./admin/EventsTab";
@@ -1279,8 +1280,9 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
       setList([...stateList, mapFn ? mapFn(data) : data]);
       logAudit?.(table + "_created", table, data.id, label, null);
     } else {
-      const { error } = await sb.from(table).update(row).eq("id", row.id);
+      const { data, error } = await sb.from(table).update(row).eq("id", row.id).select();
       if (error) { notify("Erro: " + error.message); setSaving(false); return; }
+      if (!data?.length) { notify("Erro: registro não encontrado — nada foi salvo."); setSaving(false); return; }
       setList(stateList.map((r) => r.id === row.id ? (mapFn ? mapFn({ ...r, ...row }) : { ...r, ...row }) : r));
       logAudit?.(table + "_updated", table, row.id, label, null);
     }
@@ -1301,7 +1303,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
     clearSel();
   };
 
-  const mapMember  = (m) => ({ id: m.id, name: m.name, firstName: m.first_name || m.firstName || '', lastName: m.last_name || m.lastName || '', badgeName: m.badge_name || m.badgeName, gender: m.gender, category: m.category, church: m.church, role: m.role || "", roles: m.roles || (m.role ? [m.role] : []), familyId: m.family_id || m.familyId, gaId: m.ga_id || m.gaId, allergies: m.allergies || '', specialNeeds: m.special_needs || m.specialNeeds || '', notes: m.notes || '', isGuest: m.is_guest || m.isGuest || false, invitedBy: m.invited_by || m.invitedBy || '', translationLanguages: m.translation_languages || m.translationLanguages || [], voiceType: m.voice_type || m.voiceType || '', instruments: m.instruments || [], emergencyContact: m.emergency_contact || m.emergencyContact || '', emergencyPhone: m.emergency_phone || m.emergencyPhone || '', acessibilidade: !!(m.acessibilidade) });
+  const mapMember  = (m) => ({ id: m.id, name: m.name, firstName: m.first_name || m.firstName || '', lastName: m.last_name || m.lastName || '', badgeName: m.badge_name || m.badgeName, gender: m.gender, category: m.category, church: m.church, role: primaryRole(rolesOf(m)), roles: rolesOf(m), familyId: m.family_id || m.familyId, gaId: m.ga_id || m.gaId, allergies: m.allergies || '', specialNeeds: m.special_needs || m.specialNeeds || '', notes: m.notes || '', isGuest: m.is_guest || m.isGuest || false, invitedBy: m.invited_by || m.invitedBy || '', translationLanguages: m.translation_languages || m.translationLanguages || [], voiceType: m.voice_type || m.voiceType || '', instruments: m.instruments || [], emergencyContact: m.emergency_contact || m.emergencyContact || '', emergencyPhone: m.emergency_phone || m.emergencyPhone || '', acessibilidade: !!(m.acessibilidade) });
   const mapFamily  = (f) => ({ id: f.id, name: f.name, memberIds: f.member_ids || f.memberIds || [] });
   const mapGA      = (g) => ({ id: g.id, name: g.name, church: g.church, leaderId: g.leader_id || g.leaderId, description: g.description || "" });
   const mapRoster  = (r) => ({ id: r.id, eventId: r.event_id || r.eventId, team: r.team, leaderId: r.leader_id || r.leaderId, memberIds: r.member_ids || r.memberIds || [] });
@@ -1860,7 +1862,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
                       if (!formData.name?.trim() && !formData.firstName?.trim()) { notify("Nome obrigatório."); return; }
                       if (churches.find((c) => c.display === formData.church)?.is_hub && !formData.gaId) { notify("Grupo é obrigatório para igrejas do Pólo."); return; }
                       const fullName = formData.name?.trim() || ((formData.firstName || '') + ' ' + (formData.lastName || '')).trim();
-                      const row = { name: fullName, first_name: formData.firstName || null, last_name: formData.lastName || null, badge_name: formData.badgeName || fullName, gender: formData.gender || "M", category: formData.category || "Adulto", church: formData.church || "", roles: formData.roles || [], role: (formData.roles || [])[0] || "", family_id: formData.familyId || null, ga_id: formData.gaId || null, allergies: formData.allergies || null, special_needs: formData.specialNeeds || null, acessibilidade: isCiaCategory(formData.category || "Adulto") && !!formData.acessibilidade, notes: formData.notes || null, is_guest: formData.isGuest || false, invited_by: formData.isGuest ? (formData.invitedBy || null) : null, translation_languages: formData.translationLanguages || [], voice_type: formData.voiceType || null, ...(formData.voiceLowestNote ? { voice_lowest_note: formData.voiceLowestNote } : {}), ...(formData.voiceHighestNote ? { voice_highest_note: formData.voiceHighestNote } : {}), ...(formData.instruments?.length ? { instruments: formData.instruments } : {}), ...(formData.immigrationStatus ? { immigration_status: formData.immigrationStatus } : {}) };
+                      const row = { name: fullName, first_name: formData.firstName || null, last_name: formData.lastName || null, badge_name: formData.badgeName || fullName, gender: formData.gender || "M", category: formData.category || "Adulto", church: formData.church || "", ...memberRoleFields(formData.roles), family_id: formData.familyId || null, ga_id: formData.gaId || null, allergies: formData.allergies || null, special_needs: formData.specialNeeds || null, acessibilidade: isCiaCategory(formData.category || "Adulto") && !!formData.acessibilidade, notes: formData.notes || null, is_guest: formData.isGuest || false, invited_by: formData.isGuest ? (formData.invitedBy || null) : null, translation_languages: formData.translationLanguages || [], voice_type: formData.voiceType || null, ...(formData.voiceLowestNote ? { voice_lowest_note: formData.voiceLowestNote } : {}), ...(formData.voiceHighestNote ? { voice_highest_note: formData.voiceHighestNote } : {}), ...(formData.instruments?.length ? { instruments: formData.instruments } : {}), ...(formData.immigrationStatus ? { immigration_status: formData.immigrationStatus } : {}) };
                       if (isNew) {
                         const nums = (members || []).map((m) => parseInt((m.id || "").replace(/^M/, ""), 10)).filter((n) => !isNaN(n));
                         const next = nums.length > 0 ? Math.max(...nums) + 1 : 1;

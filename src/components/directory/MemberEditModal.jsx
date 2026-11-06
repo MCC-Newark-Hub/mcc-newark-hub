@@ -2,6 +2,7 @@ import { CATEGORIES } from "@/constants";
 import { sb } from "@/lib/supabase";
 import { mapMember } from "@/hooks/useAppData";
 import { genMemberId } from "@/lib/genMemberId";
+import { memberRoleFields } from "@/lib/memberRoles";
 import Modal from "@/components/Modal";
 import SearchSelect from "@/components/SearchSelect";
 import RolesMultiSelect from "@/components/directory/RolesMultiSelect";
@@ -59,8 +60,7 @@ export default function MemberEditModal({
         gender: editingMember.gender,
         category: editingMember.category,
         church: (defaultChurch || "").trim(),
-        role: (editingMember.roles || [])[0] || "",
-        roles: editingMember.roles || [],
+        ...memberRoleFields(editingMember.roles),
         family_id: editingMember.familyId && editingMember.familyId !== "__new__" ? editingMember.familyId : null,
         ga_id: editingMember.gaId || null,
         allergies: editingMember.allergies || null,
@@ -78,8 +78,9 @@ export default function MemberEditModal({
       let memberId = editingMember.id;
       if (editingMember.id) {
         const oldMember = members.find((m) => m.id === editingMember.id);
-        const { error } = await sb.from("members").update(row).eq("id", editingMember.id);
+        const { data: saved, error } = await sb.from("members").update(row).eq("id", editingMember.id).select();
         if (error) throw error;
+        if (!saved?.length) throw new Error("membro não encontrado");
         setMembers((prev) => prev.map((m) => (m.id === editingMember.id ? mapMember({ ...m, ...row, id: editingMember.id }) : m)));
         if (setRegs) {
           syncMemberToRegistrations({ memberId: editingMember.id, memberName: fullName, badgeName: row.badge_name, category: row.category, church: row.church, acessibilidade: row.acessibilidade, setRegs });

@@ -433,7 +433,7 @@ function ClerkView(props) {
           ) : sec === "families" ? (
             <FamiliesPanel members={myMembers} families={myFamilies} setFamilies={setFamilies} gas={myGas} showGroup notify={notify} logAudit={logAudit} />
           ) : sec === "functions" ? (
-            <FuncoesTab members={members} setMembers={setMembers} gas={gas} notify={notify} churchLock={myChurch} logAudit={logAudit} />
+            <FuncoesTab members={members} setMembers={setMembers} gas={gas} dbVoiceTypes={props.dbVoiceTypes} dbInstruments={props.dbInstruments} notify={notify} churchLock={myChurch} logAudit={logAudit} />
           ) : (
             <GroupsPanel members={myMembers} setMembers={setMembers} gas={myGas} setGas={setGas} churches={churches} notify={notify} defaultChurch={myChurch} lockChurch logAudit={logAudit} />
           )}
