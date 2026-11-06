@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { ROLE_GROUPS } from "@/constants";
-import { FUNC_GROUPS as SHARED_FUNC_GROUPS, saveMemberRoles } from "@/lib/memberRoles";
+import { musicPicks } from "@/lib/musicianFields";
+import { FUNC_GROUPS as SHARED_FUNC_GROUPS, saveMemberPicks } from "@/lib/memberRoles";
 
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
@@ -46,18 +47,19 @@ export default function MemberFunctionsView({ members, setMembers, gas, notify, 
 
   const openRoleEdit = (m) => {
     setRoleEditing(m);
-    setEditingRoles(m.roles || []);
+    setEditingRoles(musicPicks(m));
   };
 
   const saveRoles = async () => {
-    const member = roleEditing;
+    if (!(await saveMemberPicks({ member: roleEditing, picks: editingRoles, setMembers, notify }))) return;
+    notify("Funções atualizadas!");
     setRoleEditing(null);
-    if (await saveMemberRoles({ member, roles: editingRoles, setMembers, notify })) notify("Funções atualizadas!");
   };
 
   const addMemberToGroup = async (member, role) => {
+    if (!(await saveMemberPicks({ member, picks: [...musicPicks(member), role], setMembers, notify }))) return;
+    notify(`${member.name} adicionado(a) como ${role}!`);
     setMinistryAddSearch("");
-    if (await saveMemberRoles({ member, roles: [...(member.roles || []), role], setMembers, notify })) notify(`${member.name} adicionado(a) como ${role}!`);
   };
 
   const addablePool = filterMemberIds
@@ -143,7 +145,7 @@ export default function MemberFunctionsView({ members, setMembers, gas, notify, 
         const gaLeaderMap = {};
         (gas || []).filter((g) => g.leaderId).forEach((g) => { gaLeaderMap[g.leaderId] = [...(gaLeaderMap[g.leaderId] || []), g.name]; });
         const withRoles = applyFilters(
-          (members || []).filter((m) => (m.roles || []).length > 0 || gaLeaderMap[m.id])
+          (members || []).filter((m) => musicPicks(m).length > 0 || gaLeaderMap[m.id])
         );
         const byChurch = {};
         withRoles.forEach((m) => {
@@ -163,7 +165,7 @@ export default function MemberFunctionsView({ members, setMembers, gas, notify, 
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {byChurch[ch].map((m) => {
                     const gaNames = gaLeaderMap[m.id] || [];
-                    const allRoles = [...(m.roles || []), ...gaNames.map((n) => `Responsável GA: ${n}`)];
+                    const allRoles = [...musicPicks(m), ...gaNames.map((n) => `Responsável GA: ${n}`)];
                     return (
                       <div key={m.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 12px", background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 8 }}>
                         <div style={{ flex: 1 }}>
@@ -189,7 +191,7 @@ export default function MemberFunctionsView({ members, setMembers, gas, notify, 
           const mems = applyFilters(
             group.gaLeaders
               ? gaLeaderEntries
-              : (members || []).filter((m) => (m.roles || []).some((r) => (group.roles || []).includes(r)))
+              : (members || []).filter((m) => musicPicks(m).some((r) => (group.roles || []).includes(r)))
           );
           return (
             <div key={group.id} className="card" style={{ padding: 0, overflow: "hidden" }}>
@@ -226,7 +228,7 @@ export default function MemberFunctionsView({ members, setMembers, gas, notify, 
                     style={{ marginBottom: 4 }}
                   />
                   {addSearchResults.map((m) => {
-                    const alreadyIn = (m.roles || []).some((r) => group.roles.includes(r));
+                    const alreadyIn = musicPicks(m).some((r) => group.roles.includes(r));
                     return (
                       <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderTop: "1px solid var(--border)" }}>
                         <div>
@@ -261,7 +263,7 @@ export default function MemberFunctionsView({ members, setMembers, gas, notify, 
                   mems.map((m) => {
                     const subRoles = group.gaLeaders
                       ? [m._gaName]
-                      : (m.roles || []).filter((r) => (group.roles || []).includes(r));
+                      : musicPicks(m).filter((r) => (group.roles || []).includes(r));
                     return (
                       <div
                         key={m.id + (m._gaName || "")}

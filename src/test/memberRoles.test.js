@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const update = vi.fn();
 vi.mock("@/lib/supabase", () => ({ sb: { from: () => ({ update }) } }));
 
-import { canonicalRole, normalizeRoles, primaryRole, memberRoleFields, rolesOf, saveMemberRoles, SEMINARY_TEACHER_ROLE, FUNC_GROUPS } from "@/lib/memberRoles";
+import { canonicalRole, normalizeRoles, primaryRole, memberRoleFields, rolesOf, saveMemberRoles, saveMemberPicks, SEMINARY_TEACHER_ROLE, FUNC_GROUPS } from "@/lib/memberRoles";
 import { mapMember } from "@/hooks/useAppData";
 import { ROLE_GROUPS } from "@/constants";
 
@@ -54,6 +54,22 @@ describe("saveMemberRoles", () => {
     expect(state[1].roles).toEqual(["Tradutor"]);
     expect(update).toHaveBeenCalledWith({ roles: ["Grupo de Louvor", "Pastor"], role: "Pastor" });
     expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("saveMemberPicks sends Vocal/Instrumento picks to their fields in the same write", async () => {
+    updateResolves({ data: [{ id: "M1" }], error: null });
+    let state = [{ id: "M1", name: "A", roles: ["Pastor"], role: "Pastor", voiceType: "", instruments: [] }];
+    const ok = await saveMemberPicks({ member: state[0], picks: ["Grupo de Louvor", "Pastor", "Tenor", "Violão"], setMembers: (fn) => { state = fn(state); }, notify: vi.fn() });
+    expect(ok).toBe(true);
+    expect(update).toHaveBeenCalledWith({ roles: ["Grupo de Louvor", "Pastor"], role: "Pastor", voice_type: "Tenor", instruments: ["Violão"] });
+    expect(state[0]).toMatchObject({ roles: ["Grupo de Louvor", "Pastor"], role: "Pastor", voiceType: "Tenor", instruments: ["Violão"] });
+  });
+
+  it("saveMemberRoles alone leaves voice and instruments untouched", async () => {
+    updateResolves({ data: [{ id: "M1" }], error: null });
+    await saveMemberRoles({ member: { id: "M1" }, roles: ["Tradutor"], setMembers: () => {}, notify: vi.fn() });
+    expect(update.mock.calls[0][0]).not.toHaveProperty("voice_type");
+    expect(update.mock.calls[0][0]).not.toHaveProperty("instruments");
   });
 
   it("toasts when the row was not found (no error, zero rows)", async () => {

@@ -122,7 +122,7 @@ function CMSAdmin({ props, lang }) {
               </>
             )}
             {sec === "ga" && <AdminGA {...props} />}
-            {sec === "funcoes" && <FuncoesTab members={props.members} setMembers={props.setMembers} gas={props.gas} dbVoiceTypes={props.dbVoiceTypes} dbInstruments={props.dbInstruments} notify={props.notify} logAudit={props.logAudit} />}
+            {sec === "funcoes" && <FuncoesTab members={props.members} setMembers={props.setMembers} gas={props.gas} notify={props.notify} logAudit={props.logAudit} />}
             {sec === "import" && <AdminImport members={props.members} setMembers={props.setMembers} families={props.families} setFamilies={props.setFamilies} gas={props.gas} setGas={props.setGas} rosters={props.rosters} setRosters={props.setRosters} churches={props.churches} setChurches={props.setChurches} notify={props.notify} />}
           </div>
         </div>

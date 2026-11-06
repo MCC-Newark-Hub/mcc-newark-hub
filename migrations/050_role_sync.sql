@@ -1,4 +1,4 @@
--- Diretório › Funções and Diretório › Membros show the same roles.
+-- 050: Diretório › Funções and Diretório › Membros show the same roles.
 -- 1. Add to the functions catalogue (what the Membros form offers) the roles the Funções
 --    tabs use but the catalogue lacks, each next to its siblings.
 -- 2. Rename the old "Professor de Seminário" to the catalogue name on members.

@@ -6,6 +6,7 @@ import { memberRoleFields } from "@/lib/memberRoles";
 import Modal from "@/components/Modal";
 import SearchSelect from "@/components/SearchSelect";
 import RolesMultiSelect from "@/components/directory/RolesMultiSelect";
+import { INSTRUMENTS, VOICE_TYPES, applyMusicPicks } from "@/lib/musicianFields";
 import { syncMemberToRegistrations } from "@/lib/syncMemberName";
 import StaffContactEditor from "@/components/StaffContactEditor";
 import AcessibilidadeField from "@/components/directory/AcessibilidadeField";
@@ -179,7 +180,7 @@ export default function MemberEditModal({
         </div>
         <RolesMultiSelect
           roles={editingMember.roles}
-          onChange={(roles) => setEditingMember({ ...editingMember, roles })}
+          onChange={(roles) => setEditingMember(applyMusicPicks(editingMember, roles))}
         />
         {(editingMember.roles || []).includes("Tradutor") && (
           <div>
@@ -204,13 +205,13 @@ export default function MemberEditModal({
               <label>Tipo de Voz</label>
               <select value={editingMember.voiceType || ""} onChange={(e) => setEditingMember({ ...editingMember, voiceType: e.target.value })}>
                 <option value="">— Nenhum —</option>
-                {["Soprano", "Mezzo-Soprano", "Contralto", "Tenor", "Barítono", "Baixo"].map((v) => <option key={v}>{v}</option>)}
+                {VOICE_TYPES.map((v) => <option key={v}>{v}</option>)}
               </select>
             </div>
             <div>
               <label>Instrumentos</label>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
-                {["Violão", "Guitarra", "Contrabaixo", "Teclado", "Bateria", "Percussão", "Flauta", "Violino", "Trompete", "Saxofone"].map((inst) => {
+                {INSTRUMENTS.map((inst) => {
                   const checked = (editingMember.instruments || []).includes(inst);
                   return (
                     <label key={inst} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, cursor: "pointer", userSelect: "none" }}>

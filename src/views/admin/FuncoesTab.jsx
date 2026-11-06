@@ -1,16 +1,11 @@
 import { useState } from "react";
 import { X } from "lucide-react";
-import { sb } from "@/lib/supabase";
-import { FUNC_GROUPS, saveMemberRoles } from "@/lib/memberRoles";
+import { musicPicks } from "@/lib/musicianFields";
+import { FUNC_GROUPS, saveMemberPicks, saveMemberRoles } from "@/lib/memberRoles";
 
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
-// Voice and instruments are the same fields the Membros form edits (voice_type,
-// instruments) — not roles — so both screens show the same thing.
-const FALLBACK_VOICES = ["Soprano", "Mezzo-Soprano", "Contralto", "Tenor", "Barítono", "Baixo"];
-const FALLBACK_INSTRUMENTS = ["Violão", "Guitarra", "Baixo Elétrico", "Teclado", "Bateria", "Percussão", "Flauta", "Violino", "Trompete", "Saxofone"];
-
-export default function FuncoesTab({ members, setMembers, gas, dbVoiceTypes, dbInstruments, notify, logAudit, churchLock, filterMemberIds }) {
+export default function FuncoesTab({ members, setMembers, gas, notify, logAudit, churchLock, filterMemberIds }) {
   const [activeGroup, setActiveGroup] = useState("louvor");
   const [groupByChurch, setGroupByChurch] = useState(false);
   const [groupByClass, setGroupByClass] = useState(false);
@@ -19,8 +14,6 @@ export default function FuncoesTab({ members, setMembers, gas, dbVoiceTypes, dbI
   const [filterChurch, setFilterChurch] = useState(churchLock || "");
   const [roleEditing, setRoleEditing] = useState(null);
   const [editingRoles, setEditingRoles] = useState([]);
-  const [editingVoice, setEditingVoice] = useState("");
-  const [editingInstruments, setEditingInstruments] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
   const [addSearch, setAddSearch] = useState("");
   const [addRole, setAddRole] = useState("");
@@ -82,29 +75,13 @@ export default function FuncoesTab({ members, setMembers, gas, dbVoiceTypes, dbI
     setAddRole("");
   };
 
-  const isLouvor = activeGroup === "louvor";
-  const voiceOptions = (dbVoiceTypes?.length ? dbVoiceTypes : FALLBACK_VOICES.map((name) => ({ name })))
-    .filter((v) => !v.gender || !roleEditing?.gender || v.gender === roleEditing.gender).map((v) => v.name);
-  const instrumentOptions = (dbInstruments?.length ? dbInstruments : FALLBACK_INSTRUMENTS.map((name) => ({ name }))).map((i) => i.name);
-
-  const openRoleEdit = (m) => {
-    setRoleEditing(m);
-    setEditingRoles(m.roles || []);
-    setEditingVoice(m.voiceType || "");
-    setEditingInstruments(m.instruments || []);
-  };
+  const openRoleEdit = (m) => { setRoleEditing(m); setEditingRoles(musicPicks(m)); };
 
   const saveRoles = async () => {
     const member = roleEditing;
     setRoleEditing(null);
-    const ok = await saveMemberRoles({ member, roles: editingRoles, setMembers, notify });
-    if (!ok) return;
-    if (isLouvor && (editingVoice !== (member.voiceType || "") || editingInstruments.join("|") !== (member.instruments || []).join("|"))) {
-      setMembers((p) => p.map((m) => m.id === member.id ? { ...m, voiceType: editingVoice, instruments: editingInstruments } : m));
-      const { data, error } = await sb.from("members").update({ voice_type: editingVoice || null, instruments: editingInstruments }).eq("id", member.id).select();
-      if (error || !data?.length) { notify("Erro ao salvar voz/instrumentos" + (error ? ": " + error.message : ".")); return; }
-    }
-    logAudit?.("member_roles_updated", "member", member.id, member.name, { roles: editingRoles });
+    if (!(await saveMemberPicks({ member, picks: editingRoles, setMembers, notify }))) return;
+    logAudit?.("member_roles_updated", "member", member.id, member.name, { picks: editingRoles });
     notify("Funções atualizadas!");
   };
 
@@ -117,13 +94,14 @@ export default function FuncoesTab({ members, setMembers, gas, dbVoiceTypes, dbI
     const role = group?.roles?.length === 1 ? group.roles[0] : addRole;
     if (!role) return;
     setAddSearch("");
-    const ok = await saveMemberRoles({ member: m, roles: [...(m.roles || []), role], setMembers, notify });
-    if (!ok) return;
+    if (!(await saveMemberRoles({ member: m, roles: [...(m.roles || []), role], setMembers, notify }))) return;
     logAudit?.("member_role_added", "member", m.id, m.name, { role });
     notify(`${m.name} adicionado(a) como ${role}!`);
   };
 
-  const allGroupRoles = group?.roles || [];
+  const allGroupRoles = group?.roleGroups
+    ? group.roleGroups.flatMap((g) => g.roles)
+    : group?.roles || [];
 
   const toChurchCards = (mems) =>
     [...new Set(mems.map((m) => m.church || "Outra / Não Listada"))]
@@ -149,7 +127,7 @@ export default function FuncoesTab({ members, setMembers, gas, dbVoiceTypes, dbI
   const renderRow = (m) => {
     const subRoles = group?.gaLeaders
       ? [m._gaName]
-      : [...(m.roles || []).filter((r) => allGroupRoles.includes(r)), ...(isLouvor ? [m.voiceType, ...(m.instruments || [])].filter(Boolean) : [])];
+      : musicPicks(m).filter((r) => allGroupRoles.includes(r));
     return (
       <div
         key={m.id + (m._gaName || "")}
@@ -274,42 +252,38 @@ export default function FuncoesTab({ members, setMembers, gas, dbVoiceTypes, dbI
               <button className="btn btn-ghost btn-sm" onClick={() => setRoleEditing(null)}>✕</button>
             </div>
             <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 14 }}>{roleEditing.church}</p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {(group?.roles || []).map((r) => {
-                const on = editingRoles.includes(r);
-                return (
-                  <button key={r}
-                    onClick={() => setEditingRoles((p) => on ? p.filter((x) => x !== r) : [...p, r])}
-                    style={{ fontSize: 13, padding: "6px 14px", borderRadius: 20, border: `1px solid ${on ? "var(--icm-crimson)" : "var(--border)"}`, background: on ? "var(--icm-crimson)" : "var(--card-bg)", color: on ? "#fff" : "var(--text)", cursor: "pointer", fontWeight: on ? 600 : 400 }}>
-                    {r}
-                  </button>
-                );
-              })}
-            </div>
-            {isLouvor && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 16 }}>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 6 }}>Voz</div>
-                  <select value={editingVoice} onChange={(e) => setEditingVoice(e.target.value)}>
-                    <option value="">— Nenhuma —</option>
-                    {[...new Set([...voiceOptions, editingVoice].filter(Boolean))].map((v) => <option key={v} value={v}>{v}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 6 }}>Instrumentos</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {[...new Set([...instrumentOptions, ...editingInstruments])].map((inst) => {
-                      const on = editingInstruments.includes(inst);
-                      return (
-                        <button key={inst}
-                          onClick={() => setEditingInstruments((p) => on ? p.filter((x) => x !== inst) : [...p, inst])}
-                          style={{ fontSize: 12, padding: "5px 12px", borderRadius: 20, border: `1px solid ${on ? "var(--icm-crimson)" : "var(--border)"}`, background: on ? "var(--icm-crimson)" : "var(--card-bg)", color: on ? "#fff" : "var(--text)", cursor: "pointer", fontWeight: on ? 600 : 400 }}>
-                          {inst}
-                        </button>
-                      );
-                    })}
+            {group?.roleGroups ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {group.roleGroups.map(({ label, roles: rols }) => (
+                  <div key={label}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 6 }}>{label}</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {rols.map((r) => {
+                        const on = editingRoles.includes(r);
+                        return (
+                          <button key={r}
+                            onClick={() => setEditingRoles((p) => on ? p.filter((x) => x !== r) : [...p, r])}
+                            style={{ fontSize: 12, padding: "5px 12px", borderRadius: 20, border: `1px solid ${on ? "var(--icm-crimson)" : "var(--border)"}`, background: on ? "var(--icm-crimson)" : "var(--card-bg)", color: on ? "#fff" : "var(--text)", cursor: "pointer", fontWeight: on ? 600 : 400 }}>
+                            {r}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {(group?.roles || []).map((r) => {
+                  const on = editingRoles.includes(r);
+                  return (
+                    <button key={r}
+                      onClick={() => setEditingRoles((p) => on ? p.filter((x) => x !== r) : [...p, r])}
+                      style={{ fontSize: 13, padding: "6px 14px", borderRadius: 20, border: `1px solid ${on ? "var(--icm-crimson)" : "var(--border)"}`, background: on ? "var(--icm-crimson)" : "var(--card-bg)", color: on ? "#fff" : "var(--text)", cursor: "pointer", fontWeight: on ? 600 : 400 }}>
+                      {r}
+                    </button>
+                  );
+                })}
               </div>
             )}
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>

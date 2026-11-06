@@ -170,8 +170,6 @@ function GALeaderView(props) {
                 members={members}
                 setMembers={setMembers}
                 gas={gas}
-                dbVoiceTypes={props.dbVoiceTypes}
-                dbInstruments={props.dbInstruments}
                 notify={notify}
                 filterMemberIds={allMyMembers.map((m) => m.id)}
                 logAudit={logAudit}
