@@ -67,7 +67,7 @@ export const ROLE_GROUPS = [
     group: "Louvor",
     roles: ["Grupo de Louvor", "Instrumentista", "Instrumentista Aprendiz", "Operador de Som", "Operador de Projeção"],
   },
-  { group: "Louvor — Vocal", roles: ["Soprano", "Mezzo", "Contralto", "Tenor", "Barítono", "Baixo"] },
+  { group: "Louvor — Vocal", roles: ["Soprano", "Mezzo-Soprano", "Contralto", "Tenor", "Barítono", "Baixo"] },
   { group: "Louvor — Instrumento", roles: ["Violão", "Guitarra", "Baixo Elétrico", "Bateria", "Teclado", "Piano", "Flauta", "Saxofone", "Trompete", "Violino", "Percussão"] },
   { group: "Intercessão", roles: ["Grupo de Intercessão", "Grupo de Oração"] },
   { group: "Limpeza", roles: ["Grupo de Limpeza"] },

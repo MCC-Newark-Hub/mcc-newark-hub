@@ -22,6 +22,7 @@ import GroupsPanel from "@/components/directory/GroupsPanel";
 import ChurchGroupsPanel from "@/components/directory/ChurchGroupsPanel";
 import OrgChartPanel from "@/components/directory/OrgChartPanel";
 import RolesMultiSelect from "@/components/directory/RolesMultiSelect";
+import { applyMusicPicks } from "@/lib/musicianFields";
 import RegistrationsTab from "./admin/RegistrationsTab";
 import TeamsTab from "./admin/TeamsTab";
 import EventsTab from "./admin/EventsTab";
@@ -1701,7 +1702,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
                     )}
                     <RolesMultiSelect
                       roles={formData.roles}
-                      onChange={(roles) => setFormData({ ...formData, roles })}
+                      onChange={(roles) => setFormData(applyMusicPicks(formData, roles))}
                       dbFunctions={dbFunctions}
                     />
                     {(formData.roles || []).some((r) => ["Grupo de Louvor", "Instrumentista", "Instrumentista Aprendiz", "Responsável - Grupo de Louvor"].includes(r)) && (
@@ -1860,7 +1861,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
                       if (!formData.name?.trim() && !formData.firstName?.trim()) { notify("Nome obrigatório."); return; }
                       if (churches.find((c) => c.display === formData.church)?.is_hub && !formData.gaId) { notify("Grupo é obrigatório para igrejas do Pólo."); return; }
                       const fullName = formData.name?.trim() || ((formData.firstName || '') + ' ' + (formData.lastName || '')).trim();
-                      const row = { name: fullName, first_name: formData.firstName || null, last_name: formData.lastName || null, badge_name: formData.badgeName || fullName, gender: formData.gender || "M", category: formData.category || "Adulto", church: formData.church || "", roles: formData.roles || [], role: (formData.roles || [])[0] || "", family_id: formData.familyId || null, ga_id: formData.gaId || null, allergies: formData.allergies || null, special_needs: formData.specialNeeds || null, acessibilidade: isCiaCategory(formData.category || "Adulto") && !!formData.acessibilidade, notes: formData.notes || null, is_guest: formData.isGuest || false, invited_by: formData.isGuest ? (formData.invitedBy || null) : null, translation_languages: formData.translationLanguages || [], voice_type: formData.voiceType || null, ...(formData.voiceLowestNote ? { voice_lowest_note: formData.voiceLowestNote } : {}), ...(formData.voiceHighestNote ? { voice_highest_note: formData.voiceHighestNote } : {}), ...(formData.instruments?.length ? { instruments: formData.instruments } : {}), ...(formData.immigrationStatus ? { immigration_status: formData.immigrationStatus } : {}) };
+                      const row = { name: fullName, first_name: formData.firstName || null, last_name: formData.lastName || null, badge_name: formData.badgeName || fullName, gender: formData.gender || "M", category: formData.category || "Adulto", church: formData.church || "", roles: formData.roles || [], role: (formData.roles || [])[0] || "", family_id: formData.familyId || null, ga_id: formData.gaId || null, allergies: formData.allergies || null, special_needs: formData.specialNeeds || null, acessibilidade: isCiaCategory(formData.category || "Adulto") && !!formData.acessibilidade, notes: formData.notes || null, is_guest: formData.isGuest || false, invited_by: formData.isGuest ? (formData.invitedBy || null) : null, translation_languages: formData.translationLanguages || [], voice_type: formData.voiceType || null, ...(formData.voiceLowestNote ? { voice_lowest_note: formData.voiceLowestNote } : {}), ...(formData.voiceHighestNote ? { voice_highest_note: formData.voiceHighestNote } : {}), instruments: formData.instruments || [], ...(formData.immigrationStatus ? { immigration_status: formData.immigrationStatus } : {}) };
                       if (isNew) {
                         const nums = (members || []).map((m) => parseInt((m.id || "").replace(/^M/, ""), 10)).filter((n) => !isNaN(n));
                         const next = nums.length > 0 ? Math.max(...nums) + 1 : 1;

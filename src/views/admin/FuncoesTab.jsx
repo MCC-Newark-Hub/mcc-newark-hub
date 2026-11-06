@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { sb } from "@/lib/supabase";
+import { INSTRUMENTS, VOICE_TYPES, musicPicks, musicRow } from "@/lib/musicianFields";
 
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
@@ -9,8 +10,9 @@ const FUNC_GROUPS = [
   { id: "louvor",      label: "Louvor",             roles: ["Grupo de Louvor", "Instrumentista", "Instrumentista Aprendiz"],
     roleGroups: [
       { label: "Função",      roles: ["Grupo de Louvor", "Instrumentista", "Instrumentista Aprendiz"] },
-      { label: "Vocal",       roles: ["Soprano", "Mezzo", "Contralto", "Tenor", "Barítono", "Baixo"] },
-      { label: "Instrumento", roles: ["Violão", "Guitarra", "Baixo Elétrico", "Bateria", "Teclado", "Piano", "Flauta", "Saxofone", "Trompete", "Violino", "Percussão"] },
+      // Saved in members.voice_type / members.instruments (see musicRow), not in roles.
+      { label: "Vocal",       roles: VOICE_TYPES },
+      { label: "Instrumento", roles: INSTRUMENTS },
     ]
   },
   { id: "som",         label: "Som & Projeção",     roles: ["Operador de Som", "Operador de Projeção"] },
@@ -94,13 +96,14 @@ export default function FuncoesTab({ members, setMembers, gas, notify, logAudit,
     setAddRole("");
   };
 
-  const openRoleEdit = (m) => { setRoleEditing(m); setEditingRoles(m.roles || []); };
+  const openRoleEdit = (m) => { setRoleEditing(m); setEditingRoles(musicPicks(m)); };
 
   const saveRoles = async () => {
-    const { error } = await sb.from("members").update({ roles: editingRoles }).eq("id", roleEditing.id).select();
-    if (error) { notify("Erro: " + error.message); return; }
-    setMembers((p) => p.map((m) => m.id === roleEditing.id ? { ...m, roles: editingRoles } : m));
-    logAudit?.("member_roles_updated", "member", roleEditing.id, roleEditing.name, { roles: editingRoles });
+    const row = musicRow(editingRoles);
+    const { data, error } = await sb.from("members").update(row).eq("id", roleEditing.id).select("id");
+    if (error || !data?.length) { notify("Erro: " + (error?.message || "membro não encontrado")); return; }
+    setMembers((p) => p.map((m) => m.id === roleEditing.id ? { ...m, roles: row.roles, voiceType: row.voice_type || "", instruments: row.instruments } : m));
+    logAudit?.("member_roles_updated", "member", roleEditing.id, roleEditing.name, row);
     notify("Funções atualizadas!");
     setRoleEditing(null);
   };
@@ -150,7 +153,7 @@ export default function FuncoesTab({ members, setMembers, gas, notify, logAudit,
   const renderRow = (m) => {
     const subRoles = group?.gaLeaders
       ? [m._gaName]
-      : (m.roles || []).filter((r) => allGroupRoles.includes(r));
+      : musicPicks(m).filter((r) => allGroupRoles.includes(r));
     return (
       <div
         key={m.id + (m._gaName || "")}
