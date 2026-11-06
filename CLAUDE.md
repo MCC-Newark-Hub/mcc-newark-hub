@@ -53,6 +53,7 @@ Uses React Router v6. `<BrowserRouter>` in `src/main.jsx`; full route tree in `s
 | `/cms` | CMSSection — church/member management (Phase 4+) |
 | `/assistance` | AssistanceSection — Assistência/Care: Frequência (service census) tab; GA attendance, visits and prayer requests to come |
 | `/schedule` | ScheduleSection — door/flower rotations, prayer agenda (Phase 3+) |
+| `/worship` | WorshipSection — Culto Profético: Listas de louvores (lists, catalogue, history) and Grupos (responsible group per weekly service) |
 | `/apprentice` | ApprenticeSection — Projeto Aprendiz (TBD) |
 | `/settings` | SettingsSection — users, PINs, audit (Phase 5+) |
 
