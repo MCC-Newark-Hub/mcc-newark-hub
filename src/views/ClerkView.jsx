@@ -402,14 +402,14 @@ function ClerkView(props) {
                         {viewRegs.map((r) => (
                           <tr key={r.id}>
                             <td><input type="checkbox" checked={bulkSel.includes(r.id)} onChange={() => toggleBulk(r.id)} /></td>
-                            <td style={{ fontFamily: "monospace", fontSize: 11, color: "#1a3a6b", fontWeight: 600, whiteSpace: "nowrap" }}>{r.regNumber || "—"}</td>
+                            <td style={{ fontFamily: "monospace", fontSize: 11, color: "var(--text)", fontWeight: 600, whiteSpace: "nowrap" }}>{r.regNumber || "—"}</td>
                             <td><div style={{ fontWeight: 600 }}>{r.memberName || "—"}</div></td>
-                            <td>{r.role ? <span className={`badge ${ROLE_BADGE[r.role] || "badge-gray"}`}>{r.role}</span> : <span style={{ color: "#9ca3af", fontSize: 12 }}>—</span>}</td>
+                            <td>{r.role ? <span className={`badge ${ROLE_BADGE[r.role] || "badge-gray"}`}>{r.role}</span> : <span style={{ color: "var(--muted)", fontSize: 12 }}>—</span>}</td>
                             <td><span className="badge badge-blue">{r.category || "—"}</span></td>
-                            <td style={{ fontSize: 12, color: "#6b7280" }}>{r.church || "—"}</td>
+                            <td style={{ fontSize: 12, color: "var(--muted)" }}>{r.church || "—"}</td>
                             <td style={{ fontSize: 12 }}>{r.team || "—"}</td>
-                            <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{r.exempt ? <span style={{ color: "#6b7280" }}>{t.exempt}</span> : fmt(r.fee ?? 0)}</td>
-                            <td style={{ fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>{r.registeredAt || "—"}</td>
+                            <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{r.exempt ? <span style={{ color: "var(--muted)" }}>{t.exempt}</span> : fmt(r.fee ?? 0)}</td>
+                            <td style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>{r.registeredAt || "—"}</td>
                             <td><StatusBadge r={r} event={event} allRegs={allForCity} /></td>
                             <td className="sticky-actions">
                               <RegActions reg={r} {...actionProps} resending={resendingId === r.id} />
@@ -441,7 +441,7 @@ function ClerkView(props) {
                   <span style={{ fontSize: 12, color: "#6b7280" }}>{memberList.length}</span>
                 </div>
                 <div className="table-wrap">
-                  <table className="table">
+                  <table className="table table-stack ts-auto-title">
                     <thead style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--card-bg, #fff)" }}><tr><th>{t.memberName}</th><th>{t.cargo}</th><th>{t.cat}</th><th>Família</th><th>{t.actions}</th></tr></thead>
                     <tbody>
                       {memberList.length === 0 && <tr><td colSpan={5} style={{ textAlign: "center", color: "#6b7280", padding: 28 }}>{t.noRecords}</td></tr>}

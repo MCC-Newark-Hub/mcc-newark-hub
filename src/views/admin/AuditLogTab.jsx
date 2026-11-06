@@ -206,7 +206,7 @@ export default function AuditLogTab({ dbUsers }) {
 
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         <div className="table-wrap">
-          <table className="table">
+          <table className="table table-stack ts-auto">
             <thead style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--card-bg, #fff)" }}>
               <tr>
                 <th style={{ width: 150 }}>Data/Hora</th>

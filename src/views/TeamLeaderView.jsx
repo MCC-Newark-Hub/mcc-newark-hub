@@ -441,7 +441,7 @@ function TeamLeaderView(props) {
                           <p style={{ padding: "14px 16px", color: "var(--muted)", fontSize: 13 }}>Nenhum inscrito nesta classe.</p>
                         ) : (
                           <div style={{ overflowX: "auto" }}>
-                            <table className="table" style={{ minWidth: 420 }}>
+                            <table className="table table-stack ts-auto" style={{ minWidth: 420 }}>
                               <thead>
                                 <tr>
                                   <th style={{ width: 44 }}>Presença</th>
@@ -533,7 +533,7 @@ function TeamLeaderView(props) {
                       </div>
                       {open && (
                         <div style={{ overflowX: "auto" }}>
-                          <table className="table" style={{ minWidth: 420 }}>
+                          <table className="table table-stack ts-auto" style={{ minWidth: 420 }}>
                             <thead>
                               <tr>
                                 <th style={{ width: 44 }}>Presença</th>
@@ -712,7 +712,7 @@ function TeamLeaderView(props) {
                     <p style={{ padding: 24, color: "var(--muted)", textAlign: "center", fontSize: 13 }}>Nenhum músico na equipe ainda.</p>
                   ) : (
                     <div style={{ overflowX: "auto" }}>
-                      <table className="table" style={{ minWidth: 520 }}>
+                      <table className="table table-stack ts-auto-title" style={{ minWidth: 520 }}>
                         <thead>
                           <tr>
                             <th>Nome</th>
@@ -831,7 +831,7 @@ function TeamLeaderView(props) {
                     </p>
                   ) : (
                     <div style={{ overflowX: "auto" }}>
-                      <table className="table" style={{ minWidth: 480 }}>
+                      <table className="table table-stack ts-auto-title" style={{ minWidth: 480 }}>
                         <thead>
                           <tr>
                             <th>Nome</th>

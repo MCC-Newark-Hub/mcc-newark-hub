@@ -232,34 +232,36 @@ export default function FamiliesPanel({ members, families, setFamilies, gas, sho
       )}
 
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-        <table className="table">
-          <thead>
-            <tr>
-              <th style={{ width: 36 }}>
-                <input type="checkbox" checked={allIds.length > 0 && allIds.every((id) => selected.includes(id))}
-                  onChange={(e) => e.target.checked ? selAll(allIds) : clearSel()} />
-              </th>
-              <th>Nome</th>
-              {showChurch && <th>Igreja</th>}
-              {showGroup  && <th>Grupo</th>}
-              <th>Membros</th>
-              <th style={{ width: 90 }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {groupedList ? groupedList.flatMap((grp) => [
-              <tr key={`grp-${grp.key}`} style={{ background: "var(--bg2)" }}>
-                <td colSpan={colCount} style={{ fontWeight: 700, fontSize: 12, padding: "6px 10px" }}>
-                  {groupBy === "church" ? "🏛" : "👥"} {grp.key} <span style={{ opacity: .65, fontWeight: 400 }}>({grp.items.length})</span>
-                </td>
-              </tr>,
-              ...grp.items.map(renderRow),
-            ]) : sorted.map(renderRow)}
-            {sorted.length === 0 && (
-              <tr><td colSpan={colCount} style={{ textAlign: "center", color: "var(--muted)", padding: 20 }}>Nenhum resultado.</td></tr>
-            )}
-          </tbody>
-        </table>
+        <div className="table-wrap">
+          <table className="table table-stack ts-auto">
+            <thead>
+              <tr>
+                <th style={{ width: 36 }}>
+                  <input type="checkbox" checked={allIds.length > 0 && allIds.every((id) => selected.includes(id))}
+                    onChange={(e) => e.target.checked ? selAll(allIds) : clearSel()} />
+                </th>
+                <th>Nome</th>
+                {showChurch && <th>Igreja</th>}
+                {showGroup  && <th>Grupo</th>}
+                <th>Membros</th>
+                <th style={{ width: 90 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {groupedList ? groupedList.flatMap((grp) => [
+                <tr key={`grp-${grp.key}`} style={{ background: "var(--bg2)" }}>
+                  <td colSpan={colCount} style={{ fontWeight: 700, fontSize: 12, padding: "6px 10px" }}>
+                    {groupBy === "church" ? "🏛" : "👥"} {grp.key} <span style={{ opacity: .65, fontWeight: 400 }}>({grp.items.length})</span>
+                  </td>
+                </tr>,
+                ...grp.items.map(renderRow),
+              ]) : sorted.map(renderRow)}
+              {sorted.length === 0 && (
+                <tr><td colSpan={colCount} style={{ textAlign: "center", color: "var(--muted)", padding: 20 }}>Nenhum resultado.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
