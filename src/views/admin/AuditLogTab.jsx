@@ -16,6 +16,8 @@ const ACTION_LABELS = {
   app_user_created: "Usuário criado",
   app_user_updated: "Usuário atualizado",
   app_user_pin_generated: "Novo PIN gerado",
+  see_as_started: "Ver como: início",
+  see_as_ended: "Ver como: fim",
   member_created: "Membro criado (form próprio)",
   member_updated: "Membro atualizado (form próprio)",
   members_created: "Membro criado",
