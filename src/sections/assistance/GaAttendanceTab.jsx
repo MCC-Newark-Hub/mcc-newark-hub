@@ -5,6 +5,7 @@ import { todayLocal } from "@/lib/prayerSlots";
 import { groupGasByChurch } from "@/lib/gaGroups";
 import { gasInScope, rosterFor, attendanceTypesFor, attendanceDateAllowed, isAttendanceAdmin, addDays, ATTENDANCE_DAYS_BACK } from "@/lib/gaAttendance";
 import GaAttendanceForm from "./GaAttendanceForm";
+import GaFollowUp from "./GaFollowUp";
 
 // Assistência › Chamada do GA: the GA leader marks who of their group was at each service (admins: any group), and
 // follows who has not been coming — to care for them, never to accuse.
@@ -73,7 +74,7 @@ export default function GaAttendanceTab({ lang }) {
             canSave={dateOk} lang={lang} />
         </>
       )}
-      {view === "follow" && null}
+      {view === "follow" && <GaFollowUp key={ga.id} ga={ga} roster={roster} lang={lang} />}
     </div>
   );
 }

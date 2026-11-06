@@ -97,3 +97,27 @@ describe("GaAttendanceTab — Chamada", () => {
     expect(await screen.findByLabelText("Carla")).toBeTruthy();
   });
 });
+
+describe("GaAttendanceTab — Acompanhamento", () => {
+  it("lists who to reach out to first, with gentle wording", async () => {
+    listA.mockResolvedValue({ data: [
+      { service_date: "2026-10-11", service_type: "noite", roster_ids: ["a", "b"], present_ids: ["a", "b"] },
+      { service_date: "2026-10-18", service_type: "noite", roster_ids: ["a", "b"], present_ids: ["a"] },
+      { service_date: "2026-10-25", service_type: "noite", roster_ids: ["a", "b"], present_ids: ["a"] },
+      { service_date: "2026-11-01", service_type: "ebd", roster_ids: ["a", "b"], present_ids: ["a"] },
+    ], error: null });
+    renderTab(leader);
+    fireEvent.click(screen.getByText("Acompanhamento"));
+    await waitFor(() => expect(listA).toHaveBeenCalledWith("g1", "2026-05-03"));
+    expect(await screen.findByText("Para cuidar primeiro")).toBeTruthy();
+    expect(screen.getAllByText("Última presença: há 3 semanas").length).toBeGreaterThan(0); // Bruno, 21 days
+    expect(screen.getAllByText("Última presença: hoje").length).toBeGreaterThan(0);          // Ana
+    expect(document.body.textContent).not.toMatch(/falt/i);
+  });
+
+  it("says so when there is no attendance yet", async () => {
+    renderTab(leader);
+    fireEvent.click(screen.getByText("Acompanhamento"));
+    expect(await screen.findByText("Ainda não há chamadas deste grupo. Faça a primeira na aba Chamada.")).toBeTruthy();
+  });
+});
