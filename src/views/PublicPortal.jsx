@@ -341,6 +341,8 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
   const [contactErrs, setContactErrs] = useState({});
   const [invitedByMemberId, setInvitedByMemberId] = useState("");
   const [translations, setTranslations] = useState({ en: false, es: false });
+  // Someone filling the form in Portuguese doesn't need translation; only ask in EN.
+  const askTranslation = (lang || "pt") !== "pt";
   const [allergies, setAllergies] = useState({ hasAny: false, other: "" });
   const [specialNeeds, setSpecialNeeds] = useState({ hasAny: false, other: "" });
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -564,7 +566,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
           team: teamForRole(m.role),
           paid: false,
           exempt: false,
-          needsTranslation: translations.en || translations.es,
+          needsTranslation: askTranslation && (translations.en || translations.es),
           note: sharedNote,
           invitedByMemberId: invitedByMemberId || null,
           forceWaitlist: isBlocked || undefined,
@@ -1311,13 +1313,13 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
                     placeholder={lang === "en" ? "Search name..." : "Buscar nome..."}
                   />
                 </div>
-                <div>
+                {askTranslation && <div>
                   <label>{t.translationNeededLabel}</label>
                   <div style={{ display: "flex", gap: 16, marginTop: 4 }}>
                     <div className="cb"><input type="checkbox" id="ten" checked={translations.en} onChange={(e) => setTranslations({ ...translations, en: e.target.checked })} /><label htmlFor="ten">{t.translationEN}</label></div>
                     <div className="cb"><input type="checkbox" id="tes" checked={translations.es} onChange={(e) => setTranslations({ ...translations, es: e.target.checked })} /><label htmlFor="tes">{t.translationES}</label></div>
                   </div>
-                </div>
+                </div>}
               </div>
 
               {/* Language tabs */}
