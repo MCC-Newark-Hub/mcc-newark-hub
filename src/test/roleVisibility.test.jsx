@@ -53,7 +53,7 @@ describe("canSeeSection: one list for tiles and routes", () => {
   const see = (user) => Object.keys(SECTION_ROLES).filter((id) => canSeeSection(user, id));
 
   it("admin sees every section", () => expect(see(admin)).toEqual(Object.keys(SECTION_ROLES)));
-  it("GA leader: Eventos and Diretório — no Escalas, no Culto Profético", () => expect(see(gaLeader)).toEqual(["events", "cms"]));
+  it("GA leader: Eventos, Diretório and Assistência (Trombetas only) — no Escalas, no Culto Profético", () => expect(see(gaLeader)).toEqual(["events", "cms", "assistance"]));
   it("secretary keeps Escalas and Culto Profético", () => expect(see(clerk)).toEqual(["events", "cms", "assistance", "schedule", "worship", "apprentice"]));
   it("pastor and treasurer are unchanged", () => {
     expect(see(pastor)).toEqual(["events", "cms", "assistance", "schedule", "worship", "apprentice"]);

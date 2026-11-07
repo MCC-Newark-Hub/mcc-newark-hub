@@ -1,24 +1,25 @@
 import { useState } from "react";
-import { Users } from "lucide-react";
+import { Users, Megaphone } from "lucide-react";
 import { STRINGS } from "@/i18n/strings";
 import { useAppDataContext } from "@/context/AppDataContext";
 import CensusTab from "./CensusTab";
+import TrumpetsTab from "./TrumpetsTab";
 
-// Assistência (Care): pastoral follow-up. Starts with the service census; GA attendance, visits and prayer requests
-// arrive as tabs here.
+// Assistência (Care): the service census (staff) and Trombetas e Festas (staff and GA leaders).
 const TABS = [
-  { id: "census", icon: Users, color: "#b45309", pt: "Frequência", en: "Attendance" },
+  { id: "census", icon: Users, color: "#b45309", pt: "Frequência", en: "Attendance", roles: ["admin", "clerk", "pastor"] },
+  { id: "trumpets", icon: Megaphone, color: "#7c3aed", pt: "Trombetas e Festas", en: "Trumpets & Feasts", roles: ["admin", "clerk", "pastor", "ga_leader"] },
 ];
-// Same profiles as the Home tile; anyone else who types /assistance gets a message, not the data.
-const ALLOWED = ["admin", "clerk", "pastor"];
 
 export default function AssistanceSection({ lang }) {
   const pt = lang !== "en";
-  const [tab, setTab] = useState("census");
   const { user } = useAppDataContext() || {};
   const roles = user?.sysRoles?.length ? user.sysRoles : [user?.sysRole].filter(Boolean);
+  const visible = TABS.filter((t) => t.roles.some((r) => roles.includes(r)));
+  const [picked, setTab] = useState(null);
+  const tab = visible.some((t) => t.id === picked) ? picked : visible[0]?.id;
 
-  if (!roles.some((r) => ALLOWED.includes(r))) {
+  if (!visible.length) {
     return (
       <div style={{ minHeight: "calc(100vh - 56px)", background: "var(--bg)", padding: "48px 24px", textAlign: "center", color: "var(--muted)" }}>
         {STRINGS[pt ? "pt" : "en"].assistNoAccess}
@@ -29,7 +30,7 @@ export default function AssistanceSection({ lang }) {
   return (
     <div style={{ minHeight: "calc(100vh - 56px)", background: "var(--bg)" }}>
       <div style={{ background: "var(--card)", borderBottom: "1px solid var(--border)", padding: "0 24px", display: "flex", gap: 4 }}>
-        {TABS.map((t) => {
+        {visible.map((t) => {
           const Icon = t.icon;
           const isActive = t.id === tab;
           return (
@@ -53,6 +54,7 @@ export default function AssistanceSection({ lang }) {
       </div>
       <div style={{ maxWidth: 1000, margin: "0 auto", padding: "32px 24px" }}>
         {tab === "census" && <CensusTab lang={lang} />}
+        {tab === "trumpets" && <TrumpetsTab lang={lang} />}
       </div>
     </div>
   );
