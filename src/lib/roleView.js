@@ -21,3 +21,10 @@ export function seeAs(realUser, target, role) {
 
 // Name for timelines and the audit log while seeing as someone: "Admin Geral (como Marcos Martins)".
 export const actingName = (user) => (user?.viewedBy ? `${user.viewedBy.name} (como ${user.name})` : user?.name);
+
+// Names of the profiles, as the switcher shows them.
+const ROLE_NAMES = {
+  pt: { admin: "Administrador", clerk: "Secretaria", pastor: "Pastores", ga_leader: "Líder de GA", team_leader: "Líder de Equipe", treasurer: "Tesouraria" },
+  en: { admin: "Admin", clerk: "Secretary", pastor: "Pastors", ga_leader: "GA Leader", team_leader: "Team Leader", treasurer: "Treasury" },
+};
+export const roleName = (role, lang = "pt") => (ROLE_NAMES[lang] || ROLE_NAMES.pt)[role] || ROLE_NAMES.pt[role] || role;

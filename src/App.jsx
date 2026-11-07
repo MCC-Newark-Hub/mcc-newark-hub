@@ -3,7 +3,7 @@ import { Routes, Route, useNavigate, useLocation, useParams, Navigate } from "re
 import "./index.css";
 import { LangContext } from "@/i18n/strings";
 import { ROLES_SYS } from "@/constants";
-import { SwitchRoleContext, SeeAsContext } from "@/context/switchRole";
+import { SwitchRoleContext, SeeAsContext, RolePickContext } from "@/context/switchRole";
 import { AppDataContext } from "@/context/AppDataContext";
 import { clearSession, getSessionToken, saveSession } from "@/lib/session";
 import { viewAs, seeAs, canSeeAs, actingName } from "@/lib/roleView";
@@ -183,6 +183,7 @@ export default function App() {
     <AppDataContext.Provider value={shared}>
       <LangContext.Provider value={lang}>
         <SwitchRoleContext.Provider value={user?.allRoles?.length > 1 ? () => setRoleSwitcher(true) : null}>
+        <RolePickContext.Provider value={user?.allRoles?.length > 1 ? { roles: user.allRoles, active: user.sysRole, select: selectRole } : null}>
         <SeeAsContext.Provider value={canSeeAs(authUser) ? () => setSeeAsPicker(true) : null}>
           <div data-theme={theme} style={{ minHeight: "100vh", fontFamily: "'Montserrat','Segoe UI',sans-serif" }}>
             {toast && <div className={`toast${toast.leaving ? " toast-leaving" : ""}`}>{toast.msg}</div>}
@@ -329,6 +330,7 @@ export default function App() {
             )}
           </div>
         </SeeAsContext.Provider>
+        </RolePickContext.Provider>
         </SwitchRoleContext.Provider>
       </LangContext.Provider>
     </AppDataContext.Provider>
