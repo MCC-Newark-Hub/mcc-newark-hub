@@ -8,6 +8,7 @@ import { buildRegNumber, noteRegNumber, parseRegNumber, regCounters } from "@/li
 import { regFeeFlags } from "@/lib/regFee";
 import { waitlistToPromote, PAUSE_FULL, PAUSE_WAITLIST } from "@/lib/pause";
 import { mergeFreshRegs } from "@/lib/regRefresh";
+import { setInstrumentCatalog } from "@/lib/musicianFields";
 import { primaryRole, rolesOf } from "@/lib/memberRoles";
 
 // ── DB → app object mappers ───────────────────────────────────────────────────
@@ -174,6 +175,9 @@ export function useAppData({ getUserRef, notify }) {
   const [dbTeams, setDbTeams] = useState([]);
   const [dbInstruments, setDbInstruments] = useState([]);
   const [dbVoiceTypes, setDbVoiceTypes] = useState([]);
+  // Pickers read INSTRUMENTS; follow the catalog during render (not in an effect) so the
+  // screens below already get the new list in the same render.
+  useMemo(() => setInstrumentCatalog([...dbInstruments].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)).map((i) => i.name)), [dbInstruments]);
   const [settings, setSettings] = useState({ sessionTtlHours: 2 });
   // Last submission number per event and last person per submission (see src/lib/regNumber.js).
   // A ref, not state: a family submission calls addReg several times before React re-renders.

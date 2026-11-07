@@ -1239,6 +1239,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
   const [editing, setEditing] = useState(null);
   const [formData, setFormData] = useState({});
   const [deleting, setDeleting] = useState(null); // { ids:[], label:"" }
+  const [instSort, setInstSort] = useState("order"); // Instrumentos: "order" | "name"
   const [selected, setSelected] = useState([]);
   const [saving, setSaving]   = useState(false);
   const [expanded, setExpanded] = useState(null);
@@ -1312,7 +1313,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <h2 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 22, fontWeight: 700 }}>{title}</h2>
+        {title && <h2 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 22, fontWeight: 700 }}>{title}</h2>}
       </div>
 
       {TABS.length > 1 && <div role="tablist" style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "8px 0 16px" }}>
@@ -2206,8 +2207,20 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
 
       {/* ── Instruments catalog ───────────────────────────────────────────── */}
       {tab === "instruments" && (() => {
-        const list = (dbInstruments || []).filter((i) => norm(i.name).includes(norm(search))).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-        const mapInst = (i) => ({ id: i.id, name: i.name, sortOrder: i.sort_order ?? 0 });
+        const byName = (a, b) => (a.name || "").localeCompare(b.name || "", "pt", { sensitivity: "base" });
+        const list = (dbInstruments || []).filter((i) => norm(i.name).includes(norm(search)))
+          .sort(instSort === "name" ? byName : (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || byName(a, b));
+        // Same shape as the rows loaded from the database (sort_order), so a new or edited
+        // instrument shows its real order without a reload.
+        const mapInst = (i) => ({ id: i.id, name: i.name, sort_order: i.sort_order ?? i.sortOrder ?? 0 });
+        const sortTh = (key, label, style) => (
+          <th style={style} aria-sort={instSort === key ? "ascending" : "none"}>
+            <button type="button" onClick={() => setInstSort(key)} title={`Ordenar por ${label.toLowerCase()}`}
+              style={{ background: "none", border: "none", padding: 0, font: "inherit", color: instSort === key ? "var(--text)" : "inherit", textTransform: "inherit", letterSpacing: "inherit", cursor: "pointer" }}>
+              {label}{instSort === key ? " ↑" : ""}
+            </button>
+          </th>
+        );
         return (
           <>
             {editing !== null && (
@@ -2239,7 +2252,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
             <div className="card" style={{ padding: 0, overflow: "hidden" }}>
               <div style={{ overflow: "auto", maxHeight: "calc(100vh - 320px)" }}>
               <table className="table">
-                <thead style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--card-bg, #fff)" }}><tr><th>Nome</th><th style={{ width: 80 }}>Ordem</th><th style={{ width: 90 }}></th></tr></thead>
+                <thead style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--card-bg, #fff)" }}><tr>{sortTh("name", "Nome")}{sortTh("order", "Ordem", { width: 80 })}<th style={{ width: 90 }}></th></tr></thead>
                 <tbody>
                   {list.map((i) => (
                     <tr key={i.id || i.name}>

@@ -17,6 +17,7 @@ export default function ListasTab({
   dbExpenseCategories, setDbExpenseCategories,
   dbIncomeTypes, setDbIncomeTypes,
   notify,
+  extraTypes = [], // [{ key, label, render }]: lists with their own editor (Instrumentos, Vozes)
 }) {
   const [activeType, setActiveType] = useState("functions");
   const [editing, setEditing] = useState(null); // null | "new" | row object
@@ -24,7 +25,8 @@ export default function ListasTab({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(null);
 
-  const cfg = TYPES.find((t) => t.key === activeType);
+  const extra = extraTypes.find((t) => t.key === activeType);
+  const cfg = TYPES.find((t) => t.key === activeType) || TYPES[0];
 
   const getItems = () => {
     if (activeType === "functions")          return dbFunctions           || [];
@@ -134,7 +136,7 @@ export default function ListasTab({
     <div style={{ display: "flex", gap: 0, minHeight: 400 }}>
       {/* Type selector */}
       <div style={{ width: 190, borderRight: "1px solid var(--border)", paddingRight: 12, flexShrink: 0 }}>
-        {TYPES.map((t) => (
+        {[...TYPES, ...extraTypes].map((t) => (
           <button key={t.key}
             onClick={() => { setActiveType(t.key); setEditing(null); setDeleting(null); }}
             style={{
@@ -147,13 +149,14 @@ export default function ListasTab({
             }}>
             {t.label}
             <span style={{ float: "right", fontSize: 11, color: "var(--muted)", fontWeight: 400 }}>
-              {activeType === t.key ? sorted.length : ""}
+              {activeType === t.key && !extra ? sorted.length : ""}
             </span>
           </button>
         ))}
       </div>
 
       {/* List panel */}
+      {extra ? <div key={extra.key} style={{ flex: 1, minWidth: 0, paddingLeft: 20 }}>{extra.render()}</div> : (
       <div style={{ flex: 1, paddingLeft: 20 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
           <span style={{ fontWeight: 700, fontSize: 15 }}>{cfg.label}</span>
@@ -261,6 +264,7 @@ export default function ListasTab({
           </p>
         )}
       </div>
+      )}
     </div>
   );
 }

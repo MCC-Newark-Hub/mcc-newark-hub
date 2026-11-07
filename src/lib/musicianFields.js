@@ -6,6 +6,13 @@
 export const VOICE_TYPES = ["Soprano", "Mezzo-Soprano", "Contralto", "Tenor", "Barítono", "Baixo"];
 export const INSTRUMENTS = ["Violão", "Guitarra", "Baixo Elétrico", "Bateria", "Percussão", "Teclado", "Piano", "Flauta", "Violino", "Trompete", "Saxofone"];
 
+// The catalog in Diretório › Voluntários › Instrumentos replaces the default list above, in its
+// order. INSTRUMENTS is updated in place so every picker that holds it sees new instruments.
+export function setInstrumentCatalog(names) {
+  const list = [...new Set((names || []).map((n) => (n || "").trim()).filter(Boolean))];
+  if (list.length) INSTRUMENTS.splice(0, INSTRUMENTS.length, ...list);
+}
+
 // Old function names that mean a voice type.
 const VOICE_ALIASES = { Mezzo: "Mezzo-Soprano" };
 

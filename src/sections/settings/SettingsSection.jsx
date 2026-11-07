@@ -6,7 +6,7 @@ import { useTopbarContent } from "@/context/TopbarContext";
 import Sidebar from "@/components/Sidebar";
 import ListasTab from "@/views/admin/ListasTab";
 import AuditLogTab from "@/views/admin/AuditLogTab";
-import { AdminUsers } from "@/views/AdminView";
+import { AdminUsers, AdminDirectory } from "@/views/AdminView";
 
 // Configurações: users & PINs, the lookup lists and the audit log — moved out of the Eventos menu.
 // Admin-only (the hub tile already is); any other profile that types /settings gets the placeholder.
@@ -43,6 +43,10 @@ function SettingsAdmin({ props, lang }) {
                   dbExpenseCategories={props.dbExpenseCategories} setDbExpenseCategories={props.setDbExpenseCategories}
                   dbIncomeTypes={props.dbIncomeTypes} setDbIncomeTypes={props.setDbIncomeTypes}
                   notify={props.notify}
+                  extraTypes={[
+                    { key: "instruments", label: pt ? "Instrumentos" : "Instruments", render: () => <AdminDirectory {...props} tabs={["instruments"]} title={null} /> },
+                    { key: "voice_types", label: pt ? "Vozes" : "Voices", render: () => <AdminDirectory {...props} tabs={["voice_types"]} title={null} /> },
+                  ]}
                 />
               </div>
             )}

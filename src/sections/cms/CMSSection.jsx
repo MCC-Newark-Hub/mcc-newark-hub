@@ -91,7 +91,7 @@ function CMSOverviewOnly({ lang }) {
 const DIRECTORY_GROUPS = [
   { id: "estrutura", pt: "Estrutura", en: "Structure", icon: <Network size={16} />, tabs: ["org_chart", "church_groups", "churches", "groups"] },
   { id: "membros", pt: "Membros", en: "Members", icon: <Users size={16} />, tabs: ["members", "families"] },
-  { id: "voluntarios", pt: "Voluntários", en: "Volunteers", icon: <HeartHandshake size={16} />, tabs: ["teams_dir", "teams", "instruments", "voice_types"] },
+  { id: "voluntarios", pt: "Voluntários", en: "Volunteers", icon: <HeartHandshake size={16} />, tabs: ["teams_dir", "teams"] },
 ];
 
 function CMSAdmin({ props, lang }) {

@@ -52,3 +52,16 @@ it("isMusicPick", () => {
   expect(isMusicPick("Mezzo")).toBe(true);
   expect(isMusicPick("Instrumentista")).toBe(false);
 });
+
+describe("instrument catalog", () => {
+  it("replaces the default list, so new instruments are recognized", async () => {
+    const { INSTRUMENTS, setInstrumentCatalog, musicRow } = await import("@/lib/musicianFields");
+    const before = [...INSTRUMENTS];
+    setInstrumentCatalog(["Violão", "Acordeão", " Clarinete ", "Violão", ""]);
+    expect(INSTRUMENTS).toEqual(["Violão", "Acordeão", "Clarinete"]);
+    expect(musicRow(["Grupo de Louvor", "Acordeão"])).toMatchObject({ roles: ["Grupo de Louvor"], instruments: ["Acordeão"] });
+    setInstrumentCatalog([]);
+    expect(INSTRUMENTS).toEqual(["Violão", "Acordeão", "Clarinete"]); // an empty catalog keeps the list
+    setInstrumentCatalog(before);
+  });
+});
