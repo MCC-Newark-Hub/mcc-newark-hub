@@ -24,7 +24,7 @@ describe("Diretório section (items moved out of Eventos)", () => {
   it("opens the admin on the Visão Geral, with the data grouped in Estrutura, Membros and Voluntários", () => {
     withUser(admin, <CMSSection lang="pt" />);
     expect(screen.getByText("conteúdo-visao-geral")).toBeTruthy();
-    for (const [menu, tabs] of [["Estrutura", "org_chart,church_groups,churches,groups"], ["Membros", "members,families"], ["Voluntários", "teams_dir,teams,instruments,voice_types"]]) {
+    for (const [menu, tabs] of [["Estrutura", "org_chart,church_groups,churches,groups"], ["Membros", "members,families"], ["Voluntários", "teams_dir,teams"]]) {
       fireEvent.click(screen.getAllByText(menu)[0]);
       expect(screen.getByText(`conteúdo-diretorio:${menu}:${tabs}`)).toBeTruthy();
     }
