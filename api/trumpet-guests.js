@@ -146,7 +146,52 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
-    // goals / setGoal / stats: Task 4.
+    if (body.action === "goals") {
+      const year = yearOf(body.year);
+      if (!year) return fail(400, "invalid_year");
+      if (!allowed.size) return res.status(200).json({ goals: [] });
+      const r = await rest(`trumpet_goals?year=eq.${year}&select=church,goal&order=church`);
+      if (!r.ok) throw new Error(`goals_read_failed:${r.status}`);
+      return res.status(200).json({ goals: r.data || [] });
+    }
+
+    if (body.action === "setGoal") {
+      if (!canManagePanel(roles)) return fail(403, "forbidden");
+      const year = yearOf(body.year);
+      if (!year) return fail(400, "invalid_year");
+      const church = String(body.church || "").slice(0, 120);
+      const goal = Number(body.goal);
+      if (!Number.isInteger(goal) || goal < 0 || goal > 100000) return fail(400, "invalid_goal");
+      if (goal === 0) {
+        const d = await rest(`trumpet_goals?year=eq.${year}&church=eq.${encodeURIComponent(church)}`, { method: "DELETE" });
+        if (!d.ok) throw new Error(`goal_delete_failed:${d.status}`);
+      } else {
+        const w = await rest("trumpet_goals?on_conflict=year,church&select=year,church,goal", {
+          method: "POST",
+          body: { year, church, goal, updated_at: new Date().toISOString(), updated_by: by },
+          prefer: "resolution=merge-duplicates,return=representation",
+        });
+        if (!w.ok || !w.data?.[0]) throw new Error(`goal_save_failed:${w.status}`);
+      }
+      await rest("audit_log", {
+        method: "POST",
+        body: { actor_name: caller.name, actor_id: caller.id, actor_role: caller.sys_role, action: "trumpet_goal_set", entity_type: "trumpet_goal", entity_id: String(year), entity_label: church || "*", details: { goal } },
+      });
+      return res.status(200).json({ ok: true });
+    }
+
+    if (body.action === "stats") {
+      if (!canManagePanel(roles)) return fail(403, "forbidden");
+      const year = yearOf(body.year);
+      if (!year) return fail(400, "invalid_year");
+      const rows = await fetchAll(rest, `trumpet_guests?year=in.(${year},${year - 1})&select=year,church,ga_id,invited_by_member_id,attended_at,created_at&order=created_at`);
+      const inviterIds = [...new Set(rows.filter((r) => r.year === year).map((r) => r.invited_by_member_id).filter(Boolean))];
+      const members = inviterIds.length ? await fetchAll(rest, `members?id=in.(${inviterIds.join(",")})&select=id,name&order=id`) : [];
+      const gr = await rest(`trumpet_goals?year=eq.${year}&select=church,goal`);
+      if (!gr.ok) throw new Error(`goals_read_failed:${gr.status}`);
+      const stats = buildStats(rows, { year, gas, members, goals: gr.data || [], today: todayNY() });
+      return res.status(200).json({ stats });
+    }
 
     return fail(400, "unknown_action");
   } catch (err) {

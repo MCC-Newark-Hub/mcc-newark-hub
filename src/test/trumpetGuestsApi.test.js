@@ -28,6 +28,12 @@ function fakeDb({ guests = [G1, G2] } = {}) {
     const id = Number((path.match(/^app_users\?id=eq\.(\d+)/) || [])[1]);
     if (path.startsWith("app_users?")) out = USERS[id] ? [USERS[id]] : [];
     else if (path.startsWith("assistance_groups?")) out = GAS;
+    else if (path.startsWith("trumpet_guests?") && method === "GET" && path.includes("year=in.(")) {
+      out = [
+        { year: 2026, church: "Newark, NJ - EUA", ga_id: "GA1", invited_by_member_id: "M1", attended_at: null, created_at: "2026-11-07T15:00:00Z" },
+        { year: 2025, church: "Newark, NJ - EUA", ga_id: "GA1", invited_by_member_id: "M1", attended_at: "t", created_at: "2025-11-07T15:00:00Z" },
+      ];
+    }
     else if (path.startsWith("trumpet_guests?") && method === "GET") {
       const one = path.match(/id=eq\.([0-9a-f-]+)/);
       const inGa = path.match(/ga_id=in\.\(([^)]*)\)/);
@@ -41,6 +47,10 @@ function fakeDb({ guests = [G1, G2] } = {}) {
       const one = path.match(/id=eq\.([0-9a-f-]+)/)[1];
       out = guests.filter((x) => x.id === one).map((x) => ({ id: x.id }));
     }
+    else if (path.startsWith("trumpet_goals?") && method === "GET") out = [{ church: "", goal: 50 }];
+    else if (path.startsWith("trumpet_goals") && method === "POST") out = [body];
+    else if (path.startsWith("trumpet_goals?") && method === "DELETE") out = [{ year: 2026 }];
+    else if (path.startsWith("members?")) out = [{ id: "M1", name: "Ana" }];
     return { ok: true, status: 200, text: async () => JSON.stringify(out) };
   }));
   return calls;
@@ -161,5 +171,43 @@ describe("/api/trumpet-guests", () => {
     const res = await call({ action: "list", year: 2026 }, 1);
     expect(res.body.guests).toHaveLength(1001);
     expect(calls.filter((c) => c.path.startsWith("trumpet_guests?")).length).toBe(2);
+  });
+});
+
+describe("/api/trumpet-guests goals and stats", () => {
+  it("stats is for admin / pastor only", async () => {
+    fakeDb();
+    expect((await call({ action: "stats", year: 2026 }, 4)).statusCode).toBe(403);
+    expect((await call({ action: "stats", year: 2026 }, 2)).statusCode).toBe(403);
+  });
+
+  it("stats aggregates this year and last year, with names but no contacts", async () => {
+    const calls = fakeDb();
+    const res = await call({ action: "stats", year: 2026 }, 1);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.stats).toMatchObject({ invited: 1, goal: 50, prev: { invited: 1, attended: 1 }, topInviters: [{ name: "Ana", invited: 1 }] });
+    const read = calls.find((c) => c.path.includes("year=in.("));
+    expect(read.path).not.toMatch(/phone|email|name/);
+  });
+
+  it("goals are readable in scope; setGoal is admin / pastor only", async () => {
+    fakeDb();
+    expect((await call({ action: "goals", year: 2026 }, 2)).body).toEqual({ goals: [{ church: "", goal: 50 }] });
+    expect((await call({ action: "goals", year: 2026 }, 3)).body).toEqual({ goals: [] });
+    expect((await call({ action: "setGoal", year: 2026, church: "", goal: 80 }, 4)).statusCode).toBe(403);
+  });
+
+  it("setGoal upserts, and 0 removes the goal", async () => {
+    const calls = fakeDb();
+    expect((await call({ action: "setGoal", year: 2026, church: "", goal: 80 }, 1)).body).toEqual({ ok: true });
+    expect(calls.find((c) => c.path.startsWith("trumpet_goals") && c.method === "POST").body).toMatchObject({ year: 2026, church: "", goal: 80 });
+    await call({ action: "setGoal", year: 2026, church: "", goal: 0 }, 1);
+    expect(calls.some((c) => c.path.startsWith("trumpet_goals?") && c.method === "DELETE")).toBe(true);
+  });
+
+  it("setGoal rejects a negative or fractional goal", async () => {
+    fakeDb();
+    expect((await call({ action: "setGoal", year: 2026, church: "", goal: -1 }, 1)).body).toEqual({ error: "invalid_goal" });
+    expect((await call({ action: "setGoal", year: 2026, church: "", goal: 1.5 }, 1)).body).toEqual({ error: "invalid_goal" });
   });
 });
