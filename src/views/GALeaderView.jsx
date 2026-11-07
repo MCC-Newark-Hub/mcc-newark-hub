@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CalendarDays } from "lucide-react";
 import { useT } from "@/i18n/strings";
 import { deadlineStatus } from "@/constants";
 import { sb } from "@/lib/supabase";
@@ -126,6 +127,13 @@ function GALeaderView(props) {
               <h2 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 22 }}>
                 {t.hello}, {greetingName}!
               </h2>
+              {/* The seminar this screen counts — the top bar hides it on phones. */}
+              {event && (
+                <p className="ga-event-name" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: "var(--text)", margin: "4px 0 6px" }}>
+                  <CalendarDays size={14} aria-hidden="true" style={{ flex: "none", color: "var(--primary)" }} />
+                  <span>{eventSubtitle(event, lang)}</span>
+                </p>
+              )}
               <p style={{ color: "#6b7280", fontSize: 13 }}>{t.readOnlyNote}</p>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
