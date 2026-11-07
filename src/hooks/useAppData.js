@@ -5,6 +5,7 @@ import { sb } from "@/lib/supabase";
 import { APP_USER_COLUMNS } from "@/lib/appUsers";
 import { pickCurrentEvent } from "@/lib/eventId";
 import { buildRegNumber, noteRegNumber, parseRegNumber, regCounters } from "@/lib/regNumber";
+import { insertWithFreeRegNumber, isRegNumberConflict, takeRegSlot } from "@/lib/regInsert";
 import { regFeeFlags } from "@/lib/regFee";
 import { waitlistToPromote, PAUSE_FULL, PAUSE_WAITLIST } from "@/lib/pause";
 import { mergeFreshRegs } from "@/lib/regRefresh";
@@ -432,10 +433,7 @@ export function useAppData({ getUserRef, notify }) {
     var group = parseRegNumber(data.groupWith);
     if (group && group.prefix !== event.prefix) group = null; // another event's number
     var counters = counterRef.current;
-    var submission = group ? group.submission : (counters.submissions[event.id] || 0) + 1;
-    if (!group) counters.submissions[event.id] = submission;
-    var person = (counters.persons[event.id + ":" + submission] || 0) + 1;
-    counters.persons[event.id + ":" + submission] = person;
+    var slot = takeRegSlot(counters, event.id, group ? group.submission : null);
     var feeFlags = regFeeFlags(event, data.category, data.role, data.exempt);
     var isExempt = feeFlags.isExempt;
     var bypassesCapacity = feeFlags.bypassesCapacity;
@@ -445,7 +443,7 @@ export function useAppData({ getUserRef, notify }) {
       { status: "Submetido", date: today, by: byName },
       { status: "Pendente", date: today, by: "Sistema" },
     ];
-    var regNumber = buildRegNumber(event.prefix, today, submission, person);
+    var regNumber = buildRegNumber(event.prefix, today, slot.submission, slot.person);
     var dbRow = {
       reg_number: regNumber,
       event_id: event.id,
@@ -488,38 +486,37 @@ export function useAppData({ getUserRef, notify }) {
     // instead of trusting the optimistic notify — a failed insert here rolls the
     // optimistic entry back out of local state, but by then a caller that already
     // showed its own "success" UI from the synchronous return has no way to know.
-    // Another device can take the same number before realtime tells us about it
-    // (reg_number is unique): move to the next free number and try again.
-    var save = function (attempt) {
-      return sb.from("registrations").insert(dbRow).select().single().then(function (res) {
-        if (res.error && res.error.code === "23505" && /reg_number/.test(res.error.message || "") && attempt < 3) {
-          var previous = regNumber;
-          if (group) {
-            person = (counters.persons[event.id + ":" + submission] || person) + 1;
-          } else {
-            submission = Math.max(counters.submissions[event.id] || 0, submission) + 1;
-            counters.submissions[event.id] = submission;
-            person = 1;
-          }
-          counters.persons[event.id + ":" + submission] = Math.max(counters.persons[event.id + ":" + submission] || 0, person);
-          regNumber = buildRegNumber(event.prefix, today, submission, person);
-          dbRow.reg_number = regNumber;
-          setRegs(function (p) {
-            return p.map(function (x) { return x.regNumber === previous ? { ...x, regNumber: regNumber } : x; });
-          });
-          return save(attempt + 1);
-        }
-        return res;
-      });
-    };
-    r.confirmed = save(0)
+    // Another device can take the same number before this one hears about it, on the same
+    // day or an earlier one (the database refuses a reused submission number, migration
+    // 053): reload the event's numbers, move to the next free one and try again.
+    var saved = insertWithFreeRegNumber({
+      row: dbRow,
+      counters: counters,
+      event: event,
+      today: today,
+      groupSubmission: group ? group.submission : null,
+      insert: function (row) { return sb.from("registrations").insert(row).select().single(); },
+      loadNumbers: function (eventId) {
+        return sb.from("registrations").select("reg_number").eq("event_id", eventId).then(function (res) {
+          if (res.error) throw res.error;
+          return (res.data || []).map(function (x) { return { eventId: eventId, regNumber: x.reg_number }; });
+        });
+      },
+      onRenumber: function (previous, next) {
+        regNumber = next;
+        setRegs(function (p) {
+          return p.map(function (x) { return x.regNumber === previous ? { ...x, regNumber: next } : x; });
+        });
+      },
+    });
+    r.confirmed = saved
       .then(function (res) {
         if (res.error) {
           console.error("addReg DB error:", res.error);
           setRegs(function (p) {
             return p.filter(function (x) { return x.regNumber !== regNumber; });
           });
-          if (res.error.code === "23505") {
+          if (res.error.code === "23505" && !isRegNumberConflict(res.error)) {
             notify(data.memberName + " já possui inscrição ativa neste evento.");
           } else {
             notify("Erro ao salvar inscrição. Verifique sua conexão e tente novamente.");
