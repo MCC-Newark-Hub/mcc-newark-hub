@@ -24,6 +24,10 @@ import { resendConfirmation } from "@/lib/resendConfirmation";
 import { useSortable } from "@/hooks/useSortable";
 import { groupByFamily, familyIdOf } from "@/lib/family";
 import { matchesRegNumber } from "@/lib/regNumber";
+import RegActions from "@/components/RegActions";
+import InfoCard from "@/components/InfoCard";
+import ViewToggle from "@/components/ViewToggle";
+import { useViewMode } from "@/hooks/useViewMode";
 
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 const statusSortOf = (r) => r.cancelled ? "cancelado" : r.waitlisted ? "lista de espera" : r.excedente ? "excedente" : r.exempt ? "isento" : r.paid ? "pago" : "pendente";
@@ -92,6 +96,7 @@ function ClerkView(props) {
   const [tab, setTab] = useState("active");
   const [showReg, setShowReg] = useState(false);
   const [detail, setDetail] = useState(null);
+  const [viewMode, setViewMode] = useViewMode("clerk_regs");
   const [prefill, setPrefill] = useState(null);
   const [replaceTarget, setReplaceTarget] = useState(null);
   const [replaceSearch, setReplaceSearch] = useState("");
@@ -196,6 +201,18 @@ function ClerkView(props) {
     }
   };
 
+  // Same actions for the table rows and the cards (the clerk can't delete or print badges here).
+  const actionProps = {
+    onPaid: (r) => updateReg(r.id, { paid: true }),
+    onPresence: updatePresence ? (id, value) => updatePresence(id, value, "manual") : undefined,
+    onPromote: promoteFromWaitlist,
+    onEdit: setDetail,
+    onToWaitlist: props.sendToWaitlist,
+    onReplace: (r) => { setReplaceTarget(r); setReplaceSearch(""); setReplaceCandidate(null); },
+    replaceLabel: t.actReplaceRequest,
+    onResend: handleResend,
+  };
+
   return (
     <div className="app-shell">
       <div className="body-with-sidebar">
@@ -286,7 +303,12 @@ function ClerkView(props) {
                       <button key={k} className={`tab ${tab === k ? "active" : ""}`} onClick={() => { setTab(k); setBulkSel([]); }}>{l}</button>
                     ))}
                   </div>
-                  {tab !== "approvals" && <span style={{ fontSize: 12, color: "#6b7280" }}>{viewRegs.length}</span>}
+                  {tab !== "approvals" && (
+                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "var(--muted)" }}>{viewRegs.length}</span>
+                      <ViewToggle mode={viewMode} onChange={setViewMode} />
+                    </div>
+                  )}
                 </div>
 
                 {tab === "approvals" ? (
@@ -305,6 +327,33 @@ function ClerkView(props) {
                       </div>
                     ))}
                   </div>
+                ) : viewMode === "cards" ? (
+                  <div className="info-cards" style={{ padding: 12 }}>
+                    {viewRegs.length === 0 && <p style={{ color: "var(--muted)", padding: 16 }}>{t.noRecords}</p>}
+                    {viewRegs.map((r) => (
+                      <InfoCard
+                        key={r.id}
+                        title={r.memberName || "—"}
+                        code={r.regNumber || "—"}
+                        aside={<StatusBadge r={r} event={event} allRegs={allForCity} />}
+                        meta={<>
+                          <span>{r.church || "—"}</span>
+                          {r.team && <span>{r.team}</span>}
+                          <span style={{ fontWeight: 600, color: "var(--text)" }}>{r.exempt ? t.exempt : fmt(r.fee ?? 0)}</span>
+                          {r.registeredAt && <span>{r.registeredAt}</span>}
+                        </>}
+                        badges={<>
+                          <span className="badge badge-blue">{r.category || "—"}</span>
+                          {r.role && <span className={`badge ${ROLE_BADGE[r.role] || "badge-gray"}`}>{r.role}</span>}
+                        </>}
+                        actions={<RegActions reg={r} {...actionProps} resending={resendingId === r.id} />}
+                        dimmed={r.cancelled}
+                        selected={bulkSel.includes(r.id)}
+                        onSelect={() => toggleBulk(r.id)}
+                        selectLabel={r.memberName}
+                      />
+                    ))}
+                  </div>
                 ) : (
                   <div className="table-wrap">
                     <table className="table">
@@ -314,9 +363,9 @@ function ClerkView(props) {
                             checked={viewRegs.length > 0 && viewRegs.every((r) => bulkSel.includes(r.id))}
                             onChange={(e) => setBulkSel(e.target.checked ? viewRegs.map((r) => r.id) : [])} />
                         </th>
-                        <th>{t.regNum}</th><Th k="memberName">{t.memberName}</Th><Th k="role">{t.cargo}</Th><Th k="category">{t.cat}</Th><Th k="church">{t.churchH}</Th><Th k="team">{t.teamH}</Th><Th k="fee">{t.feeH}</Th><Th k="registeredAt">{t.regDate}</Th><Th k="statusSort">{t.statusH}</Th><th>Presença</th><th>{t.actions}</th></tr></thead>
+                        <th>{t.regNum}</th><Th k="memberName">{t.memberName}</Th><Th k="role">{t.cargo}</Th><Th k="category">{t.cat}</Th><Th k="church">{t.churchH}</Th><Th k="team">{t.teamH}</Th><Th k="fee">{t.feeH}</Th><Th k="registeredAt">{t.regDate}</Th><Th k="statusSort">{t.statusH}</Th><th className="sticky-actions">{t.actions}</th></tr></thead>
                       <tbody>
-                        {viewRegs.length === 0 && <tr><td colSpan={12} style={{ textAlign: "center", color: "#6b7280", padding: 28 }}>{t.noRecords}</td></tr>}
+                        {viewRegs.length === 0 && <tr><td colSpan={11} style={{ textAlign: "center", color: "#6b7280", padding: 28 }}>{t.noRecords}</td></tr>}
                         {viewRegs.map((r) => (
                           <tr key={r.id}>
                             <td><input type="checkbox" checked={bulkSel.includes(r.id)} onChange={() => toggleBulk(r.id)} /></td>
@@ -329,42 +378,8 @@ function ClerkView(props) {
                             <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{r.exempt ? <span style={{ color: "#6b7280" }}>{t.exempt}</span> : fmt(r.fee ?? 0)}</td>
                             <td style={{ fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>{r.registeredAt || "—"}</td>
                             <td><StatusBadge r={r} event={event} allRegs={allForCity} /></td>
-                            <td>
-                              <select
-                                value={r.presence || 'unknown'}
-                                onChange={(e) => updatePresence && updatePresence(r.id, e.target.value, 'manual')}
-                                style={{ fontSize: 11, padding: "2px 4px", borderRadius: 4, border: "1px solid var(--border)", background: r.presence === 'present' ? '#d1fae5' : r.presence === 'absent' ? '#fee2e2' : r.presence === 'walk_in' ? '#dbeafe' : '#f3f4f6', color: r.presence === 'present' ? '#065f46' : r.presence === 'absent' ? '#991b1b' : r.presence === 'walk_in' ? '#1e3a8a' : '#374151' }}
-                              >
-                                <option value="unknown">🔲 Desconhecida</option>
-                                <option value="present">✅ Presente</option>
-                                <option value="absent">❌ Ausente</option>
-                                <option value="walk_in">🚶 Walk-in</option>
-                              </select>
-                            </td>
-                            <td>
-                              <div style={{ display: "flex", gap: 4 }}>
-                                {r.waitlisted && <button className="btn btn-ok btn-sm" onClick={() => promoteFromWaitlist(r.id)}>{t.promoteWaitlist}</button>}
-                                {!r.waitlisted && !r.cancelled && <button className="btn btn-ghost btn-sm" title="Mover para lista de espera" onClick={() => props.sendToWaitlist(r.id)}>🎫</button>}
-                                {!r.waitlisted && !r.paid && !r.exempt && !r.cancelled && <button className="btn btn-ok btn-sm" onClick={() => updateReg(r.id, { paid: true })}>{t.markPaid}</button>}
-                                <button className="btn btn-ghost btn-sm" onClick={() => setDetail(r)}>{t.edit}</button>
-                                {!r.cancelled && !r.waitlisted && (
-                                  <button
-                                    className="btn btn-ghost btn-sm"
-                                    title="Solicitar Substituição"
-                                    onClick={() => { setReplaceTarget(r); setReplaceSearch(""); setReplaceCandidate(null); }}
-                                  >
-                                    🔄
-                                  </button>
-                                )}
-                                <button
-                                  className="btn btn-ghost btn-sm"
-                                  disabled={resendingId === r.id}
-                                  onClick={() => handleResend(r)}
-                                  title={t.resendConfirmation}
-                                >
-                                  {resendingId === r.id ? "…" : "📧"}
-                                </button>
-                              </div>
+                            <td className="sticky-actions">
+                              <RegActions reg={r} {...actionProps} resending={resendingId === r.id} />
                             </td>
                           </tr>
                         ))}

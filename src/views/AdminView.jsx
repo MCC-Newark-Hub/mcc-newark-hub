@@ -22,6 +22,10 @@ import GroupsPanel from "@/components/directory/GroupsPanel";
 import ChurchGroupsPanel from "@/components/directory/ChurchGroupsPanel";
 import OrgChartPanel from "@/components/directory/OrgChartPanel";
 import RolesMultiSelect from "@/components/directory/RolesMultiSelect";
+import InfoCard from "@/components/InfoCard";
+import MoreMenu from "@/components/MoreMenu";
+import ViewToggle from "@/components/ViewToggle";
+import { useViewMode } from "@/hooks/useViewMode";
 import { memberRoleFields, primaryRole, rolesOf } from "@/lib/memberRoles";
 import { applyMusicPicks } from "@/lib/musicianFields";
 import RegistrationsTab from "./admin/RegistrationsTab";
@@ -1240,6 +1244,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
   const [formData, setFormData] = useState({});
   const [deleting, setDeleting] = useState(null); // { ids:[], label:"" }
   const [instSort, setInstSort] = useState("order"); // Instrumentos: "order" | "name"
+  const [memberView, setMemberView] = useViewMode("dir_members");
   const [selected, setSelected] = useState([]);
   const [saving, setSaving]   = useState(false);
   const [expanded, setExpanded] = useState(null);
@@ -1627,6 +1632,32 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
           return null;
         };
         const groups = makeGroups();
+        const editMember = (m) => openEdit(m, { firstName: m.firstName || '', lastName: m.lastName || '', name: m.name, badgeName: m.badgeName || "", gender: m.gender || "M", category: m.category, church: m.church || "", roles: m.roles || (m.role ? [m.role] : []), role: m.role || "", familyId: familyIdOf(m, families) || "", gaId: m.gaId || "", allergies: m.allergies || '', specialNeeds: m.specialNeeds || '', acessibilidade: !!m.acessibilidade, notes: m.notes || '', isGuest: m.isGuest || false, invitedBy: m.invitedBy || '', translationLanguages: m.translationLanguages || [], voiceType: m.voiceType || '', voiceLowestNote: m.voiceLowestNote || '', voiceHighestNote: m.voiceHighestNote || '', instruments: m.instruments || [], immigrationStatus: m.immigrationStatus || '' });
+        const memberRoles = (m) => (m.roles && m.roles.length > 0 ? m.roles : (m.role ? [m.role] : []));
+        const renderMemberCard = (m) => (
+          <InfoCard
+            key={m.id}
+            title={<>{(m.firstName && m.lastName) ? `${m.firstName} ${m.lastName}` : m.name}{m.isGuest && <span className="badge badge-gray" style={{ fontSize: 10, marginLeft: 6 }}>Visitante</span>}</>}
+            code={m.badgeName && m.badgeName !== m.name ? `🏷 ${m.badgeName}` : null}
+            meta={<>
+              <span>{m.church || "—"}</span>
+              <span>Grupo: {m.gaName || "—"}</span>
+              {m.familyName && <span>Família: {m.familyName}</span>}
+            </>}
+            badges={<>
+              <span className="badge badge-blue">{m.category}</span>
+              {m.gender && <span className="badge badge-gray">{m.gender}</span>}
+              {memberRoles(m).map((r) => <span key={r} className="badge badge-gray">{r}</span>)}
+            </>}
+            actions={<>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => editMember(m)}><Pencil size={13} style={{ marginRight: 4 }} />Editar</button>
+              <MoreMenu items={[{ key: "delete", label: "Excluir membro", icon: <Trash2 size={14} />, danger: true, onClick: () => setDeleting({ ids: [m.id], label: m.name }) }]} />
+            </>}
+            selected={selected.includes(m.id)}
+            onSelect={() => toggleSel(m.id)}
+            selectLabel={m.name}
+          />
+        );
         const renderMemberRow = (m) => (
           <tr key={m.id} style={{ background: selected.includes(m.id) ? "var(--sidebar-active-bg)" : "" }}>
             <td><input type="checkbox" checked={selected.includes(m.id)} onChange={() => toggleSel(m.id)} /></td>
@@ -1653,7 +1684,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
             <td style={{ fontSize: 11, color: "var(--muted)", maxWidth: 160 }}>{m.notes ? m.notes.slice(0, 40) + (m.notes.length > 40 ? '…' : '') : '—'}</td>
             <td>
               <div style={{ display: "flex", gap: 6 }}>
-                <button className="btn btn-ghost btn-xs" onClick={() => openEdit(m, { firstName: m.firstName || '', lastName: m.lastName || '', name: m.name, badgeName: m.badgeName || "", gender: m.gender || "M", category: m.category, church: m.church || "", roles: m.roles || (m.role ? [m.role] : []), role: m.role || "", familyId: familyIdOf(m, families) || "", gaId: m.gaId || "", allergies: m.allergies || '', specialNeeds: m.specialNeeds || '', acessibilidade: !!m.acessibilidade, notes: m.notes || '', isGuest: m.isGuest || false, invitedBy: m.invitedBy || '', translationLanguages: m.translationLanguages || [], voiceType: m.voiceType || '', voiceLowestNote: m.voiceLowestNote || '', voiceHighestNote: m.voiceHighestNote || '', instruments: m.instruments || [], immigrationStatus: m.immigrationStatus || '' })}><Pencil size={12} /></button>
+                <button className="btn btn-ghost btn-xs" onClick={() => editMember(m)} title="Editar" aria-label={`Editar ${m.name}`}><Pencil size={12} /></button>
                 <button className="btn btn-danger btn-xs" onClick={() => setDeleting({ ids: [m.id], label: m.name })}><Trash2 size={12} /></button>
               </div>
             </td>
@@ -1994,6 +2025,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
                 a.download = `membros_${new Date().toISOString().slice(0,10)}.csv`;
                 a.click();
               }}><Download size={13} /> Exportar CSV ({list.length})</button>
+              <ViewToggle mode={memberView} onChange={setMemberView} />
               {(members || []).length > 0 && (
                 <button className="btn btn-danger btn-sm" style={{ display: "flex", alignItems: "center", gap: 6 }}
                   onClick={() => setDeleting({ ids: (members || []).map((m) => m.id).filter(Boolean), label: "" })}>
@@ -2001,6 +2033,22 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
                 </button>
               )}
             </div>
+            {memberView === "cards" ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {list.length === 0 && <p style={{ color: "var(--muted)", padding: 20 }}>Nenhum resultado.</p>}
+                {(groups || [{ familyId: "__all__", familyName: null, members: list }]).map((g) => (
+                  <section key={`cg-${g.familyId ?? "none"}`}>
+                    {g.familyName && (
+                      <h3 style={{ fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>
+                        {groupBy === "family" ? "👪" : groupBy === "church" ? "⛪" : "👥"} {g.familyName}
+                        <span style={{ opacity: .65, fontWeight: 400, marginLeft: 6 }}>{g.members.length} membro{g.members.length !== 1 ? "s" : ""}</span>
+                      </h3>
+                    )}
+                    <div className="info-cards">{g.members.map(renderMemberCard)}</div>
+                  </section>
+                ))}
+              </div>
+            ) : (
             <div className="card" style={{ padding: 0, overflow: "hidden" }}>
               <div style={{ overflow: "auto", maxHeight: "calc(100vh - 320px)" }}>
                 <table className="table" style={{ minWidth: 640 }}>
@@ -2035,6 +2083,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
                 </table>
               </div>
             </div>
+            )}
           </>
         );
       })()}

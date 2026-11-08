@@ -16,6 +16,10 @@ import { eventRequiresContact, needsOwnContact, hasFullContact } from "@/lib/con
 import { fetchContactStatus, staffGetContacts } from "@/lib/contactApi";
 import { contactExportRows, CONTACT_EXPORT_HEADERS, toCsv } from "@/lib/contactExport";
 import ContactChangeRequests from "@/components/ContactChangeRequests";
+import RegActions from "@/components/RegActions";
+import InfoCard from "@/components/InfoCard";
+import ViewToggle from "@/components/ViewToggle";
+import { useViewMode } from "@/hooks/useViewMode";
 
 const norm = (s) => (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
@@ -56,6 +60,7 @@ export default function RegistrationsTab(props) {
   const [replaceCandidate, setReplaceCandidate] = useState(null);
   const [badgeReg, setBadgeReg] = useState(null);
   const [resendingId, setResendingId] = useState(null);
+  const [viewMode, setViewMode] = useViewMode("admin_regs");
 
   const handleResend = async (reg) => {
     setResendingId(reg.id);
@@ -157,6 +162,19 @@ export default function RegistrationsTab(props) {
     return ms && mf;
   }).map((r) => ({ ...r, statusSort: statusSortOf(r) }));
   const { sorted: filtered, Th } = useSortable(preFiltered, "memberName");
+  // Same actions for the table rows and the cards.
+  const actionProps = {
+    onPaid: (r) => updateReg(r.id, { paid: true }),
+    onPresence: updatePresence ? (id, value) => updatePresence(id, value, "manual") : undefined,
+    onPromote: promoteFromWaitlist,
+    onEdit: setDetail,
+    onPrintBadge: setBadgeReg,
+    onToWaitlist: sendToWaitlist,
+    onReplace: (r) => { setReplaceTarget(r); setReplaceSearch(""); setReplaceCandidate(null); },
+    onResend: handleResend,
+    onDelete: setConfirmDelete,
+  };
+
   return (
     <div>
       <div
@@ -226,6 +244,7 @@ export default function RegistrationsTab(props) {
             </button>
           ))}
         </div>
+        <ViewToggle mode={viewMode} onChange={setViewMode} />
       </div>
       {/* Capacity history strip */}
       {active.length > 0 && (
@@ -252,6 +271,34 @@ export default function RegistrationsTab(props) {
           )}
         </div>
       )}
+      {viewMode === "cards" ? (
+        <div className="info-cards">
+          {filtered.length === 0 && <p style={{ color: "var(--muted)", padding: 20 }}>{t.noRecords}</p>}
+          {filtered.map((r) => (
+            <InfoCard
+              key={r.id}
+              title={<>{r.memberName}{r.badgeName && r.badgeName !== r.memberName && <span style={{ fontWeight: 400, fontSize: 12, color: "var(--text-secondary)" }}> · 🏷 {r.badgeName}</span>}</>}
+              code={<>{r.regNumber}{positionOf[r.id] != null && <span> · #{positionOf[r.id]}</span>}</>}
+              aside={<StatusBadge r={r} event={event} allRegs={all} />}
+              meta={<>
+                <span>{liveChurchOf(r)}</span>
+                {r.team && <span>{r.team}</span>}
+                <span style={{ fontWeight: 600, color: "var(--text)" }}>{r.exempt ? t.exempt : fmt(r.fee)}</span>
+                {r.registeredAtTs && <span>{new Date(r.registeredAtTs).toLocaleString("pt-BR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>}
+              </>}
+              badges={<>
+                <span className="badge badge-blue">{r.category}</span>
+                {r.role && <span className={`badge ${ROLE_BADGE[r.role]}`}>{r.role}</span>}
+              </>}
+              actions={<RegActions reg={r} {...actionProps} resending={resendingId === r.id} />}
+              dimmed={r.cancelled}
+              selected={bulkSel.includes(r.id)}
+              onSelect={() => toggleBulk(r.id)}
+              selectLabel={r.memberName}
+            />
+          ))}
+        </div>
+      ) : (
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         <div className="table-wrap">
           <table className="table">
@@ -272,8 +319,7 @@ export default function RegistrationsTab(props) {
                 <Th k="fee">{t.feeH}</Th>
                 <Th k="registeredAtTs">{t.regDate}</Th>
                 <Th k="statusSort">{t.statusH}</Th>
-                <th>Presença</th>
-                <th></th>
+                <th className="sticky-actions">{t.actions}</th>
               </tr>
             </thead>
             <tbody>
@@ -333,68 +379,8 @@ export default function RegistrationsTab(props) {
                   <td>
                     <StatusBadge r={r} event={event} allRegs={all} />
                   </td>
-                  <td>
-                    <select
-                      value={r.presence || 'unknown'}
-                      onChange={(e) => updatePresence && updatePresence(r.id, e.target.value, 'manual')}
-                      style={{ fontSize: 11, padding: "2px 4px", borderRadius: 4, border: "1px solid var(--border)", background: r.presence === 'present' ? '#d1fae5' : r.presence === 'absent' ? '#fee2e2' : r.presence === 'walk_in' ? '#dbeafe' : '#f3f4f6', color: r.presence === 'present' ? '#065f46' : r.presence === 'absent' ? '#991b1b' : r.presence === 'walk_in' ? '#1e3a8a' : '#374151' }}
-                    >
-                      <option value="unknown">🔲 Desconhecida</option>
-                      <option value="present">✅ Presente</option>
-                      <option value="absent">❌ Ausente</option>
-                      <option value="walk_in">🚶 Walk-in</option>
-                    </select>
-                  </td>
-                  <td>
-                    {r.waitlisted && (
-                      <button
-                        className="btn btn-ok btn-sm"
-                        style={{ marginRight: 4 }}
-                        onClick={() => promoteFromWaitlist(r.id)}
-                      >
-                        {t.promoteWaitlist}
-                      </button>
-                    )}
-                    <button className="btn btn-ghost btn-sm" onClick={() => setDetail(r)}>
-                      {t.edit}
-                    </button>
-                    {!r.cancelled && (
-                      <button className="btn btn-ghost btn-sm" style={{ marginLeft: 4 }} onClick={() => setBadgeReg(r)}>
-                        🖨️
-                      </button>
-                    )}
-                    {!r.cancelled && !r.waitlisted && (
-                      <>
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          style={{ marginLeft: 4 }}
-                          title="Mover para lista de espera"
-                          onClick={() => sendToWaitlist(r.id)}
-                        >
-                          🎫
-                        </button>
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          style={{ marginLeft: 4 }}
-                          title="Substituir inscrito"
-                          onClick={() => { setReplaceTarget(r); setReplaceSearch(""); setReplaceCandidate(null); }}
-                        >
-                          🔄
-                        </button>
-                      </>
-                    )}
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      style={{ marginLeft: 4 }}
-                      disabled={resendingId === r.id}
-                      onClick={() => handleResend(r)}
-                      title={t.resendConfirmation}
-                    >
-                      {resendingId === r.id ? "…" : "📧"}
-                    </button>
-                    <button className="btn btn-danger btn-sm" style={{ marginLeft: 4 }} onClick={() => setConfirmDelete(r)}>
-                      🗑
-                    </button>
+                  <td className="sticky-actions">
+                    <RegActions reg={r} {...actionProps} resending={resendingId === r.id} />
                   </td>
                 </tr>
               ))}
@@ -402,6 +388,7 @@ export default function RegistrationsTab(props) {
           </table>
         </div>
       </div>
+      )}
       {showReg && (
         <RegModal
           event={event}
