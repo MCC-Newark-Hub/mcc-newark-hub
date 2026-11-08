@@ -85,7 +85,7 @@ function PastorView(props) {
   const toggleCh = (key) => setExpandedCh((p) => ({ ...p, [key]: !p[key] }));
   const toggleHub = (key) => setExpandedHub((p) => ({ ...p, [key]: !p[key] }));
   const toggleGuest = (key) => setExpandedGuest((p) => ({ ...p, [key]: !p[key] }));
-  const myChurches = user?.churches?.length ? user.churches : null;
+  const myChurches = user?.churches?.length && !user.churches.includes("*") ? user.churches : null; // "*" = every church
   const inScope = (church) => !myChurches || myChurches.some((c) => (church || "").toLowerCase().startsWith(c.toLowerCase()));
   const er = regs.filter((r) => r.eventId === event?.id && !r.cancelled && !r.waitlisted && inScope(r.church));
   const paid = er.filter((r) => r.paid && !r.exempt);

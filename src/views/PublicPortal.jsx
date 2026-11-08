@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import HealthPicker from "@/components/HealthPicker";
+import { emptyHealth, healthNote, healthProblem, pruneHealth } from "@/lib/healthNotes";
 import { Search, ArrowLeft, CheckCircle2, ClipboardList, Share2, AlertTriangle } from "lucide-react";
 import { STRINGS, fill } from "@/i18n/strings";
 import { CATEGORIES, ROLE_BADGE, OBREIRO_ROLES, fmt, teamForRole } from "@/constants";
@@ -343,8 +345,9 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
   const [translations, setTranslations] = useState({ en: false, es: false });
   // Someone filling the form in Portuguese doesn't need translation; only ask in EN.
   const askTranslation = (lang || "pt") !== "pt";
-  const [allergies, setAllergies] = useState({ hasAny: false, other: "" });
-  const [specialNeeds, setSpecialNeeds] = useState({ hasAny: false, other: "" });
+  const [allergies, setAllergies] = useState(emptyHealth);
+  const [specialNeeds, setSpecialNeeds] = useState(emptyHealth);
+  const [showHealthErr, setShowHealthErr] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsError, setTermsError] = useState(false);
   const [deadlineAccepted, setDeadlineAccepted] = useState(false);
@@ -503,11 +506,11 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
     // Batch token groups all regs from this submission for family lookup. Phone and
     // e-mail go to the directory (fill_member_contact), not into the note.
     const batchId = "B" + Date.now();
-    const sharedNote = [
-      "[" + batchId + "]",
-      allergies.hasAny ? "Alergias: " + allergies.other : "",
-      specialNeeds.hasAny ? "Nec. especiais: " + specialNeeds.other : "",
-    ].filter(Boolean).join(" | ");
+    // Each person gets only their own allergies / special needs (healthNotes).
+    const healthSingle = allParticipants.length <= 1;
+    const healthA = pruneHealth(allergies, allParticipants);
+    const healthN = pruneHealth(specialNeeds, allParticipants);
+    const noteFor = (m) => healthNote(batchId, healthA, healthN, m.id, healthSingle);
     const isPastDeadline = getDeadlineStatus(event?.registration_deadline) === "past";
     const submittedRegs = [];
     let groupNumber = addingFamily ? existingReg.regNumber : null;
@@ -547,7 +550,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
           team: teamForRole(m.role),
           fee: event?.fees?.[category] ?? 0,
           reason: lang === "en" ? "Submitted after the registration deadline." : "Enviado após o prazo de encerramento das inscrições.",
-          note: sharedNote,
+          note: noteFor(m),
         });
       } else {
         // addReg updates the UI optimistically (reg number shown immediately), then
@@ -567,7 +570,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
           paid: false,
           exempt: false,
           needsTranslation: askTranslation && (translations.en || translations.es),
-          note: sharedNote,
+          note: noteFor(m),
           invitedByMemberId: invitedByMemberId || null,
           forceWaitlist: isBlocked || undefined,
           waitlistReason: pausedWaitlist ? PAUSED_WAITLIST_REASON : undefined,
@@ -657,8 +660,9 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
           setShowManualPrimary(false); setManualPrimary({ name: "", gender: "M", category: "Adulto" });
           setContacts({}); setContactStatus({}); setContactErrs({}); setBadgeNames({});
           setTranslations({ en: false, es: false });
-          setAllergies({ hasAny: false, other: "" });
-          setSpecialNeeds({ hasAny: false, other: "" });
+          setAllergies(emptyHealth());
+          setSpecialNeeds(emptyHealth());
+          setShowHealthErr(false);
           setTermsAccepted(false); setDeadlineAccepted(false); setCashAcknowledged(false); setCashChecked(false); setWaitlistAcknowledged(false); setSubmitted(null);
         }}
         onHome={onReset}
@@ -1231,18 +1235,21 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
               <h3 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 18, fontWeight: 700, color: "#03223f", marginBottom: 4 }}>3. {t.step3}</h3>
               <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 20 }}>{lang === "en" ? "This information helps us prepare the event safely for everyone." : "Essas informações nos ajudam a preparar o evento com segurança para todos."}</p>
               <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                <div>
-                  <div className="cb" style={{ marginBottom: 10 }}><input type="checkbox" id="hasAllergies" checked={allergies.hasAny} onChange={(e) => setAllergies((prev) => ({ ...prev, hasAny: e.target.checked, other: e.target.checked ? prev.other : "" }))} /><label htmlFor="hasAllergies" style={{ fontSize: 14, fontWeight: 600, color: "#1a1e2e" }}>{t.allergiesTitle}</label></div>
-                  {allergies.hasAny && <textarea rows={3} value={allergies.other} onChange={(e) => setAllergies({ ...allergies, other: e.target.value })} placeholder={lang === "en" ? "Describe your allergies or dietary restrictions..." : "Descreva suas alergias ou restrições alimentares..."} style={{ marginTop: 4 }} />}
-                </div>
-                <div>
-                  <div className="cb" style={{ marginBottom: 10 }}><input type="checkbox" id="hasSpecialNeeds" checked={specialNeeds.hasAny} onChange={(e) => setSpecialNeeds((prev) => ({ ...prev, hasAny: e.target.checked, other: e.target.checked ? prev.other : "" }))} /><label htmlFor="hasSpecialNeeds" style={{ fontSize: 14, fontWeight: 600, color: "#1a1e2e" }}>{t.specialNeedsTitle}</label></div>
-                  {specialNeeds.hasAny && <textarea rows={3} value={specialNeeds.other} onChange={(e) => setSpecialNeeds({ ...specialNeeds, other: e.target.value })} placeholder={lang === "en" ? "Describe any special needs..." : "Descreva as necessidades especiais..."} style={{ marginTop: 4 }} />}
-                </div>
+                <HealthPicker id="hasAllergies" title={t.allergiesTitle} state={pruneHealth(allergies, allParticipants)} onChange={setAllergies} people={allParticipants} lang={lang}
+                  placeholder={lang === "en" ? "Describe the allergies or dietary restrictions..." : "Descreva as alergias ou restrições alimentares..."}
+                  problem={showHealthErr ? healthProblem(pruneHealth(allergies, allParticipants), allParticipants.length <= 1) : null} />
+                <HealthPicker id="hasSpecialNeeds" title={t.specialNeedsTitle} state={pruneHealth(specialNeeds, allParticipants)} onChange={setSpecialNeeds} people={allParticipants} lang={lang}
+                  placeholder={lang === "en" ? "Describe any special needs..." : "Descreva as necessidades especiais..."}
+                  problem={showHealthErr ? healthProblem(pruneHealth(specialNeeds, allParticipants), allParticipants.length <= 1) : null} />
               </div>
               <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
                 <button className="btn btn-ghost" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }} onClick={() => setStep(2)}><ArrowLeft size={14} /> {t.back}</button>
-                <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => setStep(4)}>{lang === "en" ? "Next: Contact & Terms →" : "Próximo: Contato & Termos →"}</button>
+                <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => {
+                  const single = allParticipants.length <= 1;
+                  if (healthProblem(pruneHealth(allergies, allParticipants), single) || healthProblem(pruneHealth(specialNeeds, allParticipants), single)) { setShowHealthErr(true); return; }
+                  setShowHealthErr(false);
+                  setStep(4);
+                }}>{lang === "en" ? "Next: Contact & Terms →" : "Próximo: Contato & Termos →"}</button>
               </div>
             </div>
           )}

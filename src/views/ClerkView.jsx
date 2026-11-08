@@ -24,6 +24,7 @@ import { resendConfirmation } from "@/lib/resendConfirmation";
 import { useSortable } from "@/hooks/useSortable";
 import { groupByFamily, familyIdOf } from "@/lib/family";
 import { matchesRegNumber } from "@/lib/regNumber";
+import { clerkCities, inClerkScope } from "@/lib/clerkScope";
 import RegActions from "@/components/RegActions";
 import InfoCard from "@/components/InfoCard";
 import ViewToggle from "@/components/ViewToggle";
@@ -120,21 +121,23 @@ function ClerkView(props) {
   const [deletingMember, setDeletingMember] = useState(false);
   const [newFamilyName, setNewFamilyName] = useState("");
 
-  const cityOf = (s) => (s || "").split(",")[0].trim().toLowerCase();
   const myChurch = user?.church || "";
-  const myCity = cityOf(myChurch);
-  const myMembers = members.filter((m) => cityOf(m.church) === myCity);
+  // The churches this clerk works with: their own, a list, or all of them (the main secretary).
+  const scopeCities = clerkCities(user);
+  const inScope = (church) => inClerkScope(scopeCities, church);
+  const singleChurch = !!scopeCities && scopeCities.length === 1;
+  const myMembers = members.filter((m) => inScope(m.church));
 
   const eventApprovals = (approvals || []).filter((a) => a.eventId === event?.id);
   const pendingApprovalList = eventApprovals.filter((a) => a.status === "pending");
   useTopbarContent({ title: user?.name || t.clerkTitle, sub: `${t.clerkTitle} · ${eventSubtitle(event, lang)}`, pendingCount: pendingApprovalList.length, helpPath: "tutorials/register-member" });
   const resolvedApprovalList = eventApprovals.filter((a) => a.status !== "pending");
   const allActiveAll = regs.filter((r) => r.eventId === event?.id && !r.cancelled && !r.waitlisted);
-  const allActive = allActiveAll.filter((r) => cityOf(r.church) === myCity);
+  const allActive = allActiveAll.filter((r) => inScope(r.church));
   // Includes cancelled rows too, unlike allActive — deadlineStatus needs a member's
   // full history to anchor the payment countdown to their earliest attempt.
-  const allForCity = regs.filter((r) => r.eventId === event?.id && cityOf(r.church) === myCity);
-  const myWlRegs = (wlRegs || []).filter((r) => cityOf(r.church) === myCity);
+  const allForCity = regs.filter((r) => r.eventId === event?.id && inScope(r.church));
+  const myWlRegs = (wlRegs || []).filter((r) => inScope(r.church));
   const myExRegs = allActive.filter((r) => r.excedente);
   const isOverdue = (r) => deadlineStatus(r, event, allForCity)?.overdue;
   const myOverdueRegs = allActive.filter(isOverdue);
@@ -142,7 +145,7 @@ function ClerkView(props) {
     tab === "active" ? allActive
     : tab === "waitlist" ? myWlRegs
     : tab === "overdue" ? myOverdueRegs
-    : regs.filter((r) => r.eventId === event?.id && r.cancelled && cityOf(r.church) === myCity)
+    : regs.filter((r) => r.eventId === event?.id && r.cancelled && inScope(r.church))
   ).filter((r) => {
     const q = norm(search);
     return norm(r.memberName).includes(q) || norm(r.regNumber).includes(q) || matchesRegNumber(r.regNumber, search) || norm(r.church).includes(q) ||
@@ -163,7 +166,7 @@ function ClerkView(props) {
   ];
 
   const myFamilies = families.filter((f) => (f.memberIds || []).some((id) => myMembers.some((m) => m.id === id)));
-  const myGas = (gas || []).filter((g) => cityOf(g.church) === myCity);
+  const myGas = (gas || []).filter((g) => inScope(g.church));
 
   const navItems = [
     { id: "resumo", icon: <BarChart2 size={16} />, label: "Resumo" },
@@ -253,7 +256,7 @@ function ClerkView(props) {
                 wlExempt={myWlRegs.filter((r) => r.exempt).length}
                 wlPend={myWlRegs.filter((r) => !r.paid && !r.exempt).length}
                 wlTotal={myWlRegs.length}
-                cancelled={regs.filter((r) => r.eventId === event?.id && r.cancelled && cityOf(r.church) === myCity).length}
+                cancelled={regs.filter((r) => r.eventId === event?.id && r.cancelled && inScope(r.church)).length}
                 lang={lang}
               />
 
@@ -448,9 +451,9 @@ function ClerkView(props) {
           ) : sec === "families" ? (
             <FamiliesPanel members={myMembers} families={myFamilies} setFamilies={setFamilies} gas={myGas} showGroup notify={notify} logAudit={logAudit} />
           ) : sec === "functions" ? (
-            <FuncoesTab members={members} setMembers={setMembers} gas={gas} notify={notify} churchLock={myChurch} logAudit={logAudit} />
+            <FuncoesTab members={members} setMembers={setMembers} gas={gas} notify={notify} churchLock={singleChurch ? myChurch : undefined} logAudit={logAudit} />
           ) : (
-            <GroupsPanel members={myMembers} setMembers={setMembers} gas={myGas} setGas={setGas} churches={churches} notify={notify} defaultChurch={myChurch} lockChurch logAudit={logAudit} />
+            <GroupsPanel members={myMembers} setMembers={setMembers} gas={myGas} setGas={setGas} churches={churches} notify={notify} defaultChurch={myChurch} lockChurch={singleChurch} logAudit={logAudit} />
           )}
         </div>
         </div>

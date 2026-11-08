@@ -21,6 +21,7 @@ import FamiliesPanel from "@/components/directory/FamiliesPanel";
 import GroupsPanel from "@/components/directory/GroupsPanel";
 import ChurchGroupsPanel from "@/components/directory/ChurchGroupsPanel";
 import OrgChartPanel from "@/components/directory/OrgChartPanel";
+import { ALL_CHURCHES } from "@/lib/clerkScope";
 import RolesMultiSelect from "@/components/directory/RolesMultiSelect";
 import InfoCard from "@/components/InfoCard";
 import MoreMenu from "@/components/MoreMenu";
@@ -1015,11 +1016,19 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
                 const cityOptions = [...new Set((churches || []).map((c) => (c.display || c).split(",")[0].trim()))].sort();
                 const sel = editing.churches || [];
                 const toggle = (city) => setEditing({ ...editing, churches: sel.includes(city) ? sel.filter((x) => x !== city) : [...sel, city] });
+                const isClerk = (editing.sysRoles || []).includes("clerk");
+                const all = sel.includes(ALL_CHURCHES);
                 return (
                   <div>
-                    <label>Igrejas visíveis <span style={{ fontWeight: 400, color: "var(--muted)", fontSize: 11 }}>(vazio = todas)</span></label>
+                    <label>Igrejas visíveis <span style={{ fontWeight: 400, color: "var(--muted)", fontSize: 11 }}>{isClerk ? "(Secretaria: vazio = só a igreja dela)" : "(vazio = todas)"}</span></label>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
-                      {cityOptions.map((city) => (
+                      {isClerk && (
+                        <label className="cb" style={{ fontWeight: 600, textTransform: "none", fontSize: 13, background: all ? "var(--sidebar-active-bg)" : "var(--bg2)", padding: "3px 10px", borderRadius: 99, border: "1px solid var(--border)", cursor: "pointer" }}>
+                          <input type="checkbox" checked={all} onChange={() => setEditing({ ...editing, churches: all ? [] : [ALL_CHURCHES] })} style={{ marginRight: 5 }} />
+                          Todas as igrejas (Secretaria principal)
+                        </label>
+                      )}
+                      {!all && cityOptions.map((city) => (
                         <label key={city} className="cb" style={{ fontWeight: 400, textTransform: "none", fontSize: 13, background: sel.includes(city) ? "var(--sidebar-active-bg)" : "var(--bg2)", padding: "3px 10px", borderRadius: 99, border: "1px solid var(--border)", cursor: "pointer" }}>
                           <input type="checkbox" checked={sel.includes(city)} onChange={() => toggle(city)} style={{ marginRight: 5 }} />
                           {city}
