@@ -3,7 +3,7 @@ import { LayoutDashboard, ClipboardList, Users, Clock, BarChart2, Calendar, Chec
 import { useT, fill } from "@/i18n/strings";
 import { CATEGORIES, TEAMS, ROLE_BADGE, ROLE_GROUPS, fmt, classifyVoice, normalizeNote, isValidNote } from "@/constants";
 import { sb } from "@/lib/supabase";
-import { APP_USER_COLUMNS } from "@/lib/appUsers";
+import { saveAppUser, setAppUserActive } from "@/lib/appUsersApi";
 import { authHeaders } from "@/lib/session";
 import { groupGasByChurch } from "@/lib/gaGroups";
 import { eventSubtitle } from "@/lib/registrationDeadline";
@@ -892,10 +892,13 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
     const activeAdmins = (dbUsers || []).filter((x) => x.active !== false && (x.sys_roles || [x.sys_role]).includes("admin"));
     if (!active && activeAdmins.length === 1 && activeAdmins[0].id === u.id) { notify("Não dá para desativar o último administrador ativo."); return; }
     if (!active && !window.confirm(`Desativar "${u.name}"? A conta deixa de entrar no sistema, mas pode ser reativada.`)) return;
-    const { data, error } = await sb.from("app_users").update({ active }).eq("id", u.id).select();
-    if (error || !data?.length) { notify("Erro ao salvar: " + (error?.message || "usuário não encontrado")); return; }
+    try {
+      await setAppUserActive(u.id, active); // server: admin check, last-admin guard, audit log
+    } catch (err) {
+      notify(err.message === "last_admin" ? "Não dá para desativar o último administrador ativo." : "Erro ao salvar: " + err.message);
+      return;
+    }
     setDbUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, active } : x)));
-    logAudit?.(active ? "app_user_reactivated" : "app_user_deactivated", "app_user", u.id, u.name, {});
     if (active) notify("Conta reativada. Se a pessoa não tiver PIN, use \"Novo PIN\".");
   };
 
@@ -915,18 +918,24 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
         team_leads: sysRoles.includes("team_leader") ? (editing.teamLeads || []) : [],
         ga_ids: sysRoles.includes("ga_leader") ? (editing.gaIds || []) : [],
       };
+      // Saved by /api/app-users (admin only; it writes the audit log). The browser can't write app_users (migration 055).
+      const saved = await saveAppUser({
+        id: editing.id,
+        name: row.name,
+        primaryRole: row.primary_role,
+        sysRoles: row.sys_roles,
+        initials: row.initials,
+        church: row.church,
+        gaIds: row.ga_ids,
+        teamLeads: row.team_leads,
+        churches: editing.churches || [],
+        showFinancials: showFin,
+      });
       if (editing.id) {
-        const { error } = await sb.from("app_users").update(row).eq("id", editing.id);
-        if (error) throw error;
-        await sb.rpc("set_user_show_financials", { p_id: editing.id, p_val: showFin });
-        await sb.rpc("set_user_churches", { p_id: editing.id, p_val: editing.churches || [] });
-        setDbUsers((prev) => prev.map((u) => u.id === editing.id ? { ...u, ...row, show_financials: showFin } : u));
-        logAudit?.("app_user_updated", "app_user", editing.id, row.name, { sysRole: row.sys_role, church: row.church });
+        setDbUsers((prev) => prev.map((u) => (u.id === editing.id ? { ...u, ...saved } : u)));
       } else {
-        const { data, error } = await sb.from("app_users").insert({ ...row, show_financials: showFin }).select(APP_USER_COLUMNS).single();
-        if (error) throw error;
+        const data = saved;
         setDbUsers((prev) => [...prev, data]);
-        logAudit?.("app_user_created", "app_user", data.id, row.name, { sysRole: row.sys_role, church: row.church });
         setEditing(null);
         await generatePin(data, { confirm: false });
         return;
@@ -934,7 +943,8 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
       notify("Usuário atualizado!");
       setEditing(null);
     } catch (err) {
-      notify((editing.id ? "Erro ao salvar: " : "Erro ao criar: ") + (err?.message || "Erro desconhecido."));
+      const msg = err?.message === "last_admin" ? "Este é o último administrador ativo: mantenha o papel de admin." : (err?.message || "Erro desconhecido.");
+      notify((editing.id ? "Erro ao salvar: " : "Erro ao criar: ") + msg);
     } finally {
       setSaving(false);
     }
