@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Routes, Route, useNavigate, useLocation, useParams, Navigate } from "react-router-dom";
 import "./index.css";
-import { LangContext } from "@/i18n/strings";
+import { LangContext, STRINGS, fill } from "@/i18n/strings";
 import { ROLES_SYS } from "@/constants";
 import { SwitchRoleContext, SeeAsContext, RolePickContext } from "@/context/switchRole";
 import { AppDataContext } from "@/context/AppDataContext";
@@ -132,6 +132,32 @@ export default function App() {
     localStorage.setItem("mcc_view", safeRole);
     setView(safeRole);
     navigate("/");
+  };
+
+  // "Ao entrar, abrir como": the user picks the role they open with at sign-in (app_users.primary_role).
+  // The server checks it is one of their own roles. Local dev has no serverless functions: kept in memory.
+  const [savingStartRole, setSavingStartRole] = useState(false);
+  const saveStartRole = async (role) => {
+    const s = STRINGS[lang] || STRINGS.pt;
+    if (!authUser || role === authUser.primaryRole) return;
+    setSavingStartRole(true);
+    let res = null;
+    try {
+      res = await fetch("/api/me", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getSessionToken()}` },
+        body: JSON.stringify({ primaryRole: role }),
+      });
+    } catch { /* offline */ }
+    setSavingStartRole(false);
+    if ((!res || res.status === 404) && import.meta.env.DEV) {
+      setAuthUser({ ...authUser, primaryRole: role });
+    } else {
+      const data = res?.ok ? await res.json().catch(() => null) : null;
+      if (!data?.user) { notify(s.startRoleFailed); return; }
+      setAuthUser(mapAppUser(data.user));
+    }
+    notify(fill(s.startRoleSaved, { role: ROLE_LABELS[role] || role }));
   };
 
   // Resolves to true, or to the error code from useAuth's login.
@@ -304,7 +330,7 @@ export default function App() {
             {roleSwitcher && user && (
               <div className="modal-bg" style={{ zIndex: 9998 }} onClick={(e) => e.target === e.currentTarget && setRoleSwitcher(false)}>
                 <div className="modal" style={{ maxWidth: 320 }}>
-                  <h3 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 18, marginBottom: 16 }}>Trocar Função</h3>
+                  <h3 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 18, marginBottom: 16 }}>{(STRINGS[lang] || STRINGS.pt).switchRoleTitle}</h3>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {user.allRoles.map((role) => {
                       const label = role === "team_leader" && user.teamLeads?.length
@@ -317,6 +343,20 @@ export default function App() {
                       );
                     })}
                   </div>
+                  {!user.viewedBy && authUser && (
+                    <label style={{ display: "block", marginTop: 16, fontSize: 12, color: "var(--muted)" }}>
+                      {(STRINGS[lang] || STRINGS.pt).startRoleLabel}
+                      <select
+                        id="start-role"
+                        value={authUser.primaryRole && user.allRoles.includes(authUser.primaryRole) ? authUser.primaryRole : user.allRoles[0]}
+                        disabled={savingStartRole}
+                        onChange={(e) => saveStartRole(e.target.value)}
+                        style={{ marginTop: 4 }}
+                      >
+                        {user.allRoles.map((role) => <option key={role} value={role}>{ROLE_LABELS[role] || role}</option>)}
+                      </select>
+                    </label>
+                  )}
                 </div>
               </div>
             )}
