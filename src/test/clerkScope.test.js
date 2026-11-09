@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { clerkCities, inClerkScope, ALL_CHURCHES } from "@/lib/clerkScope";
+import { clerkCities, inClerkScope, regChurchFilter, ALL_CHURCHES } from "@/lib/clerkScope";
 
 describe("Secretaria church scope", () => {
   it("is the clerk's own church by default", () => {
@@ -21,5 +21,21 @@ describe("Secretaria church scope", () => {
     expect(c.sort()).toEqual(["newark", "philadelphia"]);
     expect(inClerkScope(c, "Philadelphia, PA")).toBe(true);
     expect(inClerkScope(c, "New York, NY")).toBe(false);
+  });
+});
+
+describe("Secretaria's Inscrições church filter", () => {
+  const cities = ["newark"];
+  it("opens on the clerk's own church", () => {
+    const f = regChurchFilter("mine", [], cities);
+    expect(f("Newark, NJ")).toBe(true);
+    expect(f("Outra: Igreja Americana em Boca Raton, Florida")).toBe(false);
+  });
+  it("can show every church or a chosen few", () => {
+    expect(regChurchFilter("all", [], cities)("Everett, MA")).toBe(true);
+    const some = regChurchFilter("pick", ["Everett, MA", ""], cities);
+    expect(some("Everett, MA")).toBe(true);
+    expect(some("")).toBe(true);
+    expect(some("Newark, NJ")).toBe(false);
   });
 });
