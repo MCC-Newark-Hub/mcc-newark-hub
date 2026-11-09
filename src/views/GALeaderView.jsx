@@ -15,6 +15,10 @@ import { newMemberForm, memberToForm } from "@/lib/memberForm";
 import { resendConfirmation } from "@/lib/resendConfirmation";
 import { eventSubtitle } from "@/lib/registrationDeadline";
 import { groupByFamily } from "@/lib/family";
+import InfoCard from "@/components/InfoCard";
+import MoreMenu from "@/components/MoreMenu";
+import ViewToggle from "@/components/ViewToggle";
+import { useViewMode } from "@/hooks/useViewMode";
 
 const cityOf = (s) => (s || "").split(",")[0].trim().toLowerCase();
 
@@ -33,6 +37,7 @@ function GALeaderView(props) {
   const [showFuncoes, setShowFuncoes] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   const [groupByFam, setGroupByFam] = useState(false);
+  const [viewMode, setViewMode] = useViewMode("ga_members");
   const [transferMemberId, setTransferMemberId] = useState("");
   const [transferTargetGaId, setTransferTargetGaId] = useState("");
   const [requestTarget, setRequestTarget] = useState(null); // { reg, type: "reactivation" | "deadline_extension" }
@@ -265,6 +270,39 @@ function GALeaderView(props) {
             const notR = gam.filter((m) => getStatus(m.id) === "not_registered");
             const pendG = gam.filter((m) => getStatus(m.id) === "pending");
             const conf = gam.filter((m) => getStatus(m.id) === "confirmed");
+            const statusBadge = (s) => s === "not_registered"
+              ? <span className="badge badge-gray">○ {t.notRegistered}</span>
+              : s === "pending" ? <span className="badge badge-yellow">⏳ {t.pendPayment}</span>
+              : <span className="badge badge-green">✓ {t.confirmed}</span>;
+            const memberActions = (m, reg, cancelledReg, overdueStatus) => (
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setEditingMember(memberToForm(m, families)); setNewFamilyName(""); }}>{t.edit}</button>
+                <MoreMenu
+                  label={t.actMore}
+                  ariaLabel={`${t.actMoreLabel} — ${m.name}`}
+                  items={[
+                    reg && { key: "resend", label: resendingId === reg.id ? "…" : t.actResend, disabled: resendingId === reg.id, onClick: () => handleResend(reg) },
+                    cancelledReg && { key: "reactivate", label: t.requestReactivation, onClick: () => setRequestTarget({ reg: cancelledReg, type: "reactivation" }) },
+                    reg && overdueStatus && (overdueStatus.overdue || overdueStatus.urgent) && { key: "extend", label: t.requestExtension, onClick: () => setRequestTarget({ reg, type: "deadline_extension" }) },
+                  ]}
+                />
+              </div>
+            );
+            const renderMemberCard = (m) => {
+              const reg = getReg(m.id);
+              const cancelledReg = !reg ? getCancelledReg(m.id) : null;
+              const overdueStatus = reg ? deadlineStatus(reg, event, allEventRegs) : null;
+              return (
+                <InfoCard
+                  key={m.id}
+                  title={m.name}
+                  code={reg?.regNumber}
+                  aside={statusBadge(getStatus(m.id))}
+                  badges={<><span className="badge badge-blue">{m.category}</span><RoleBadges member={m} /></>}
+                  actions={memberActions(m, reg, cancelledReg, overdueStatus)}
+                />
+              );
+            };
             const renderMemberRow = (m) => {
               const s = getStatus(m.id);
               const reg = getReg(m.id);
@@ -295,45 +333,7 @@ function GALeaderView(props) {
                         ? t.payAtDesk
                         : `✓ ${t.confirmed}`}
                   </td>
-                  <td>
-                    <div style={{ display: "flex", gap: 4 }}>
-                      <button
-                        className="btn btn-ghost btn-xs"
-                        onClick={() => { setEditingMember(memberToForm(m, families)); setNewFamilyName(""); }}
-                        title="Editar membro"
-                      >
-                        ✏️
-                      </button>
-                      {reg && (
-                        <button
-                          className="btn btn-ghost btn-xs"
-                          disabled={resendingId === reg.id}
-                          onClick={() => handleResend(reg)}
-                          title={t.resendConfirmation}
-                        >
-                          {resendingId === reg.id ? "…" : "📧"}
-                        </button>
-                      )}
-                      {cancelledReg && (
-                        <button
-                          className="btn btn-ghost btn-xs"
-                          onClick={() => setRequestTarget({ reg: cancelledReg, type: "reactivation" })}
-                          title={t.requestReactivation}
-                        >
-                          ♻️
-                        </button>
-                      )}
-                      {reg && overdueStatus && (overdueStatus.overdue || overdueStatus.urgent) && (
-                        <button
-                          className="btn btn-ghost btn-xs"
-                          onClick={() => setRequestTarget({ reg, type: "deadline_extension" })}
-                          title={t.requestExtension}
-                        >
-                          ⏰
-                        </button>
-                      )}
-                    </div>
-                  </td>
+                  <td style={{ whiteSpace: "nowrap" }}>{memberActions(m, reg, cancelledReg, overdueStatus)}</td>
                 </tr>
               );
             };
@@ -358,8 +358,19 @@ function GALeaderView(props) {
                     <span className="badge badge-yellow">{pendG.length}⏳</span>
                     <span className="badge badge-gray">{notR.length}○</span>
                     <button className="btn btn-ghost btn-xs" onClick={() => setManagingGA(ga)}>👥 Gerenciar Membros</button>
+                    <ViewToggle mode={viewMode} onChange={setViewMode} />
                   </div>
                 </div>
+                {viewMode === "cards" ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    {(groupByFam ? groupByFamily(gam, families) : [{ familyId: "__all__", familyName: null, members: gam }]).map((g) => (
+                      <section key={`cf-${g.familyId ?? "none"}`}>
+                        {g.familyName && <h4 style={{ fontSize: 13, fontWeight: 700, margin: "0 0 8px" }}>👪 {g.familyName} <span style={{ opacity: .65, fontWeight: 400 }}>({g.members.length})</span></h4>}
+                        <div className="info-cards">{g.members.map(renderMemberCard)}</div>
+                      </section>
+                    ))}
+                  </div>
+                ) : (
                 <div className="card" style={{ padding: 0, overflow: "hidden" }}>
                   <div className="table-wrap">
                     <table className="table">
@@ -388,6 +399,7 @@ function GALeaderView(props) {
                     </table>
                   </div>
                 </div>
+                )}
                 {notR.length > 0 && (
                   <div
                     style={{

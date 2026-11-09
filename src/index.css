@@ -44,6 +44,7 @@
   --modal-bg:#ffffff;
   --overlay:rgba(3,34,63,.55);
   --r:10px;
+  --ok-bg:#ecfdf5; --ok-fg:#065f46; --danger-bg:#fef2f2; --danger-fg:#991b1b;
   --shadow:0 1px 4px rgba(3,34,63,.08);
   --shadow-md:0 4px 16px rgba(3,34,63,.12);
   --shadow-lg:0 8px 32px rgba(3,34,63,.16);
@@ -58,6 +59,7 @@
 
 /* Dark Mode */
 [data-theme="dark"]{
+  --ok-bg:rgba(45,138,78,.16); --ok-fg:#86efac; --danger-bg:rgba(192,57,43,.18); --danger-fg:#fca5a5;
   --bg:var(--icm-navy-deep);
   --bg2:#021c33;
   --card:#02243d;
@@ -407,3 +409,49 @@ label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase
 .pace-tip{position:absolute;pointer-events:none;background:var(--modal-bg);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-md);padding:6px 8px;font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--text);z-index:2;}
 .pace-table td,.pace-table th{white-space:nowrap;}
 .pace-table .num{text-align:right;font-variant-numeric:tabular-nums;}
+
+/* ── REGISTRATION ACTIONS, "⋯ Mais" MENU, TABLE/CARDS SWITCH, CARDS
+   (src/components/RegActions.jsx, MoreMenu.jsx, ViewToggle.jsx, InfoCard.jsx) ── */
+.reg-actions{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;}
+.reg-presence{background:var(--card);color:var(--text);border:1px solid var(--border);display:inline-flex;align-items:center;gap:4px;}
+.reg-presence.on{background:var(--ok-bg);color:var(--ok-fg);border-color:var(--ok-fg);}
+.reg-presence.absent{background:var(--danger-bg);color:var(--danger-fg);border-color:var(--danger-fg);}
+.more-menu-btn{display:inline-flex;align-items:center;gap:4px;}
+.more-menu{z-index:1200;min-width:220px;background:var(--card);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow-lg);padding:6px;display:flex;flex-direction:column;}
+.more-menu-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;min-height:40px;padding:8px 12px;border:none;border-radius:8px;background:transparent;color:var(--text);font:500 13px 'Montserrat',sans-serif;cursor:pointer;}
+.more-menu-item:disabled{opacity:.5;cursor:default;}
+.more-menu-item.danger{color:var(--danger);}
+.more-menu-icon{display:inline-flex;color:var(--muted);}
+.more-menu-item.danger .more-menu-icon{color:inherit;}
+@media (hover:hover) and (pointer:fine){ .more-menu-item:hover:not(:disabled){background:var(--table-hover-bg);} }
+.more-menu-item:focus-visible{outline:2px solid var(--primary);outline-offset:-2px;}
+/* The actions column stays in view while the table scrolls sideways */
+.table .sticky-actions{position:sticky;right:0;z-index:1;background:var(--card);box-shadow:-6px 0 8px -6px rgba(3,34,63,.25);white-space:nowrap;}
+.table th.sticky-actions{background:var(--table-header-bg);z-index:3;}
+.table tr:hover td.sticky-actions{background:var(--table-hover-bg);}
+.view-toggle{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--card);}
+.view-toggle-btn{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:6px 12px;border:none;background:transparent;color:var(--muted);font:600 12px 'Montserrat',sans-serif;cursor:pointer;transition:transform 120ms ease-out;}
+.view-toggle-btn + .view-toggle-btn{border-left:1px solid var(--border);}
+.view-toggle-btn.active{background:var(--primary);color:#fff;}
+.view-toggle-btn:active{transform:scale(.97);}
+.view-toggle-btn:focus-visible{outline:2px solid var(--primary);outline-offset:-2px;}
+.info-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;}
+.info-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0;}
+.info-card.dimmed{opacity:.55;}
+.info-card.selected{border-color:var(--primary);}
+.info-card-head{display:flex;align-items:flex-start;gap:10px;}
+.info-card-head input[type=checkbox]{margin-top:3px;flex:none;width:auto;min-width:0;}
+.info-card-title{flex:1;min-width:0;}
+.info-card-name{font-weight:700;font-size:14px;color:var(--text);overflow-wrap:anywhere;}
+.info-card-code{font-family:monospace;font-size:12px;color:var(--text-secondary);margin-top:2px;}
+.info-card-aside{flex:none;text-align:right;}
+.info-card-meta{font-size:12px;color:var(--text-secondary);display:flex;flex-wrap:wrap;gap:4px 12px;}
+.info-card-badges{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+.info-card-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-top:1px solid var(--border-light);padding-top:10px;}
+.info-card-actions .reg-actions{flex-wrap:wrap;}
+@media(max-width:768px){
+  .info-cards{grid-template-columns:1fr;}
+  .info-card-actions .btn,.info-card-actions .view-toggle-btn{min-height:44px;}
+  .more-menu-item{min-height:44px;}
+}
+@media(prefers-reduced-motion:reduce){ .view-toggle-btn{transition:none;} .view-toggle-btn:active{transform:none;} }

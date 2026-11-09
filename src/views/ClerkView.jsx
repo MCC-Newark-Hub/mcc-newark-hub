@@ -24,6 +24,11 @@ import { resendConfirmation } from "@/lib/resendConfirmation";
 import { useSortable } from "@/hooks/useSortable";
 import { groupByFamily, familyIdOf } from "@/lib/family";
 import { matchesRegNumber } from "@/lib/regNumber";
+import { clerkCities, inClerkScope } from "@/lib/clerkScope";
+import RegActions from "@/components/RegActions";
+import InfoCard from "@/components/InfoCard";
+import ViewToggle from "@/components/ViewToggle";
+import { useViewMode } from "@/hooks/useViewMode";
 
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 const statusSortOf = (r) => r.cancelled ? "cancelado" : r.waitlisted ? "lista de espera" : r.excedente ? "excedente" : r.exempt ? "isento" : r.paid ? "pago" : "pendente";
@@ -92,6 +97,7 @@ function ClerkView(props) {
   const [tab, setTab] = useState("active");
   const [showReg, setShowReg] = useState(false);
   const [detail, setDetail] = useState(null);
+  const [viewMode, setViewMode] = useViewMode("clerk_regs");
   const [prefill, setPrefill] = useState(null);
   const [replaceTarget, setReplaceTarget] = useState(null);
   const [replaceSearch, setReplaceSearch] = useState("");
@@ -115,21 +121,23 @@ function ClerkView(props) {
   const [deletingMember, setDeletingMember] = useState(false);
   const [newFamilyName, setNewFamilyName] = useState("");
 
-  const cityOf = (s) => (s || "").split(",")[0].trim().toLowerCase();
   const myChurch = user?.church || "";
-  const myCity = cityOf(myChurch);
-  const myMembers = members.filter((m) => cityOf(m.church) === myCity);
+  // The churches this clerk works with: their own, a list, or all of them (the main secretary).
+  const scopeCities = clerkCities(user);
+  const inScope = (church) => inClerkScope(scopeCities, church);
+  const singleChurch = !!scopeCities && scopeCities.length === 1;
+  const myMembers = members.filter((m) => inScope(m.church));
 
   const eventApprovals = (approvals || []).filter((a) => a.eventId === event?.id);
   const pendingApprovalList = eventApprovals.filter((a) => a.status === "pending");
   useTopbarContent({ title: user?.name || t.clerkTitle, sub: `${t.clerkTitle} · ${eventSubtitle(event, lang)}`, pendingCount: pendingApprovalList.length, helpPath: "tutorials/register-member" });
   const resolvedApprovalList = eventApprovals.filter((a) => a.status !== "pending");
   const allActiveAll = regs.filter((r) => r.eventId === event?.id && !r.cancelled && !r.waitlisted);
-  const allActive = allActiveAll.filter((r) => cityOf(r.church) === myCity);
+  const allActive = allActiveAll.filter((r) => inScope(r.church));
   // Includes cancelled rows too, unlike allActive — deadlineStatus needs a member's
   // full history to anchor the payment countdown to their earliest attempt.
-  const allForCity = regs.filter((r) => r.eventId === event?.id && cityOf(r.church) === myCity);
-  const myWlRegs = (wlRegs || []).filter((r) => cityOf(r.church) === myCity);
+  const allForCity = regs.filter((r) => r.eventId === event?.id && inScope(r.church));
+  const myWlRegs = (wlRegs || []).filter((r) => inScope(r.church));
   const myExRegs = allActive.filter((r) => r.excedente);
   const isOverdue = (r) => deadlineStatus(r, event, allForCity)?.overdue;
   const myOverdueRegs = allActive.filter(isOverdue);
@@ -137,7 +145,7 @@ function ClerkView(props) {
     tab === "active" ? allActive
     : tab === "waitlist" ? myWlRegs
     : tab === "overdue" ? myOverdueRegs
-    : regs.filter((r) => r.eventId === event?.id && r.cancelled && cityOf(r.church) === myCity)
+    : regs.filter((r) => r.eventId === event?.id && r.cancelled && inScope(r.church))
   ).filter((r) => {
     const q = norm(search);
     return norm(r.memberName).includes(q) || norm(r.regNumber).includes(q) || matchesRegNumber(r.regNumber, search) || norm(r.church).includes(q) ||
@@ -158,7 +166,7 @@ function ClerkView(props) {
   ];
 
   const myFamilies = families.filter((f) => (f.memberIds || []).some((id) => myMembers.some((m) => m.id === id)));
-  const myGas = (gas || []).filter((g) => cityOf(g.church) === myCity);
+  const myGas = (gas || []).filter((g) => inScope(g.church));
 
   const navItems = [
     { id: "resumo", icon: <BarChart2 size={16} />, label: "Resumo" },
@@ -194,6 +202,18 @@ function ClerkView(props) {
     } finally {
       setDeletingMember(false);
     }
+  };
+
+  // Same actions for the table rows and the cards (the clerk can't delete or print badges here).
+  const actionProps = {
+    onPaid: (r) => updateReg(r.id, { paid: true }),
+    onPresence: updatePresence ? (id, value) => updatePresence(id, value, "manual") : undefined,
+    onPromote: promoteFromWaitlist,
+    onEdit: setDetail,
+    onToWaitlist: props.sendToWaitlist,
+    onReplace: (r) => { setReplaceTarget(r); setReplaceSearch(""); setReplaceCandidate(null); },
+    replaceLabel: t.actReplaceRequest,
+    onResend: handleResend,
   };
 
   return (
@@ -236,7 +256,7 @@ function ClerkView(props) {
                 wlExempt={myWlRegs.filter((r) => r.exempt).length}
                 wlPend={myWlRegs.filter((r) => !r.paid && !r.exempt).length}
                 wlTotal={myWlRegs.length}
-                cancelled={regs.filter((r) => r.eventId === event?.id && r.cancelled && cityOf(r.church) === myCity).length}
+                cancelled={regs.filter((r) => r.eventId === event?.id && r.cancelled && inScope(r.church)).length}
                 lang={lang}
               />
 
@@ -286,7 +306,12 @@ function ClerkView(props) {
                       <button key={k} className={`tab ${tab === k ? "active" : ""}`} onClick={() => { setTab(k); setBulkSel([]); }}>{l}</button>
                     ))}
                   </div>
-                  {tab !== "approvals" && <span style={{ fontSize: 12, color: "#6b7280" }}>{viewRegs.length}</span>}
+                  {tab !== "approvals" && (
+                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "var(--muted)" }}>{viewRegs.length}</span>
+                      <ViewToggle mode={viewMode} onChange={setViewMode} />
+                    </div>
+                  )}
                 </div>
 
                 {tab === "approvals" ? (
@@ -305,6 +330,33 @@ function ClerkView(props) {
                       </div>
                     ))}
                   </div>
+                ) : viewMode === "cards" ? (
+                  <div className="info-cards" style={{ padding: 12 }}>
+                    {viewRegs.length === 0 && <p style={{ color: "var(--muted)", padding: 16 }}>{t.noRecords}</p>}
+                    {viewRegs.map((r) => (
+                      <InfoCard
+                        key={r.id}
+                        title={r.memberName || "—"}
+                        code={r.regNumber || "—"}
+                        aside={<StatusBadge r={r} event={event} allRegs={allForCity} />}
+                        meta={<>
+                          <span>{r.church || "—"}</span>
+                          {r.team && <span>{r.team}</span>}
+                          <span style={{ fontWeight: 600, color: "var(--text)" }}>{r.exempt ? t.exempt : fmt(r.fee ?? 0)}</span>
+                          {r.registeredAt && <span>{r.registeredAt}</span>}
+                        </>}
+                        badges={<>
+                          <span className="badge badge-blue">{r.category || "—"}</span>
+                          {r.role && <span className={`badge ${ROLE_BADGE[r.role] || "badge-gray"}`}>{r.role}</span>}
+                        </>}
+                        actions={<RegActions reg={r} {...actionProps} resending={resendingId === r.id} />}
+                        dimmed={r.cancelled}
+                        selected={bulkSel.includes(r.id)}
+                        onSelect={() => toggleBulk(r.id)}
+                        selectLabel={r.memberName}
+                      />
+                    ))}
+                  </div>
                 ) : (
                   <div className="table-wrap">
                     <table className="table">
@@ -314,9 +366,9 @@ function ClerkView(props) {
                             checked={viewRegs.length > 0 && viewRegs.every((r) => bulkSel.includes(r.id))}
                             onChange={(e) => setBulkSel(e.target.checked ? viewRegs.map((r) => r.id) : [])} />
                         </th>
-                        <th>{t.regNum}</th><Th k="memberName">{t.memberName}</Th><Th k="role">{t.cargo}</Th><Th k="category">{t.cat}</Th><Th k="church">{t.churchH}</Th><Th k="team">{t.teamH}</Th><Th k="fee">{t.feeH}</Th><Th k="registeredAt">{t.regDate}</Th><Th k="statusSort">{t.statusH}</Th><th>Presença</th><th>{t.actions}</th></tr></thead>
+                        <th>{t.regNum}</th><Th k="memberName">{t.memberName}</Th><Th k="role">{t.cargo}</Th><Th k="category">{t.cat}</Th><Th k="church">{t.churchH}</Th><Th k="team">{t.teamH}</Th><Th k="fee">{t.feeH}</Th><Th k="registeredAt">{t.regDate}</Th><Th k="statusSort">{t.statusH}</Th><th className="sticky-actions">{t.actions}</th></tr></thead>
                       <tbody>
-                        {viewRegs.length === 0 && <tr><td colSpan={12} style={{ textAlign: "center", color: "#6b7280", padding: 28 }}>{t.noRecords}</td></tr>}
+                        {viewRegs.length === 0 && <tr><td colSpan={11} style={{ textAlign: "center", color: "#6b7280", padding: 28 }}>{t.noRecords}</td></tr>}
                         {viewRegs.map((r) => (
                           <tr key={r.id}>
                             <td><input type="checkbox" checked={bulkSel.includes(r.id)} onChange={() => toggleBulk(r.id)} /></td>
@@ -329,42 +381,8 @@ function ClerkView(props) {
                             <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{r.exempt ? <span style={{ color: "#6b7280" }}>{t.exempt}</span> : fmt(r.fee ?? 0)}</td>
                             <td style={{ fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>{r.registeredAt || "—"}</td>
                             <td><StatusBadge r={r} event={event} allRegs={allForCity} /></td>
-                            <td>
-                              <select
-                                value={r.presence || 'unknown'}
-                                onChange={(e) => updatePresence && updatePresence(r.id, e.target.value, 'manual')}
-                                style={{ fontSize: 11, padding: "2px 4px", borderRadius: 4, border: "1px solid var(--border)", background: r.presence === 'present' ? '#d1fae5' : r.presence === 'absent' ? '#fee2e2' : r.presence === 'walk_in' ? '#dbeafe' : '#f3f4f6', color: r.presence === 'present' ? '#065f46' : r.presence === 'absent' ? '#991b1b' : r.presence === 'walk_in' ? '#1e3a8a' : '#374151' }}
-                              >
-                                <option value="unknown">🔲 Desconhecida</option>
-                                <option value="present">✅ Presente</option>
-                                <option value="absent">❌ Ausente</option>
-                                <option value="walk_in">🚶 Walk-in</option>
-                              </select>
-                            </td>
-                            <td>
-                              <div style={{ display: "flex", gap: 4 }}>
-                                {r.waitlisted && <button className="btn btn-ok btn-sm" onClick={() => promoteFromWaitlist(r.id)}>{t.promoteWaitlist}</button>}
-                                {!r.waitlisted && !r.cancelled && <button className="btn btn-ghost btn-sm" title="Mover para lista de espera" onClick={() => props.sendToWaitlist(r.id)}>🎫</button>}
-                                {!r.waitlisted && !r.paid && !r.exempt && !r.cancelled && <button className="btn btn-ok btn-sm" onClick={() => updateReg(r.id, { paid: true })}>{t.markPaid}</button>}
-                                <button className="btn btn-ghost btn-sm" onClick={() => setDetail(r)}>{t.edit}</button>
-                                {!r.cancelled && !r.waitlisted && (
-                                  <button
-                                    className="btn btn-ghost btn-sm"
-                                    title="Solicitar Substituição"
-                                    onClick={() => { setReplaceTarget(r); setReplaceSearch(""); setReplaceCandidate(null); }}
-                                  >
-                                    🔄
-                                  </button>
-                                )}
-                                <button
-                                  className="btn btn-ghost btn-sm"
-                                  disabled={resendingId === r.id}
-                                  onClick={() => handleResend(r)}
-                                  title={t.resendConfirmation}
-                                >
-                                  {resendingId === r.id ? "…" : "📧"}
-                                </button>
-                              </div>
+                            <td className="sticky-actions">
+                              <RegActions reg={r} {...actionProps} resending={resendingId === r.id} />
                             </td>
                           </tr>
                         ))}
@@ -433,9 +451,9 @@ function ClerkView(props) {
           ) : sec === "families" ? (
             <FamiliesPanel members={myMembers} families={myFamilies} setFamilies={setFamilies} gas={myGas} showGroup notify={notify} logAudit={logAudit} />
           ) : sec === "functions" ? (
-            <FuncoesTab members={members} setMembers={setMembers} gas={gas} notify={notify} churchLock={myChurch} logAudit={logAudit} />
+            <FuncoesTab members={members} setMembers={setMembers} gas={gas} notify={notify} churchLock={singleChurch ? myChurch : undefined} logAudit={logAudit} />
           ) : (
-            <GroupsPanel members={myMembers} setMembers={setMembers} gas={myGas} setGas={setGas} churches={churches} notify={notify} defaultChurch={myChurch} lockChurch logAudit={logAudit} />
+            <GroupsPanel members={myMembers} setMembers={setMembers} gas={myGas} setGas={setGas} churches={churches} notify={notify} defaultChurch={myChurch} lockChurch={singleChurch} logAudit={logAudit} />
           )}
         </div>
         </div>

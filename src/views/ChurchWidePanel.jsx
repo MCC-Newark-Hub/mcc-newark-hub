@@ -2,13 +2,24 @@ import { useState } from "react";
 import { useT, fill } from "@/i18n/strings";
 import { STATUS_CFG } from "@/constants";
 import { churchMembers } from "@/lib/teamScope";
+import RegActions from "@/components/RegActions";
+import InfoCard from "@/components/InfoCard";
+import ViewToggle from "@/components/ViewToggle";
+import { useViewMode } from "@/hooks/useViewMode";
 
 const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
-// Read-only list of everyone in `church` with their registration for the event (Secretaria leader).
-export default function ChurchWidePanel({ church, members, getStatus, getReg }) {
+// Everyone in `church` with their registration for the event (Secretaria leader). With
+// updateReg/updatePresence the leader can also mark payment and attendance.
+export default function ChurchWidePanel({ church, members, getStatus, getReg, updateReg, updatePresence }) {
   const t = useT();
   const [query, setQuery] = useState("");
+  const [viewMode, setViewMode] = useViewMode("church_wide");
+  const actionProps = {
+    onPaid: updateReg ? (r) => updateReg(r.id, { paid: true }) : undefined,
+    onPresence: updatePresence ? (id, value) => updatePresence(id, value, "manual") : undefined,
+  };
+  const canAct = !!(updateReg || updatePresence);
   const all = churchMembers(members, church);
   const counts = { confirmed: 0, pending: 0, not_registered: 0 };
   all.forEach((m) => counts[getStatus(m.id)]++);
@@ -33,11 +44,29 @@ export default function ChurchWidePanel({ church, members, getStatus, getReg }) 
         ))}
       </div>
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-        <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.churchAllSearch} aria-label={t.churchAllSearch} style={{ width: "100%", maxWidth: 320 }} />
+        <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border)", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "space-between" }}>
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.churchAllSearch} aria-label={t.churchAllSearch} style={{ flex: 1, minWidth: 180, maxWidth: 320 }} />
+          <ViewToggle mode={viewMode} onChange={setViewMode} />
         </div>
         {shown.length === 0 ? (
           <p style={{ padding: 24, color: "#6b7280", textAlign: "center" }}>{t.noMembers}</p>
+        ) : viewMode === "cards" ? (
+          <div className="info-cards" style={{ padding: 12 }}>
+            {shown.map((m) => {
+              const s = getStatus(m.id);
+              const reg = getReg(m.id);
+              return (
+                <InfoCard
+                  key={m.id}
+                  title={m.name}
+                  code={reg?.regNumber}
+                  aside={<span className={`badge ${STATUS_CFG[s].badge}`}>{label[s]}</span>}
+                  badges={<span className="badge badge-blue">{m.category}</span>}
+                  actions={reg && canAct ? <RegActions reg={reg} {...actionProps} /> : null}
+                />
+              );
+            })}
+          </div>
         ) : (
           <div className="table-wrap">
             <table className="table">
@@ -47,6 +76,7 @@ export default function ChurchWidePanel({ church, members, getStatus, getReg }) 
                   <th>{t.cat}</th>
                   <th>{t.regH}</th>
                   <th></th>
+                  {canAct && <th className="sticky-actions">{t.actions}</th>}
                 </tr>
               </thead>
               <tbody>
@@ -59,6 +89,7 @@ export default function ChurchWidePanel({ church, members, getStatus, getReg }) 
                       <td><span className="badge badge-blue">{m.category}</span></td>
                       <td style={{ fontSize: 12, color: "#6b7280" }}>{reg?.regNumber || "—"}</td>
                       <td><span className={`badge ${STATUS_CFG[s].badge}`} style={{ fontSize: 10 }}>{label[s]}</span></td>
+                      {canAct && <td className="sticky-actions">{reg && <RegActions reg={reg} {...actionProps} />}</td>}
                     </tr>
                   );
                 })}

@@ -11,6 +11,10 @@ import { eventSubtitle } from "@/lib/registrationDeadline";
 import { useTopbarContent } from "@/context/TopbarContext";
 import { churchWideScope, churchMembers } from "@/lib/teamScope";
 import ChurchWidePanel from "./ChurchWidePanel";
+import InfoCard from "@/components/InfoCard";
+import MoreMenu from "@/components/MoreMenu";
+import ViewToggle from "@/components/ViewToggle";
+import { useViewMode } from "@/hooks/useViewMode";
 import TeamRegisterPanel from "./TeamRegisterPanel";
 import Modal from "@/components/Modal";
 import KitchenTab from "./admin/KitchenTab";
@@ -65,6 +69,7 @@ function TeamLeaderView(props) {
   }))];
   // The Secretaria leader also sees everyone in their church (see churchWideScope).
   const wideChurch = churchWideScope(user);
+  const [rosterView, setRosterView] = useViewMode("team_roster");
   const visibleMemberIds = wideChurch ? [...new Set([...allTeamMemberIds, ...churchMembers(members, wideChurch).map((m) => m.id)])] : allTeamMemberIds;
   // Flat pool of everyone on any of this leader's teams, for the scoped reports view.
   const isCozinhaLeader = myTeams.includes("Cozinha");
@@ -210,7 +215,7 @@ function TeamLeaderView(props) {
             <h2 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 22 }}>
               {t.hello}, {firstName}!
             </h2>
-            <p style={{ color: "#6b7280", fontSize: 13 }}>{t.teamReadOnly}</p>
+            <p style={{ color: "var(--text-secondary)", fontSize: 13 }}>{wideChurch ? t.teamWideNote : t.teamReadOnly}</p>
           </div>
 
           {/* Top-level view selector — CIA leaders don't need Membros com Funções, and with Equipe alone
@@ -898,6 +903,11 @@ function TeamLeaderView(props) {
                   Nenhuma equipe cadastrada para este evento.
                 </div>
               )}
+              {myTeams.length > 0 && (
+                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+                  <ViewToggle mode={rosterView} onChange={setRosterView} />
+                </div>
+              )}
           {myTeams.map((team) => {
             const roster = rosters.find((r) => r.eventId === event?.id && r.team === team);
             const mids = roster?.memberIds || [];
@@ -1040,6 +1050,34 @@ function TeamLeaderView(props) {
               );
             }
             const notReg = teamMembers.filter((m) => getStatus(m.id) === "not_registered");
+            const transferSelect = (m) => (
+              <select
+                value=""
+                aria-label={`${t.actTransfer} ${m.name}`}
+                onChange={(e) => {
+                  const dest = e.target.value;
+                  if (dest) transferMember(team, m, dest);
+                  e.target.value = "";
+                }}
+                style={{ fontSize: 12, padding: "4px 6px", width: "auto" }}
+              >
+                <option value="">{t.actTransfer}</option>
+                {SERVICE_TEAMS.filter((tm) => tm !== team).map((tm) => (
+                  <option key={tm} value={tm}>{tm}</option>
+                ))}
+              </select>
+            );
+            const rosterMenu = (m, reg, cancelledReg, overdueStatus) => (
+              <MoreMenu
+                label={t.actMore}
+                ariaLabel={`${t.actMoreLabel} — ${m.name}`}
+                items={[
+                  cancelledReg && { key: "reactivate", label: t.requestReactivation, onClick: () => setRequestTarget({ reg: cancelledReg, type: "reactivation" }) },
+                  reg && overdueStatus && (overdueStatus.overdue || overdueStatus.urgent) && { key: "extend", label: t.requestExtension, onClick: () => setRequestTarget({ reg, type: "deadline_extension" }) },
+                  { key: "remove", label: t.actRemoveFromTeam, danger: true, onClick: () => removeFromRoster(team, m.id) },
+                ]}
+              />
+            );
             const isEditing = editTeam === team;
             return (
               <div key={team} style={{ marginBottom: 24 }}>
@@ -1166,6 +1204,30 @@ function TeamLeaderView(props) {
                     <p style={{ padding: 24, color: "#6b7280", textAlign: "center" }}>
                       {t.noMembers}
                     </p>
+                  ) : rosterView === "cards" ? (
+                    <div className="info-cards" style={{ padding: 12 }}>
+                      {teamMembers.map((m) => {
+                        const s = getStatus(m.id);
+                        const reg = getReg(m.id);
+                        const cancelledReg = !reg ? getCancelledReg(m.id) : null;
+                        const overdueStatus = reg ? deadlineStatus(reg, event, allEventRegs) : null;
+                        return (
+                          <InfoCard
+                            key={m.id}
+                            title={m.name}
+                            code={reg?.regNumber}
+                            aside={<span className={`badge ${STATUS_CFG[s].badge}`}>{t[s === "not_registered" ? "notRegistered" : s === "pending" ? "pendPayment" : "confirmed"]}</span>}
+                            meta={<span>{m.church}</span>}
+                            badges={<>
+                              <span className="badge badge-blue">{m.category}</span>
+                              {(m.roles || []).includes(SEMINARY_TEACHER_ROLE) && <span className="badge badge-purple">Prof</span>}
+                              {(m.translationLanguages || []).map((lang) => <span key={lang} className="badge badge-blue">{lang}</span>)}
+                            </>}
+                            actions={<>{transferSelect(m)}{rosterMenu(m, reg, cancelledReg, overdueStatus)}</>}
+                          />
+                        );
+                      })}
+                    </div>
                   ) : (
                     <div className="table-wrap">
                       <table className="table">
@@ -1217,57 +1279,8 @@ function TeamLeaderView(props) {
                                     }
                                   </span>
                                 </td>
-                                <td>
-                                  <select
-                                    value=""
-                                    onChange={(e) => {
-                                      const dest = e.target.value;
-                                      if (dest) transferMember(team, m, dest);
-                                      e.target.value = "";
-                                    }}
-                                    style={{ fontSize: 11, padding: "3px 6px", width: "auto" }}
-                                  >
-                                    <option value="">Transferir…</option>
-                                    {SERVICE_TEAMS.filter((tm) => tm !== team).map((tm) => (
-                                      <option key={tm} value={tm}>{tm}</option>
-                                    ))}
-                                  </select>
-                                </td>
-                                <td>
-                                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                                    {cancelledReg && (
-                                      <button
-                                        className="btn btn-ghost btn-xs"
-                                        onClick={() => setRequestTarget({ reg: cancelledReg, type: "reactivation" })}
-                                        title={t.requestReactivation}
-                                      >
-                                        ♻️
-                                      </button>
-                                    )}
-                                    {reg && overdueStatus && (overdueStatus.overdue || overdueStatus.urgent) && (
-                                      <button
-                                        className="btn btn-ghost btn-xs"
-                                        onClick={() => setRequestTarget({ reg, type: "deadline_extension" })}
-                                        title={t.requestExtension}
-                                      >
-                                        ⏰
-                                      </button>
-                                    )}
-                                    <button
-                                      onClick={() => removeFromRoster(team, m.id)}
-                                      style={{
-                                        background: "none",
-                                        border: "none",
-                                        cursor: "pointer",
-                                        color: "#9ca3af",
-                                        fontSize: 18,
-                                        lineHeight: 1,
-                                      }}
-                                    >
-                                      ×
-                                    </button>
-                                  </div>
-                                </td>
+                                <td>{transferSelect(m)}</td>
+                                <td>{rosterMenu(m, reg, cancelledReg, overdueStatus)}</td>
                               </tr>
                             );
                           })}
@@ -1298,7 +1311,7 @@ function TeamLeaderView(props) {
               </div>
             );
           })}
-          {wideChurch && <ChurchWidePanel church={wideChurch} members={members} getStatus={getStatus} getReg={getReg} />}
+          {wideChurch && <ChurchWidePanel church={wideChurch} members={members} getStatus={getStatus} getReg={getReg} updateReg={updateReg} updatePresence={updatePresence} />}
           <div
             style={{
               padding: "10px 14px",
