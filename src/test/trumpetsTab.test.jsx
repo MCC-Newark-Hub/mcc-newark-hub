@@ -114,7 +114,7 @@ describe("Trombetas e Festas tab", () => {
   });
 
   it("GA leader adds a guest: phone is required, the modal keeps the values on error", async () => {
-    api.createGuest.mockRejectedValueOnce(new Error("invalid_phone")).mockResolvedValueOnce({ ...rita, id: "g3", name: "Nova" });
+    api.createGuest.mockRejectedValueOnce(new Error("forbidden")).mockResolvedValueOnce({ ...rita, id: "g3", name: "Nova" });
     renderAs({ name: "GA", sysRoles: ["ga_leader"], gaIds: ["GA1"] });
     await screen.findByText("Rita");
     fireEvent.click(screen.getByRole("button", { name: /Convidado/ }));
@@ -125,9 +125,41 @@ describe("Trombetas e Festas tab", () => {
     fireEvent.change(screen.getByLabelText("Telefone"), { target: { value: "abc" } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     expect(await screen.findByText("Telefone inválido.")).toBeTruthy();
+    expect(api.createGuest).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("Telefone"), { target: { value: "9735550199" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    expect(await screen.findByText("Você não tem acesso a este GA.")).toBeTruthy();
     expect(screen.getByLabelText("Nome").value).toBe("Nova");
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     expect(await screen.findByText("Nova")).toBeTruthy();
-    expect(api.createGuest).toHaveBeenLastCalledWith(expect.any(Number), expect.objectContaining({ gaId: "GA1", name: "Nova", phone: "abc" }));
+    expect(api.createGuest).toHaveBeenLastCalledWith(expect.any(Number), expect.objectContaining({ gaId: "GA1", name: "Nova", phone: "9735550199" }));
+  });
+
+  it("GA leader edit is checked before it closes: an invalid phone keeps the modal and saves nothing", async () => {
+    renderAs({ name: "GA", sysRoles: ["ga_leader"], gaIds: ["GA1"] });
+    fireEvent.click(await screen.findByRole("button", { name: "Rita" }));
+    fireEvent.change(screen.getByLabelText("Telefone"), { target: { value: "abc" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    expect(await screen.findByText("Telefone inválido.")).toBeTruthy();
+    expect(api.updateGuest).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("E-mail (opcional)"), { target: { value: "nope" } });
+    fireEvent.change(screen.getByLabelText("Telefone"), { target: { value: "9735550199" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    expect(await screen.findByText("E-mail inválido.")).toBeTruthy();
+    expect(api.updateGuest).not.toHaveBeenCalled();
+  });
+
+  it("a late motivos answer for the previous year never replaces the current year's", async () => {
+    let lateResolve;
+    api.getEdition.mockImplementation((y) => (y === new Date().getFullYear()
+      ? new Promise((r) => { lateResolve = () => r({ reasons: "# Ano atual atrasado", reasonsEn: "" }); })
+      : Promise.resolve({ reasons: "# Ano anterior", reasonsEn: "" })));
+    renderAs({ name: "Pr", sysRoles: ["pastor"] });
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: String(new Date().getFullYear() - 1) } });
+    expect(await screen.findByText("Ano anterior")).toBeTruthy();
+    lateResolve();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByText("Ano atual atrasado")).toBeNull();
+    expect(screen.getByText("Ano anterior")).toBeTruthy();
   });
 });

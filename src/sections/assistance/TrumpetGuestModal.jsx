@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { isValidEmail, isValidPhone, normalizeEmail, normalizePhone } from "@/lib/contact";
 
 // Add / edit one guest (GA leaders only). Phone is required. Create waits for the server (the id is needed before
 // anything else), so this stays open with the typed values when saving fails.
@@ -21,6 +22,9 @@ export default function TrumpetGuestModal({ tt, guest, gaOptions, members, onSav
     e.preventDefault();
     if (!f.name.trim()) return setError(tt.errors.invalid_name);
     if (!f.phone.trim()) return setError(tt.errors.missing_phone);
+    // same rules as the server, so an edit (saved optimistically after this closes) can't show a value it refuses
+    if (!isValidPhone(normalizePhone(f.phone))) return setError(tt.errors.invalid_phone);
+    if (f.email.trim() && !isValidEmail(normalizeEmail(f.email))) return setError(tt.errors.invalid_email);
     setBusy(true);
     setError("");
     try {

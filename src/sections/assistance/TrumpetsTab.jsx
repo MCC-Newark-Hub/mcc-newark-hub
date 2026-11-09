@@ -42,7 +42,9 @@ export default function TrumpetsTab({ lang }) {
   const [loaded, setLoaded] = useState({ year: null, data: null });
   const summary = loaded.year === year ? loaded.data : null;
   const setSummary = (fn) => setLoaded((l) => ({ ...l, data: fn(l.data) }));
-  const [edition, setEdition] = useState({ reasons: "", reasonsEn: "" });
+  const [editionOf, setEditionOf] = useState({ year: null, data: { reasons: "", reasonsEn: "" } });
+  // a late answer for another year never shows (or gets saved) under this one
+  const edition = editionOf.year === year ? editionOf.data : { reasons: "", reasonsEn: "" };
   const [loadFailed, setLoadFailed] = useState(false);
   const noAccess = !staff && !myGas.length;
 
@@ -52,8 +54,10 @@ export default function TrumpetsTab({ lang }) {
 
   useEffect(() => {
     if (noAccess) return;
+    let off = false; // set when the year changes: that year's late answer is dropped
     reload();
-    getEdition(year).then(setEdition).catch(() => {});
+    getEdition(year).then((data) => { if (!off) setEditionOf({ year, data }); }).catch(() => {});
+    return () => { off = true; };
   }, [year, noAccess, reload]);
 
   if (noAccess) return <div style={{ padding: 32, textAlign: "center", color: "var(--muted)" }}>{tt.noGa}</div>;
@@ -67,7 +71,7 @@ export default function TrumpetsTab({ lang }) {
 
   const saveReasons = async (draft) => {
     await saveEdition(year, draft);
-    setEdition(draft);
+    setEditionOf({ year, data: draft });
   };
 
   const myGaIds = myGas.map((g) => g.id);

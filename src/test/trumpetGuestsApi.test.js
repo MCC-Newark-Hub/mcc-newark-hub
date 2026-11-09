@@ -268,4 +268,16 @@ describe("/api/trumpet-guests summary and motivos", () => {
     expect(calls.find((c) => c.path.startsWith("trumpet_editions") && c.method === "POST").body).toMatchObject({ year: 2026, reasons: "Orar", reasons_en: "Pray" });
     expect((await call({ action: "setEdition", year: 2026, reasons: "x".repeat(4001) }, 6)).body).toEqual({ error: "invalid_reasons" });
   });
+
+  it("pages over a unique order (ties broken by id) so no row repeats or goes missing", async () => {
+    let calls = fakeDb();
+    await call({ action: "list", year: 2026 }, 2);
+    expect(calls.find((c) => c.path.startsWith("trumpet_guests?")).path).toMatch(/order=name,id&/);
+    calls = fakeDb();
+    await call({ action: "summary", year: 2026 }, 1);
+    expect(calls.find((c) => c.path.startsWith("trumpet_guests?")).path).toMatch(/order=ga_id,id&/);
+    calls = fakeDb();
+    await call({ action: "stats", year: 2026 }, 1);
+    expect(calls.find((c) => c.path.startsWith("trumpet_guests?")).path).toMatch(/order=created_at,id&/);
+  });
 });

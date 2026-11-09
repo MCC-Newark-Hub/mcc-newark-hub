@@ -27,7 +27,8 @@ const yearOf = (v) => {
 };
 const todayNY = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
 
-// PostgREST caps a response at 1000 rows: read page by page.
+// PostgREST caps a response at 1000 rows: read page by page. Every paged query orders by a unique key (… ,id),
+// or tied rows could repeat or go missing between pages.
 async function fetchAll(rest, path) {
   const out = [];
   for (let offset = 0; ; offset += PAGE) {
@@ -91,7 +92,7 @@ export default async function handler(req, res) {
       const year = yearOf(body.year);
       if (!year) return fail(400, "invalid_year");
       if (!allowed.size) return res.status(200).json({ guests: [] });
-      const rows = await fetchAll(rest, `trumpet_guests?year=eq.${year}&ga_id=in.(${[...allowed].join(",")})&select=${COLS}&order=name`);
+      const rows = await fetchAll(rest, `trumpet_guests?year=eq.${year}&ga_id=in.(${[...allowed].join(",")})&select=${COLS}&order=name,id`);
       return res.status(200).json({ guests: rows.map(toGuest) });
     }
 
@@ -156,7 +157,7 @@ export default async function handler(req, res) {
       if (!year) return fail(400, "invalid_year");
       const scoped = gas.filter((x) => seen.has(x.id));
       const rows = scoped.length
-        ? await fetchAll(rest, `trumpet_guests?year=eq.${year}&ga_id=in.(${scoped.map((x) => x.id).join(",")})&select=church,ga_id,invited_by_member_id,attended_at&order=ga_id`)
+        ? await fetchAll(rest, `trumpet_guests?year=eq.${year}&ga_id=in.(${scoped.map((x) => x.id).join(",")})&select=church,ga_id,invited_by_member_id,attended_at&order=ga_id,id`)
         : [];
       const inviterIds = [...new Set(rows.map((r) => r.invited_by_member_id).filter(Boolean))];
       const members = inviterIds.length ? await fetchAll(rest, `members?id=in.(${inviterIds.join(",")})&select=id,name&order=id`) : [];
@@ -234,7 +235,7 @@ export default async function handler(req, res) {
       if (!canManagePanel(roles)) return fail(403, "forbidden");
       const year = yearOf(body.year);
       if (!year) return fail(400, "invalid_year");
-      const rows = await fetchAll(rest, `trumpet_guests?year=in.(${year},${year - 1})&select=year,church,ga_id,invited_by_member_id,attended_at,created_at&order=created_at`);
+      const rows = await fetchAll(rest, `trumpet_guests?year=in.(${year},${year - 1})&select=year,church,ga_id,invited_by_member_id,attended_at,created_at&order=created_at,id`);
       const inviterIds = [...new Set(rows.filter((r) => r.year === year).map((r) => r.invited_by_member_id).filter(Boolean))];
       const members = inviterIds.length ? await fetchAll(rest, `members?id=in.(${inviterIds.join(",")})&select=id,name&order=id`) : [];
       const gr = await rest(`trumpet_goals?year=eq.${year}&select=church,goal`);
