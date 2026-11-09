@@ -139,9 +139,9 @@ describe("/api/trumpet-guests", () => {
   });
 
   it("forbids moving a guest to a GA outside scope, and rewrites church when moving inside", async () => {
-    let calls = fakeDb();
+    fakeDb();
     expect((await call({ action: "update", id: G1.id, gaId: "GA3", name: "Rita", phone: "9735550101" }, 2)).statusCode).toBe(403);
-    calls = fakeDb();
+    const calls = fakeDb();
     await call({ action: "update", id: G1.id, gaId: "GA3", name: "Rita", phone: "9735550101" }, 7);
     const patch = calls.find((c) => c.method === "PATCH");
     expect(patch.body).toMatchObject({ ga_id: "GA3", church: "Kearny, NJ - EUA" });
@@ -261,9 +261,9 @@ describe("/api/trumpet-guests summary and motivos", () => {
   });
 
   it("setEdition is pastor / admin only, upserts and caps the length", async () => {
-    let calls = fakeDb();
+    fakeDb();
     expect((await call({ action: "setEdition", year: 2026, reasons: "x" }, 4)).statusCode).toBe(403);
-    calls = fakeDb();
+    const calls = fakeDb();
     expect((await call({ action: "setEdition", year: 2026, reasons: "Orar", reasonsEn: "Pray" }, 6)).body).toEqual({ ok: true });
     expect(calls.find((c) => c.path.startsWith("trumpet_editions") && c.method === "POST").body).toMatchObject({ year: 2026, reasons: "Orar", reasons_en: "Pray" });
     expect((await call({ action: "setEdition", year: 2026, reasons: "x".repeat(4001) }, 6)).body).toEqual({ error: "invalid_reasons" });

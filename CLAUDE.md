@@ -51,7 +51,8 @@ Uses React Router v6. `<BrowserRouter>` in `src/main.jsx`; full route tree in `s
 | `/` | HubHome — section picker tile grid |
 | `/events` | EventsSection — routes to staff view by `user.sysRole` |
 | `/cms` | CMSSection — church/member management (Phase 4+) |
-| `/assistance` | AssistanceSection — Assistência/Care: Frequência (service census) tab; GA attendance, visits and prayer requests to come |
+| `/assistance` | AssistanceSection — Assistência/Care: Frequência (service census, staff) and Trombetas e Festas (GA leaders see only this tab and only their GAs' guest list; staff see numbers by igreja → GA → membro); visits and prayer requests to come |
+| `/assistance/trombetas/painel/:year?` | TrumpetsPanelView — Trombetas e Festas big-screen numbers; PIN-gated, admin / pastor only, outside HubShell |
 | `/schedule` | ScheduleSection — door/flower rotations, prayer agenda (Phase 3+) |
 | `/worship` | WorshipSection — Culto Profético: Listas de louvores (lists, catalogue, history) and Grupos (responsible group per weekly service) |
 | `/apprentice` | ApprenticeSection — Projeto Aprendiz (TBD) |
@@ -135,7 +136,7 @@ Also: always verify UPDATE/DELETE actually changed rows by chaining `.select()` 
 
 ### Serverless Functions
 
-`api/` contains Vercel serverless functions: `login.js`, `me.js`, `user-pin.js`, `see-as.js` (admin "Ver como": admin check + audit log), `send-confirmation.js`, `daily-backup.js`, `auto-cancel-overdue.js`. These use server-side env vars (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, plus `PIN_PEPPER` and `SESSION_SECRET` for sign-in) — distinct from the client-side `VITE_SUPABASE_URL` / `VITE_SUPABASE_KEY`. Keep both pairs in sync in `.env`; they point at the same project but are separate variables.
+`api/` contains Vercel serverless functions: `login.js`, `me.js`, `user-pin.js`, `see-as.js` (admin "Ver como": admin check + audit log), `send-confirmation.js`, `daily-backup.js`, `auto-cancel-overdue.js`, `trumpet-guests.js` (Trombetas e Festas: lists for GA leaders of their GAs only; numbers, goals and motivos for staff). These use server-side env vars (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, plus `PIN_PEPPER` and `SESSION_SECRET` for sign-in) — distinct from the client-side `VITE_SUPABASE_URL` / `VITE_SUPABASE_KEY`. Keep both pairs in sync in `.env`; they point at the same project but are separate variables.
 
 ### Deployment
 

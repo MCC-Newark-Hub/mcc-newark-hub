@@ -50,7 +50,7 @@ export default function TrumpetsDrill({ tt, summary, start }) {
   const n = at.node;
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <nav aria-label="breadcrumb" style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", fontSize: 13 }}>
+      {crumbs.length > 1 && <nav aria-label="breadcrumb" style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", fontSize: 13 }}>
         {crumbs.map((c, i) => (
           <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
             {i > 0 && <ChevronRight size={14} color="var(--muted)" />}
@@ -59,7 +59,7 @@ export default function TrumpetsDrill({ tt, summary, start }) {
               : <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPath(c.go)}>{c.label}</button>}
           </span>
         ))}
-      </nav>
+      </nav>}
 
       <div data-testid="tf-level" style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 16px" }}>
         <div style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 18, fontWeight: 700 }}>{at.label}</div>
