@@ -16,3 +16,14 @@ export function clerkCities(user) {
 }
 
 export const inClerkScope = (cities, church) => !cities || cities.includes(cityOf(church));
+
+// Which registrations the Secretaria's Inscrições shows. It opens on their own scope ("mine");
+// they can widen it to every church ("all") or pick some ("pick", with church names).
+export function regChurchFilter(mode, picked, cities) {
+  if (mode === "all") return () => true;
+  if (mode === "pick") {
+    const set = new Set(picked || []);
+    return (church) => set.has(church || "");
+  }
+  return (church) => inClerkScope(cities, church);
+}
