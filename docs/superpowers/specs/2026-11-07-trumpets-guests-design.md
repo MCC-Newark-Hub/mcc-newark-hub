@@ -225,3 +225,46 @@ Both server-only like the others.
   phone *(recommended)*; (b) no, the leader corrects; (c) yes, any guest of the GA.
 - **Q3 — who writes the motivos:** (a) pastor / admin, one text for every church *(recommended)*;
   (b) each church's secretaria writes its own.
+
+---
+
+## Revision 3 (2026-11-09) — only the GA leader sees the list
+
+Leonard, 2026-11-09: "Só o líder de grupo vê a lista no sistema. Ele pode exportar a lista pra postar no
+grupo." Follow-up answers: no member link; secretaria and pastor see numbers only; the export for the
+group carries the motivos and the names.
+
+This **replaces Revision 2 items 3 and 5** and changes the original access rules:
+
+| Who | Sees in the system | Can edit |
+|---|---|---|
+| GA leader | the full list of **their** GAs (name, phone, e-mail, invited by, notes, attended) + the GA's indicators | add / edit / delete / attendance in their GAs |
+| Secretaria (clerk, `clerkCities`, `"*"` = all) | **numbers only**: church → GA → member drill-down | nothing on guests |
+| Pastor / admin | **numbers only**: all churches → church → GA → member; the big-screen panel; goals; motivos | goals, motivos |
+
+- **No member link** (`trumpet_links` and the public page are dropped). Members get the list from the
+  leader in the WhatsApp group.
+- **Server rule:** `list`, `create`, `update`, `attend`, `delete` only for a caller with the `ga_leader`
+  role, limited to their `ga_ids` (a GA leader who is also clerk / pastor still sees only their own GAs'
+  lists). New action `summary { year }` for clerk / pastor / admin / GA leader returns aggregates only in
+  the caller's scope:
+  `{ churches: [{ church, invited, attended, goal, gas: [{ gaId, name, invited, attended,
+  members: [{ memberId, name, invited, attended }] }] }] }` — inviter names are members, never guests.
+  No guest name, phone or e-mail leaves the server through `summary` or `stats`.
+- **Drill-down (numbers):** pastor / admin start at all churches, clerk at their church (picker if
+  several), GA leader at their GA. Each level: invited, attended, %, goal, top inviters, and the cards of
+  the level below; the member level shows that member's counts. The GA leader's GA level also shows the
+  list.
+- **Export for the group (GA leader):** "Baixar imagem para o grupo" — a light, 600 px sheet like
+  `ReasonsImageButton`: the year's motivos on top, then each guest's **name and who invited**, no phone,
+  e-mail or notes. On a phone it opens the share sheet. The leader also keeps a full CSV for their own
+  use.
+- **Phone required** on add / edit (Revision 2 item 1 stands).
+- **Motivos:** one text per year, PT and EN, written by pastor / admin (`trumpet_editions`), shown at the
+  top of the tab and on the panel, with "Baixar imagem" for everyone who opens the tab. *(Default chosen
+  on 2026-11-09; Leonard didn't pick — change if each church should write its own.)*
+- Clerk scope uses `clerkCities` / `inClerkScope` from `src/lib/clerkScope.js` (merge `origin/main`).
+- Panel unchanged (pastor / admin, numbers only — it never had contacts; top inviters are member names).
+
+Data: migration 054 (still unapplied) keeps `trumpet_guests` and `trumpet_goals` and adds
+`trumpet_editions (year int PK, reasons text, reasons_en text, updated_at, updated_by)`, server-only.
