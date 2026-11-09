@@ -1,4 +1,5 @@
--- Trombetas e Festas: the guests each GA invites every year, and the goals shown on the panel.
+-- Trombetas e Festas: the guests each GA invites every year, the goals and the year's motivos.
+-- Only GA leaders see guest lists (their GAs); staff get numbers only (api/trumpet-guests.js).
 -- Guests are non-members' personal data, so both tables are server-only (like member_contacts, 039):
 -- the browser reaches them only through api/trumpet-guests.js, which checks the caller's scope.
 
@@ -30,6 +31,15 @@ CREATE TABLE IF NOT EXISTS trumpet_goals (
   PRIMARY KEY (year, church)
 );
 
+-- The year's "motivos" (markdown, PT and EN), written by pastor / admin, shown at the top of the tab and the panel.
+CREATE TABLE IF NOT EXISTS trumpet_editions (
+  year       int  PRIMARY KEY,
+  reasons    text NOT NULL DEFAULT '',
+  reasons_en text NOT NULL DEFAULT '',
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  updated_by text
+);
+
 ALTER TABLE trumpet_guests ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON trumpet_guests FROM anon, authenticated;
 GRANT ALL PRIVILEGES ON trumpet_guests TO service_role;
@@ -37,5 +47,9 @@ GRANT ALL PRIVILEGES ON trumpet_guests TO service_role;
 ALTER TABLE trumpet_goals ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON trumpet_goals FROM anon, authenticated;
 GRANT ALL PRIVILEGES ON trumpet_goals TO service_role;
+
+ALTER TABLE trumpet_editions ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON trumpet_editions FROM anon, authenticated;
+GRANT ALL PRIVILEGES ON trumpet_editions TO service_role;
 
 NOTIFY pgrst, 'reload schema';

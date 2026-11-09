@@ -8,6 +8,9 @@ const USERS = {
   2: { id: 2, name: "Líder", sys_role: "ga_leader", sys_roles: ["ga_leader"], church: "Newark", churches: [], ga_ids: ["GA1"] },
   3: { id: 3, name: "Sem GA", sys_role: "ga_leader", sys_roles: ["ga_leader"], church: "Newark", churches: [], ga_ids: [] },
   4: { id: 4, name: "Sec", sys_role: "clerk", sys_roles: ["clerk"], church: "Newark", churches: [], ga_ids: [] },
+  5: { id: 5, name: "Sec Geral", sys_role: "clerk", sys_roles: ["clerk"], church: "Newark", churches: ["*"], ga_ids: [] },
+  6: { id: 6, name: "Pr", sys_role: "pastor", sys_roles: ["pastor"], church: "", churches: [], ga_ids: [] },
+  7: { id: 7, name: "Líder 2 GAs", sys_role: "ga_leader", sys_roles: ["ga_leader"], church: "Newark", churches: [], ga_ids: ["GA1", "GA3"] },
 };
 const GAS = [
   { id: "GA1", name: "GA Central", church: "Newark, NJ - EUA" },
@@ -17,7 +20,7 @@ const GAS = [
 const G1 = { id: "11111111-1111-1111-1111-111111111111", year: 2026, church: "Newark, NJ - EUA", ga_id: "GA1", name: "Rita", phone: "9735550101", email: null, invited_by_member_id: null, attended_at: null, notes: null, created_at: "c", updated_at: "u" };
 const G2 = { ...G1, id: "22222222-2222-2222-2222-222222222222", ga_id: "GA2", name: "Beto" };
 
-function fakeDb({ guests = [G1, G2] } = {}) {
+function fakeDb({ guests = [G1, G2], editions = [] } = {}) {
   const calls = [];
   vi.stubGlobal("fetch", vi.fn(async (url, opts = {}) => {
     const path = decodeURIComponent(url.replace("https://db.test/rest/v1/", ""));
@@ -51,6 +54,8 @@ function fakeDb({ guests = [G1, G2] } = {}) {
     else if (path.startsWith("trumpet_goals") && method === "POST") out = [body];
     else if (path.startsWith("trumpet_goals?") && method === "DELETE") out = [{ year: 2026 }];
     else if (path.startsWith("members?")) out = [{ id: "M1", name: "Ana" }];
+    else if (path.startsWith("trumpet_editions?") && method === "GET") out = editions;
+    else if (path.startsWith("trumpet_editions") && method === "POST") out = [body];
     return { ok: true, status: 200, text: async () => JSON.stringify(out) };
   }));
   return calls;
@@ -89,10 +94,19 @@ describe("/api/trumpet-guests", () => {
     expect(calls.some((c) => c.path.startsWith("trumpet_guests"))).toBe(false);
   });
 
-  it("clerk sees the GAs of their church", async () => {
+  it("staff never get the list: clerk, pastor and admin get [] without reading guests", async () => {
+    for (const as of [4, 5, 6, 1]) {
+      const calls = fakeDb();
+      const res = await call({ action: "list", year: 2026 }, as);
+      expect(res.body.guests).toEqual([]);
+      expect(calls.some((c) => c.path.startsWith("trumpet_guests"))).toBe(false);
+    }
+  });
+
+  it("staff cannot add guests", async () => {
     fakeDb();
-    const res = await call({ action: "list", year: 2026 }, 4);
-    expect(res.body.guests.map((g) => g.name).sort()).toEqual(["Beto", "Rita"]);
+    expect((await call({ action: "create", year: 2026, gaId: "GA1", name: "X", phone: "9735550101" }, 4)).statusCode).toBe(403);
+    expect((await call({ action: "create", year: 2026, gaId: "GA1", name: "X", phone: "9735550101" }, 1)).statusCode).toBe(403);
   });
 
   it("rejects a bad year", async () => {
@@ -115,7 +129,7 @@ describe("/api/trumpet-guests", () => {
 
   it("forbids creating in a GA outside scope", async () => {
     fakeDb();
-    expect((await call({ action: "create", year: 2026, gaId: "GA2", name: "X" }, 2)).statusCode).toBe(403);
+    expect((await call({ action: "create", year: 2026, gaId: "GA2", name: "X", phone: "9735550101" }, 2)).statusCode).toBe(403);
   });
 
   it("returns 400 on an invalid phone", async () => {
@@ -126,9 +140,9 @@ describe("/api/trumpet-guests", () => {
 
   it("forbids moving a guest to a GA outside scope, and rewrites church when moving inside", async () => {
     let calls = fakeDb();
-    expect((await call({ action: "update", id: G1.id, gaId: "GA3", name: "Rita" }, 2)).statusCode).toBe(403);
+    expect((await call({ action: "update", id: G1.id, gaId: "GA3", name: "Rita", phone: "9735550101" }, 2)).statusCode).toBe(403);
     calls = fakeDb();
-    await call({ action: "update", id: G1.id, gaId: "GA3", name: "Rita" }, 1);
+    await call({ action: "update", id: G1.id, gaId: "GA3", name: "Rita", phone: "9735550101" }, 7);
     const patch = calls.find((c) => c.method === "PATCH");
     expect(patch.body).toMatchObject({ ga_id: "GA3", church: "Kearny, NJ - EUA" });
   });
@@ -148,7 +162,7 @@ describe("/api/trumpet-guests", () => {
 
   it("404 when the guest does not exist", async () => {
     fakeDb({ guests: [] });
-    expect((await call({ action: "delete", id: G1.id })).statusCode).toBe(404);
+    expect((await call({ action: "delete", id: G1.id }, 2)).statusCode).toBe(404);
   });
 
   it("deletes in scope", async () => {
@@ -168,7 +182,7 @@ describe("/api/trumpet-guests", () => {
       const all = JSON.parse(await r.text());
       return { ok: true, status: 200, text: async () => JSON.stringify(all.slice(Number(m[2]), Number(m[2]) + Number(m[1]))) };
     }));
-    const res = await call({ action: "list", year: 2026 }, 1);
+    const res = await call({ action: "list", year: 2026 }, 2);
     expect(res.body.guests).toHaveLength(1001);
     expect(calls.filter((c) => c.path.startsWith("trumpet_guests?")).length).toBe(2);
   });
@@ -209,5 +223,49 @@ describe("/api/trumpet-guests goals and stats", () => {
     fakeDb();
     expect((await call({ action: "setGoal", year: 2026, church: "", goal: -1 }, 1)).body).toEqual({ error: "invalid_goal" });
     expect((await call({ action: "setGoal", year: 2026, church: "", goal: 1.5 }, 1)).body).toEqual({ error: "invalid_goal" });
+  });
+});
+
+describe("/api/trumpet-guests summary and motivos", () => {
+  it("summary gives numbers in scope, never guest names or contacts", async () => {
+    const calls = fakeDb({ guests: [{ ...G1, invited_by_member_id: "M1" }, G2] });
+    const res = await call({ action: "summary", year: 2026 }, 4);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.summary).toMatchObject({ invited: 2 });
+    expect(res.body.summary.churches.map((c) => c.church)).toEqual(["Newark, NJ - EUA"]);
+    expect(JSON.stringify(res.body)).not.toMatch(/Rita|Beto|9735550101/);
+    const read = calls.find((c) => c.path.startsWith("trumpet_guests?"));
+    expect(read.path).not.toMatch(/phone|email|name/);
+  });
+
+  it("a clerk with \"*\" gets every church; a GA leader only their GA", async () => {
+    fakeDb();
+    const all = await call({ action: "summary", year: 2026 }, 5);
+    expect(all.body.summary.churches.map((c) => c.church).sort()).toEqual(["Kearny, NJ - EUA", "Newark, NJ - EUA"]);
+    const own = await call({ action: "summary", year: 2026 }, 2);
+    expect(own.body.summary.churches[0].gas.map((g) => g.gaId)).toEqual(["GA1"]);
+  });
+
+  it("no scope: empty summary without reading guests", async () => {
+    const calls = fakeDb();
+    const res = await call({ action: "summary", year: 2026 }, 3);
+    expect(res.body.summary).toMatchObject({ invited: 0, churches: [] });
+    expect(calls.some((c) => c.path.startsWith("trumpet_guests"))).toBe(false);
+  });
+
+  it("edition returns the motivos, or empty strings when none", async () => {
+    fakeDb();
+    expect((await call({ action: "edition", year: 2026 }, 4)).body).toEqual({ edition: { reasons: "", reasonsEn: "" } });
+    fakeDb({ editions: [{ reasons: "# Motivo", reasons_en: "# Reason" }] });
+    expect((await call({ action: "edition", year: 2026 }, 2)).body).toEqual({ edition: { reasons: "# Motivo", reasonsEn: "# Reason" } });
+  });
+
+  it("setEdition is pastor / admin only, upserts and caps the length", async () => {
+    let calls = fakeDb();
+    expect((await call({ action: "setEdition", year: 2026, reasons: "x" }, 4)).statusCode).toBe(403);
+    calls = fakeDb();
+    expect((await call({ action: "setEdition", year: 2026, reasons: "Orar", reasonsEn: "Pray" }, 6)).body).toEqual({ ok: true });
+    expect(calls.find((c) => c.path.startsWith("trumpet_editions") && c.method === "POST").body).toMatchObject({ year: 2026, reasons: "Orar", reasons_en: "Pray" });
+    expect((await call({ action: "setEdition", year: 2026, reasons: "x".repeat(4001) }, 6)).body).toEqual({ error: "invalid_reasons" });
   });
 });

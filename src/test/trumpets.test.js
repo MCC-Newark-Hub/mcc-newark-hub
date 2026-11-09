@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  cityOf, profileOf, gaIdsInScope, canManagePanel, toGuest, cleanGuestInput,
+  cityOf, profileOf, listGaIds, summaryGaIds, buildSummary, canManagePanel, toGuest, cleanGuestInput,
   totalsByGa, sumTotals, guestsCsv, dayOf, buildStats,
 } from "@/lib/trumpets";
 
@@ -11,23 +11,27 @@ const GAS = [
 ];
 
 describe("scope", () => {
-  it("admin and pastor see every GA", () => {
-    expect(gaIdsInScope({ roles: ["admin"] }, GAS)).toEqual(["GA1", "GA2", "GA3"]);
-    expect(gaIdsInScope({ roles: ["pastor"] }, GAS)).toEqual(["GA1", "GA2", "GA3"]);
+  it("only GA leaders get lists, and only of their GAs (admin, pastor, clerk get none)", () => {
+    expect(listGaIds({ roles: ["admin"] }, GAS)).toEqual([]);
+    expect(listGaIds({ roles: ["pastor"] }, GAS)).toEqual([]);
+    expect(listGaIds({ roles: ["clerk"], church: "Newark" }, GAS)).toEqual([]);
+    expect(listGaIds({ roles: ["ga_leader"], gaIds: ["GA2", "GONE"] }, GAS)).toEqual(["GA2"]);
+    expect(listGaIds({ roles: ["ga_leader", "clerk"], church: "Kearny", gaIds: ["GA1"] }, GAS)).toEqual(["GA1"]);
   });
-  it("clerk sees the GAs of their church and extra churches, matched by city", () => {
-    expect(gaIdsInScope({ roles: ["clerk"], church: "Newark" }, GAS)).toEqual(["GA1", "GA2"]);
-    expect(gaIdsInScope({ roles: ["clerk"], church: "Newark", churches: ["Kearny, NJ"] }, GAS)).toEqual(["GA1", "GA2", "GA3"]);
+  it("numbers: admin and pastor see every GA", () => {
+    expect(summaryGaIds({ roles: ["admin"] }, GAS)).toEqual(["GA1", "GA2", "GA3"]);
+    expect(summaryGaIds({ roles: ["pastor"] }, GAS)).toEqual(["GA1", "GA2", "GA3"]);
   });
-  it("GA leader sees only their GAs; no GAs means nothing", () => {
-    expect(gaIdsInScope({ roles: ["ga_leader"], gaIds: ["GA2"] }, GAS)).toEqual(["GA2"]);
-    expect(gaIdsInScope({ roles: ["ga_leader"], gaIds: [] }, GAS)).toEqual([]);
+  it("numbers: clerk sees the GAs of their churches; \"*\" is every church", () => {
+    expect(summaryGaIds({ roles: ["clerk"], church: "Newark" }, GAS)).toEqual(["GA1", "GA2"]);
+    expect(summaryGaIds({ roles: ["clerk"], church: "Newark", churches: ["Kearny"] }, GAS)).toEqual(["GA1", "GA2", "GA3"]);
+    expect(summaryGaIds({ roles: ["clerk"], church: "Newark", churches: ["*"] }, GAS)).toEqual(["GA1", "GA2", "GA3"]);
   });
-  it("several roles get the union", () => {
-    expect(gaIdsInScope({ roles: ["ga_leader", "clerk"], church: "Kearny", gaIds: ["GA1"] }, GAS)).toEqual(["GA1", "GA3"]);
-  });
-  it("other roles see nothing", () => {
-    expect(gaIdsInScope({ roles: ["treasurer"] }, GAS)).toEqual([]);
+  it("numbers: GA leader sees their GAs; none means nothing; roles add up", () => {
+    expect(summaryGaIds({ roles: ["ga_leader"], gaIds: ["GA2"] }, GAS)).toEqual(["GA2"]);
+    expect(summaryGaIds({ roles: ["ga_leader"], gaIds: [] }, GAS)).toEqual([]);
+    expect(summaryGaIds({ roles: ["ga_leader", "clerk"], church: "Kearny", gaIds: ["GA1"] }, GAS)).toEqual(["GA1", "GA3"]);
+    expect(summaryGaIds({ roles: ["treasurer"] }, GAS)).toEqual([]);
   });
   it("profileOf reads the app user (single sysRole too)", () => {
     expect(profileOf({ sysRole: "clerk", church: "Newark" })).toEqual({ roles: ["clerk"], church: "Newark", churches: [], gaIds: [] });
@@ -47,12 +51,16 @@ describe("cleanGuestInput", () => {
   it("rejects empty name, bad GA, bad member, bad phone, bad e-mail", () => {
     expect(cleanGuestInput({ gaId: "GA1", name: " " }).error).toBe("invalid_name");
     expect(cleanGuestInput({ gaId: "", name: "A" }).error).toBe("invalid_ga");
-    expect(cleanGuestInput({ gaId: "GA1", name: "A", invitedByMemberId: "x;drop" }).error).toBe("invalid_member");
+    expect(cleanGuestInput({ gaId: "GA1", name: "A", phone: "9735550101", invitedByMemberId: "x;drop" }).error).toBe("invalid_member");
     expect(cleanGuestInput({ gaId: "GA1", name: "A", phone: "abc" }).error).toBe("invalid_phone");
-    expect(cleanGuestInput({ gaId: "GA1", name: "A", email: "nope" }).error).toBe("invalid_email");
+    expect(cleanGuestInput({ gaId: "GA1", name: "A", phone: "9735550101", email: "nope" }).error).toBe("invalid_email");
   });
-  it("empty phone / e-mail / inviter become null", () => {
-    expect(cleanGuestInput({ gaId: "GA1", name: "A" }).fields).toMatchObject({ phone: null, email: null, invited_by_member_id: null });
+  it("phone is required", () => {
+    expect(cleanGuestInput({ gaId: "GA1", name: "A" }).error).toBe("invalid_phone");
+    expect(cleanGuestInput({ gaId: "GA1", name: "A", phone: "  " }).error).toBe("invalid_phone");
+  });
+  it("empty e-mail / inviter become null", () => {
+    expect(cleanGuestInput({ gaId: "GA1", name: "A", phone: "9735550101" }).fields).toMatchObject({ email: null, invited_by_member_id: null });
   });
 });
 
@@ -124,5 +132,27 @@ describe("dayOf / buildStats", () => {
   });
   it("no goal → null", () => {
     expect(buildStats([], { year: 2026, gas: GAS, members: [], goals: [], today: "2026-11-07", days: 1 }).goal).toBeNull();
+  });
+});
+
+describe("buildSummary", () => {
+  const rows = [
+    { church: "Newark, NJ - EUA", ga_id: "GA1", invited_by_member_id: "M1", attended_at: "t" },
+    { church: "Newark, NJ - EUA", ga_id: "GA1", invited_by_member_id: "M1", attended_at: null },
+    { church: "Newark, NJ - EUA", ga_id: "GA1", invited_by_member_id: null, attended_at: null },
+    { church: "Kearny, NJ - EUA", ga_id: "GA3", invited_by_member_id: "M2", attended_at: "t" },
+  ];
+  const s = buildSummary(rows, { gas: GAS, members: [{ id: "M1", name: "Ana" }, { id: "M2", name: "Bia" }], goals: [{ church: "", goal: 10 }, { church: "Kearny, NJ - EUA", goal: 4 }] });
+  it("totals and overall goal", () => expect(s).toMatchObject({ invited: 4, attended: 2, pct: 50, goal: 10 }));
+  it("church → GA → member, sorted by invited, GAs with no guests at zero", () => {
+    expect(s.churches.map((c) => [c.church, c.invited, c.goal])).toEqual([["Newark, NJ - EUA", 3, null], ["Kearny, NJ - EUA", 1, 4]]);
+    const newark = s.churches[0];
+    expect(newark.gas.map((g) => [g.gaId, g.invited, g.attended])).toEqual([["GA1", 3, 1], ["GA2", 0, 0]]);
+    expect(newark.gas[0].members).toEqual([{ memberId: "M1", name: "Ana", invited: 2, attended: 1, pct: 50 }]);
+  });
+  it("no rows: zeros, no goal", () => {
+    const e = buildSummary([], { gas: [GAS[0]], members: [], goals: [] });
+    expect(e).toMatchObject({ invited: 0, attended: 0, pct: 0, goal: null });
+    expect(e.churches[0].gas[0]).toMatchObject({ gaId: "GA1", invited: 0, members: [] });
   });
 });

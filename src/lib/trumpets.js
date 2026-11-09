@@ -1,6 +1,7 @@
 // Trombetas e Festas: who sees which guests, input rules and every number on the tab and the panel.
 // Pure (no Supabase) and imported by api/trumpet-guests.js too — relative imports only, no "@/".
 import { isValidEmail, isValidPhone, normalizeEmail, normalizePhone } from "./contact.js";
+import { clerkCities, inClerkScope } from "./clerkScope.js";
 
 const ID = /^[A-Za-z0-9_-]{1,40}$/;
 const TOP = 10;
@@ -20,17 +21,23 @@ export function profileOf(user) {
 
 export const canManagePanel = (roles = []) => roles.includes("admin") || roles.includes("pastor");
 
-// GA ids the profile may see and edit. admin / pastor: all; clerk: GAs of their church(es) by city;
+// Whose guest LIST a profile may see and edit: only GA leaders, only their own GAs — never staff (spec rev. 3).
+export function listGaIds(profile, gas = []) {
+  if (!(profile?.roles || []).includes("ga_leader")) return [];
+  const own = new Set(profile.gaIds || []);
+  return gas.map((g) => g.id).filter((id) => own.has(id));
+}
+
+// Whose NUMBERS a profile may see. admin / pastor: all; clerk: GAs of their churches (clerkCities, "*" = all);
 // ga_leader: their own GAs. Union across roles, in the order of `gas`.
-export function gaIdsInScope(profile, gas = []) {
+export function summaryGaIds(profile, gas = []) {
   const roles = profile?.roles || [];
   if (canManagePanel(roles)) return gas.map((g) => g.id);
-  const ids = new Set();
+  const ids = new Set(listGaIds(profile, gas));
   if (roles.includes("clerk")) {
-    const cities = [profile.church, ...(profile.churches || [])].map(cityOf).filter(Boolean).map((c) => c.toLowerCase());
-    for (const g of gas) if (cities.includes(cityOf(g.church).toLowerCase())) ids.add(g.id);
+    const cities = clerkCities(profile);
+    for (const g of gas) if (inClerkScope(cities, g.church)) ids.add(g.id);
   }
-  if (roles.includes("ga_leader")) for (const id of profile.gaIds || []) ids.add(id);
   return gas.map((g) => g.id).filter((id) => ids.has(id));
 }
 
@@ -59,11 +66,11 @@ export function cleanGuestInput(body = {}) {
   const inviter = body.invitedByMemberId ? String(body.invitedByMemberId) : "";
   if (inviter && !ID.test(inviter)) return { error: "invalid_member" };
   const phone = normalizePhone(body.phone);
-  if (phone && !isValidPhone(phone)) return { error: "invalid_phone" };
+  if (!phone || !isValidPhone(phone)) return { error: "invalid_phone" };
   const email = normalizeEmail(body.email);
   if (email && !isValidEmail(email)) return { error: "invalid_email" };
   const notes = String(body.notes || "").trim().slice(0, 500);
-  return { fields: { ga_id: gaId, name, phone: phone || null, email: email || null, invited_by_member_id: inviter || null, notes: notes || null } };
+  return { fields: { ga_id: gaId, name, phone, email: email || null, invited_by_member_id: inviter || null, notes: notes || null } };
 }
 
 export function sumTotals(guests = []) {
@@ -134,4 +141,36 @@ export function buildStats(rows = [], { year, gas = [], members = [], goals = []
     topInviters: rank(cur, (r) => r.invited_by_member_id, (k) => memberName[k] || k).slice(0, TOP).map((e) => ({ memberId: e.k, name: e.label, invited: e.invited, attended: e.attended })),
     perDay: lastDays(today, days).map((date) => ({ date, count: counts[date] || 0 })),
   };
+}
+
+const counts = (rows) => {
+  const attended = rows.filter((r) => r.attended_at).length;
+  return { invited: rows.length, attended, pct: pctOf(attended, rows.length) };
+};
+const byInvited = (a, b) => b.invited - a.invited || byPt(a.name ?? a.church, b.name ?? b.church);
+
+// Numbers only, for the drill-down church → GA → member (spec rev. 3). `rows` are the year's guest rows in scope
+// (church, ga_id, invited_by_member_id, attended_at); `gas` are the GAs in scope, so a GA with no guest shows zeros.
+export function buildSummary(rows = [], { gas = [], members = [], goals = [] }) {
+  const goalOf = (church) => goals.find((g) => g.church === church)?.goal ?? null;
+  const memberName = Object.fromEntries(members.map((m) => [m.id, m.name]));
+  const churchNames = [...new Set([...gas.map((g) => g.church), ...rows.map((r) => r.church)])];
+  const churches = churchNames.map((church) => {
+    const inChurch = rows.filter((r) => r.church === church);
+    const gaIds = [...new Set([...gas.filter((g) => g.church === church).map((g) => g.id), ...inChurch.map((r) => r.ga_id)])];
+    const gaList = gaIds.map((gaId) => {
+      const inGa = inChurch.filter((r) => r.ga_id === gaId);
+      const inviters = [...new Set(inGa.map((r) => r.invited_by_member_id).filter(Boolean))];
+      return {
+        gaId,
+        name: gas.find((g) => g.id === gaId)?.name || gaId,
+        ...counts(inGa),
+        members: inviters
+          .map((memberId) => ({ memberId, name: memberName[memberId] || memberId, ...counts(inGa.filter((r) => r.invited_by_member_id === memberId)) }))
+          .sort(byInvited),
+      };
+    }).sort(byInvited);
+    return { church, ...counts(inChurch), goal: goalOf(church), gas: gaList };
+  }).sort(byInvited);
+  return { ...counts(rows), goal: goalOf(""), churches };
 }

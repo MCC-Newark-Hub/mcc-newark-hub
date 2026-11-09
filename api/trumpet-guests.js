@@ -1,6 +1,7 @@
 // Vercel serverless function: Trombetas e Festas guests and goals (migration 054, server-only tables).
-// Scope: admin / pastor all GAs; clerk the GAs of their church(es); GA leader their own GAs
-// (gaIdsInScope in src/lib/trumpets.js). The audit log never gets phone, e-mail or the guest's name.
+// Only GA leaders see and edit guest lists, of their own GAs (listGaIds). Staff get numbers only: summary for
+// admin / pastor (all), clerk (their churches, "*" = all) and GA leaders (summaryGaIds); stats for the panel.
+// No guest name, phone or e-mail leaves through summary / stats, and the audit log never gets them.
 //
 //   POST { action: "list",    year }                         → { guests }
 //   POST { action: "create",  year, gaId, name, phone?, email?, invitedByMemberId?, notes? } → { guest }
@@ -10,9 +11,12 @@
 //   POST { action: "goals",   year }                         → { goals: [{ church, goal }] }
 //   POST { action: "setGoal", year, church, goal }           → { ok: true }   admin / pastor; goal 0 removes it
 //   POST { action: "stats",   year }                         → { stats }      admin / pastor
+//   POST { action: "summary", year }                         → { summary }    numbers church → GA → member
+//   POST { action: "edition", year }                         → { edition: { reasons, reasonsEn } }
+//   POST { action: "setEdition", year, reasons, reasonsEn }  → { ok: true }   admin / pastor
 
 import { restClient, currentUser } from "./_lib/auth.js";
-import { gaIdsInScope, canManagePanel, toGuest, cleanGuestInput, buildStats } from "../src/lib/trumpets.js";
+import { listGaIds, summaryGaIds, canManagePanel, toGuest, cleanGuestInput, buildStats, buildSummary } from "../src/lib/trumpets.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const COLS = "id,year,church,ga_id,name,phone,email,invited_by_member_id,attended_at,notes,created_at,updated_at";
@@ -60,7 +64,8 @@ export default async function handler(req, res) {
     if (!g.ok) throw new Error(`gas_read_failed:${g.status}`);
     const gas = g.data || [];
     const gaById = Object.fromEntries(gas.map((x) => [x.id, x]));
-    const allowed = new Set(gaIdsInScope(profile, gas));
+    const allowed = new Set(listGaIds(profile, gas)); // lists and edits
+    const seen = new Set(summaryGaIds(profile, gas)); // numbers
     const by = caller.name || String(caller.id);
 
     const audit = (action, guestId, gaId, details = {}) =>
@@ -146,10 +151,55 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
+    if (body.action === "summary") {
+      const year = yearOf(body.year);
+      if (!year) return fail(400, "invalid_year");
+      const scoped = gas.filter((x) => seen.has(x.id));
+      const rows = scoped.length
+        ? await fetchAll(rest, `trumpet_guests?year=eq.${year}&ga_id=in.(${scoped.map((x) => x.id).join(",")})&select=church,ga_id,invited_by_member_id,attended_at&order=ga_id`)
+        : [];
+      const inviterIds = [...new Set(rows.map((r) => r.invited_by_member_id).filter(Boolean))];
+      const members = inviterIds.length ? await fetchAll(rest, `members?id=in.(${inviterIds.join(",")})&select=id,name&order=id`) : [];
+      const gr = scoped.length ? await rest(`trumpet_goals?year=eq.${year}&select=church,goal`) : { ok: true, data: [] };
+      if (!gr.ok) throw new Error(`goals_read_failed:${gr.status}`);
+      const rowsOnly = rows.map(({ church, ga_id, invited_by_member_id, attended_at }) => ({ church, ga_id, invited_by_member_id, attended_at }));
+      return res.status(200).json({ summary: buildSummary(rowsOnly, { gas: scoped, members, goals: gr.data || [] }) });
+    }
+
+    if (body.action === "edition") {
+      const year = yearOf(body.year);
+      if (!year) return fail(400, "invalid_year");
+      if (!seen.size) return res.status(200).json({ edition: { reasons: "", reasonsEn: "" } });
+      const r = await rest(`trumpet_editions?year=eq.${year}&select=reasons,reasons_en`);
+      if (!r.ok) throw new Error(`edition_read_failed:${r.status}`);
+      const e = r.data?.[0] || {};
+      return res.status(200).json({ edition: { reasons: e.reasons || "", reasonsEn: e.reasons_en || "" } });
+    }
+
+    if (body.action === "setEdition") {
+      if (!canManagePanel(roles)) return fail(403, "forbidden");
+      const year = yearOf(body.year);
+      if (!year) return fail(400, "invalid_year");
+      const reasons = String(body.reasons || "");
+      const reasonsEn = String(body.reasonsEn || "");
+      if (reasons.length > 4000 || reasonsEn.length > 4000) return fail(400, "invalid_reasons");
+      const w = await rest("trumpet_editions?on_conflict=year&select=year", {
+        method: "POST",
+        body: { year, reasons, reasons_en: reasonsEn, updated_at: new Date().toISOString(), updated_by: by },
+        prefer: "resolution=merge-duplicates,return=representation",
+      });
+      if (!w.ok || !w.data?.[0]) throw new Error(`edition_save_failed:${w.status}`);
+      await rest("audit_log", {
+        method: "POST",
+        body: { actor_name: caller.name, actor_id: caller.id, actor_role: caller.sys_role, action: "trumpet_edition_set", entity_type: "trumpet_edition", entity_id: String(year), entity_label: String(year), details: {} },
+      });
+      return res.status(200).json({ ok: true });
+    }
+
     if (body.action === "goals") {
       const year = yearOf(body.year);
       if (!year) return fail(400, "invalid_year");
-      if (!allowed.size) return res.status(200).json({ goals: [] });
+      if (!seen.size) return res.status(200).json({ goals: [] });
       const r = await rest(`trumpet_goals?year=eq.${year}&select=church,goal&order=church`);
       if (!r.ok) throw new Error(`goals_read_failed:${r.status}`);
       return res.status(200).json({ goals: r.data || [] });
