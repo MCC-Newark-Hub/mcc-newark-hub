@@ -26,3 +26,6 @@ export const deleteGuest = async (id) => { await call({ action: "delete", id });
 export const listGoals = async (year) => (await call({ action: "goals", year })).goals || [];
 export const saveGoal = async (year, church, goal) => { await call({ action: "setGoal", year, church, goal }); };
 export const fetchStats = async (year) => (await call({ action: "stats", year })).stats;
+export const fetchSummary = async (year) => (await call({ action: "summary", year })).summary;
+export const getEdition = async (year) => (await call({ action: "edition", year })).edition || { reasons: "", reasonsEn: "" };
+export const saveEdition = async (year, { reasons, reasonsEn }) => { await call({ action: "setEdition", year, reasons: reasons || "", reasonsEn: reasonsEn || "" }); };

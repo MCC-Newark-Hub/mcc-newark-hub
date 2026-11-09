@@ -10,4 +10,11 @@ describe("dev store", () => {
     expect(devTrumpets({ action: "attend", id: guest.id, attended: true }).guest.attendedAt).toBeTruthy();
     expect(devTrumpets({ action: "stats", year: 2026 }).stats.attended).toBeGreaterThan(0);
   });
+
+  it("answers summary and keeps the motivos", () => {
+    expect(devTrumpets({ action: "summary", year: 2026 }).summary.invited).toBeGreaterThan(0);
+    devTrumpets({ action: "setEdition", year: 2026, reasons: "Orar", reasonsEn: "Pray" });
+    expect(devTrumpets({ action: "edition", year: 2026 }).edition).toEqual({ reasons: "Orar", reasonsEn: "Pray" });
+    expect(devTrumpets({ action: "edition", year: 2025 }).edition).toEqual({ reasons: "", reasonsEn: "" });
+  });
 });

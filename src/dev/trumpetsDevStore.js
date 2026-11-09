@@ -1,10 +1,11 @@
 // `npm run dev` has no serverless functions: an in-memory stand-in for api/trumpet-guests.js,
 // seeded from the dev directory. No scope checks (the tab already filters by scope). Dev only.
 import { INIT_GAS, INIT_MEMBERS } from "@/dev/seeds";
-import { toGuest, cleanGuestInput, buildStats } from "@/lib/trumpets";
+import { toGuest, cleanGuestInput, buildStats, buildSummary } from "@/lib/trumpets";
 
 const rows = [];
 const goals = [];
+const editions = {};
 let seq = 0;
 const now = () => new Date().toISOString();
 const err = (error) => { throw new Error(error); };
@@ -46,6 +47,17 @@ export function devTrumpets(body) {
       if (Number(body.goal) > 0) goals.push({ year, church: body.church || "", goal: Number(body.goal) });
       return { ok: true };
     }
+    case "summary":
+      return {
+        summary: buildSummary(rows.filter((r) => r.year === year), {
+          gas: INIT_GAS, members: INIT_MEMBERS, goals: goals.filter((g) => g.year === year),
+        }),
+      };
+    case "edition":
+      return { edition: editions[year] || { reasons: "", reasonsEn: "" } };
+    case "setEdition":
+      editions[year] = { reasons: body.reasons || "", reasonsEn: body.reasonsEn || "" };
+      return { ok: true };
     case "stats":
       return {
         stats: buildStats(rows.filter((r) => r.year === year || r.year === year - 1), {
