@@ -2171,3 +2171,74 @@ WHERE table_name IN ('trumpet_guests', 'trumpet_goals') AND grantee IN ('anon', 
 ```
 
 - [ ] **Step 4: Smoke test on the Vercel preview** of the branch: sign in as a GA leader, add a guest, toggle attendance; as pastor, open the panel.
+
+---
+
+# Revision 3 tasks (2026-11-09)
+
+Spec: "Revision 3" section of the spec — **supersedes** Tasks 6–7 above where they differ. Tasks 1–5 are
+done (commits c648a84..aa776a1); R1–R3 adjust them. Task 6 Steps 1–2 (tabs by role) are done (cb63e70).
+
+## R1: Rules — leader-only lists, numbers for staff, phone required, motivos table
+
+**Files:** `migrations/054_trumpet_guests.sql`, `src/lib/trumpets.js`, `src/test/trumpets.test.js`
+
+**Interfaces — Produces:**
+- `listGaIds(profile, gas): string[]` — `ga_leader` role only: `profile.gaIds` that exist in `gas`. Anyone
+  else `[]` (even admin).
+- `summaryGaIds(profile, gas): string[]` — admin / pastor: all; clerk: `inClerkScope(clerkCities(profile), ga.church)`
+  (so `churches: ["*"]` = all); ga_leader: own; union, in `gas` order. Replaces `gaIdsInScope`.
+- `profileOf(user)` unchanged shape `{ roles, church, churches, gaIds }` (works as `clerkCities` input).
+- `cleanGuestInput`: empty phone → `{ error: "invalid_phone" }`.
+- `buildSummary(rows, { gas, members, goals }) → { invited, attended, pct, goal, churches: [{ church, invited, attended, pct, goal,
+  gas: [{ gaId, name, invited, attended, pct, members: [{ memberId, name, invited, attended, pct }] }] }] }`
+  — rows are snake_case guest rows (year already filtered); churches/GAs/members sorted by invited desc
+  then name; guests with no inviter count in the GA but not in `members`; GAs in scope with 0 guests appear
+  with zeros (pass the scoped `gas`).
+- Migration adds `trumpet_editions (year int PRIMARY KEY, reasons text NOT NULL DEFAULT '', reasons_en text NOT NULL DEFAULT '', updated_at timestamptz NOT NULL DEFAULT now(), updated_by text)`, server-only.
+
+Tests (RED first): listGaIds admin → [], ga_leader → own, ga_leader+clerk → own only; summaryGaIds clerk
+`["*"]` → all, clerk own city → that church's GAs; phone required; buildSummary nesting, zero GA, null
+inviter, goal per church and overall (`church = ""`).
+
+## R2: API — role-split actions, summary, editions
+
+**Files:** `api/trumpet-guests.js`, `src/test/trumpetGuestsApi.test.js`
+
+- `list` uses `listGaIds` (clerk / pastor / admin get `[]`); `create` / `update` / `attend` / `delete`:
+  target and existing GA must be in `listGaIds`, else 403.
+- `summary { year }` → `{ summary: buildSummary(rows of year in summaryGaIds, …) }`; reads only
+  `church,ga_id,invited_by_member_id,attended_at` (never name / phone / e-mail).
+- `goals` for anyone with a non-empty `summaryGaIds`.
+- `edition { year }` → `{ edition: { reasons, reasonsEn } }` (empty strings when none) for anyone with a
+  non-empty `summaryGaIds`; `setEdition { year, reasons, reasonsEn }` admin / pastor only (≤ 4000 chars each), upsert.
+- `stats` unchanged (admin / pastor).
+
+Tests: clerk `list` → `[]` and `create` → 403; admin `create` → 403; leader flow unchanged; `summary` for a
+clerk with `churches: ["*"]` covers every church and its read path has no `name|phone|email`;
+`setEdition` 403 for clerk, upsert for pastor; `edition` returns empty strings when no row.
+
+## R3: Client
+
+**Files:** `src/lib/trumpetsApi.js`, `src/dev/trumpetsDevStore.js`, tests.
+Add `fetchSummary(year)`, `getEdition(year)`, `saveEdition(year, { reasons, reasonsEn })`; the dev store
+answers `summary`, `edition`, `setEdition`.
+
+## R4: Tab — motivos, drill-down, leader list, group image
+
+**Files:** `src/sections/assistance/TrumpetsTab.jsx` (orchestrates), `TrumpetsDrill.jsx` (numbers),
+`TrumpetsLeaderList.jsx` (list + modal + CSV + group image), `TrumpetsReasons.jsx` (motivos, edit for
+pastor / admin, image download), `TrumpetGuestModal.jsx` (as planned, phone required), `src/i18n/strings.js`
+(`tf` block from Task 6 plus: `reasons`, `editReasons`, `downloadReasons`, `groupImage`, `levelAll`,
+`perMember`, `topInviters`, `noInviterLabel`, `backTo`).
+- Everyone in the tab: year picker, motivos on top with download.
+- Drill-down from `fetchSummary`: start level by role (pastor / admin all churches; clerk their church or
+  picker; GA leader their GA); breadcrumb; cards per child with invited / attended / % / goal; top
+  inviters list; member level = that member's counts.
+- GA leader at their GA: the list (from `listGuests`) under the numbers, with add / edit / attendance /
+  delete, CSV, and "Imagem para o grupo" (motivos + name + invited by).
+- Pastor / admin: goal field and "Editar motivos", "Abrir painel".
+Tests: clerk sees church → GA → member numbers and never calls `listGuests`; GA leader sees the list and
+the image button; pastor edits motivos (`saveEdition` called); drill-down breadcrumb returns up.
+
+## R5: Panel (Task 7 as planned) + motivos block on top. R6: docs + full check (Task 8). R7: final review. Task 9 unchanged.
