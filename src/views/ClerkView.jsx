@@ -24,7 +24,8 @@ import { resendConfirmation } from "@/lib/resendConfirmation";
 import { useSortable } from "@/hooks/useSortable";
 import { groupByFamily, familyIdOf } from "@/lib/family";
 import { matchesRegNumber } from "@/lib/regNumber";
-import { clerkCities, inClerkScope } from "@/lib/clerkScope";
+import { clerkCities, inClerkScope, regChurchFilter } from "@/lib/clerkScope";
+import MultiCheckList from "@/components/MultiCheckList";
 import RegActions from "@/components/RegActions";
 import InfoCard from "@/components/InfoCard";
 import ViewToggle from "@/components/ViewToggle";
@@ -127,17 +128,25 @@ function ClerkView(props) {
   const inScope = (church) => inClerkScope(scopeCities, church);
   const singleChurch = !!scopeCities && scopeCities.length === 1;
   const myMembers = members.filter((m) => inScope(m.church));
+  // Inscrições opens on the clerk's own church; they can widen it to all or some churches,
+  // since people from anywhere in the Pólo (and outside it) register.
+  const [regChurchMode, setRegChurchMode] = useState("mine"); // "mine" | "all" | "pick"
+  const [regChurchPick, setRegChurchPick] = useState([]);
+  const inRegScope = regChurchFilter(regChurchMode, regChurchPick, scopeCities);
 
   const eventApprovals = (approvals || []).filter((a) => a.eventId === event?.id);
   const pendingApprovalList = eventApprovals.filter((a) => a.status === "pending");
   useTopbarContent({ title: user?.name || t.clerkTitle, sub: `${t.clerkTitle} · ${eventSubtitle(event, lang)}`, pendingCount: pendingApprovalList.length, helpPath: "tutorials/register-member" });
   const resolvedApprovalList = eventApprovals.filter((a) => a.status !== "pending");
   const allActiveAll = regs.filter((r) => r.eventId === event?.id && !r.cancelled && !r.waitlisted);
-  const allActive = allActiveAll.filter((r) => inScope(r.church));
+  const allActive = allActiveAll.filter((r) => inRegScope(r.church));
   // Includes cancelled rows too, unlike allActive — deadlineStatus needs a member's
   // full history to anchor the payment countdown to their earliest attempt.
-  const allForCity = regs.filter((r) => r.eventId === event?.id && inScope(r.church));
-  const myWlRegs = (wlRegs || []).filter((r) => inScope(r.church));
+  const allForCity = regs.filter((r) => r.eventId === event?.id && inRegScope(r.church));
+  const myWlRegs = (wlRegs || []).filter((r) => inRegScope(r.church));
+  const eventChurches = Object.entries(
+    regs.filter((r) => r.eventId === event?.id && !r.cancelled).reduce((acc, r) => { acc[r.church || ""] = (acc[r.church || ""] || 0) + 1; return acc; }, {}),
+  ).sort(([a], [b]) => a.localeCompare(b, "pt"));
   const myExRegs = allActive.filter((r) => r.excedente);
   const isOverdue = (r) => deadlineStatus(r, event, allForCity)?.overdue;
   const myOverdueRegs = allActive.filter(isOverdue);
@@ -145,7 +154,7 @@ function ClerkView(props) {
     tab === "active" ? allActive
     : tab === "waitlist" ? myWlRegs
     : tab === "overdue" ? myOverdueRegs
-    : regs.filter((r) => r.eventId === event?.id && r.cancelled && inScope(r.church))
+    : regs.filter((r) => r.eventId === event?.id && r.cancelled && inRegScope(r.church))
   ).filter((r) => {
     const q = norm(search);
     return norm(r.memberName).includes(q) || norm(r.regNumber).includes(q) || matchesRegNumber(r.regNumber, search) || norm(r.church).includes(q) ||
@@ -256,7 +265,7 @@ function ClerkView(props) {
                 wlExempt={myWlRegs.filter((r) => r.exempt).length}
                 wlPend={myWlRegs.filter((r) => !r.paid && !r.exempt).length}
                 wlTotal={myWlRegs.length}
-                cancelled={regs.filter((r) => r.eventId === event?.id && r.cancelled && inScope(r.church)).length}
+                cancelled={regs.filter((r) => r.eventId === event?.id && r.cancelled && inRegScope(r.church)).length}
                 lang={lang}
               />
 
@@ -299,6 +308,27 @@ function ClerkView(props) {
                 </div>
               )}
 
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+                <label htmlFor="reg-churches" style={{ margin: 0 }}>{t.regChurchesLabel}</label>
+                <select id="reg-churches" value={regChurchMode} onChange={(e) => { setRegChurchMode(e.target.value); setBulkSel([]); }} style={{ width: "auto", minWidth: 180 }}>
+                  <option value="mine">{t.regChurchesMine}</option>
+                  <option value="all">{t.regChurchesAll}</option>
+                  <option value="pick">{t.regChurchesPick}</option>
+                </select>
+                {regChurchMode === "pick" && regChurchPick.length > 0 && (
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{regChurchPick.length} selecionada(s)</span>
+                )}
+              </div>
+              {regChurchMode === "pick" && (
+                <div className="card" style={{ padding: 12, marginBottom: 10, maxWidth: 420 }}>
+                  <MultiCheckList
+                    items={eventChurches.map(([church, n]) => ({ key: church, label: church || t.regChurchesNone, hint: String(n) }))}
+                    selected={regChurchPick}
+                    onChange={(v) => { setRegChurchPick(v); setBulkSel([]); }}
+                    placeholder={t.regChurchesSearch}
+                  />
+                </div>
+              )}
               <div className="card" style={{ padding: 0, overflow: "hidden" }}>
                 <div style={{ padding: "11px 16px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
                   <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
