@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { usePaymentAccess } from "@/context/PaymentAccessContext";
 import { TrendingUp, ClipboardList, Receipt, PlusCircle, Plus, Pencil, Trash2, ExternalLink, X } from "lucide-react";
 import { sb } from "@/lib/supabase";
 import { fmt } from "@/constants";
@@ -103,6 +104,7 @@ function RegsTab({ eventRegs, updateReg, notify, readOnly }) {
     return [...list].sort((a, b) => (a.memberName || "").localeCompare(b.memberName || ""));
   }, [eventRegs, filter, search]);
 
+  const payment = usePaymentAccess();
   const markPaid = (r) => {
     updateReg(r.id, { paid: true });
     notify(`${r.memberName} marcado como pago.`);
@@ -151,7 +153,7 @@ function RegsTab({ eventRegs, updateReg, notify, readOnly }) {
                   <td style={{ textAlign: "right", fontWeight: 600 }}>{r.fee > 0 ? fmt(r.fee) : <span style={{ color: "var(--muted)" }}>—</span>}</td>
                   <td><span className={`badge ${badgeCls}`}>{status}</span></td>
                   <td>
-                    {isPending && !readOnly && (
+                    {isPending && !readOnly && payment.allowed && (
                       <button className="btn btn-ok btn-sm" onClick={() => markPaid(r)}>✓ Marcar Pago</button>
                     )}
                   </td>

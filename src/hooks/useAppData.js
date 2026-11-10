@@ -11,6 +11,7 @@ import { waitlistToPromote, PAUSE_FULL, PAUSE_WAITLIST } from "@/lib/pause";
 import { mergeFreshRegs } from "@/lib/regRefresh";
 import { setInstrumentCatalog } from "@/lib/musicianFields";
 import { primaryRole, rolesOf } from "@/lib/memberRoles";
+import { canMarkPaid } from "@/lib/paymentAccess";
 
 // ── DB → app object mappers ───────────────────────────────────────────────────
 export function mapMember(m) {
@@ -179,7 +180,9 @@ export function useAppData({ getUserRef, notify }) {
   // Pickers read INSTRUMENTS; follow the catalog during render (not in an effect) so the
   // screens below already get the new list in the same render.
   useMemo(() => setInstrumentCatalog([...dbInstruments].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)).map((i) => i.name)), [dbInstruments]);
-  const [settings, setSettings] = useState({ sessionTtlHours: 2 });
+  const [settings, setSettings] = useState({ sessionTtlHours: 2, paymentMarkerIds: [] });
+  // updateReg/addReg are rebuilt on every render, so they always see the current list.
+  const mayMarkPaid = () => canMarkPaid(getUser(), settings.paymentMarkerIds);
   // Last submission number per event and last person per submission (see src/lib/regNumber.js).
   // A ref, not state: a family submission calls addReg several times before React re-renders.
   const counterRef = useRef({ submissions: {}, persons: {} });
@@ -242,7 +245,7 @@ export function useAppData({ getUserRef, notify }) {
         setDbTeams((teamsRes.data || []).map(mapTeam));
         if (instRes.data && instRes.data.length > 0) setDbInstruments(instRes.data);
         if (voiceRes.data && voiceRes.data.length > 0) setDbVoiceTypes(voiceRes.data.map((v) => ({ id: v.id, name: v.name, gender: v.gender, minNote: v.min_note, maxNote: v.max_note, sortOrder: v.sort_order })));
-        if (setRes.data) setSettings({ sessionTtlHours: Number(setRes.data.session_ttl_hours) || 2 });
+        if (setRes.data) setSettings({ sessionTtlHours: Number(setRes.data.session_ttl_hours) || 2, paymentMarkerIds: setRes.data.payment_marker_ids || [] });
       } catch (e) {
         if (!cancelled) setDbError(e.message);
       }
@@ -457,7 +460,8 @@ export function useAppData({ getUserRef, notify }) {
       invited_by_member_id: data.invitedByMemberId || null,
       team: data.team || "Participante",
       fee: feeFlags.fee,
-      paid: data.paid || false,
+      // Only the people in app_settings.payment_marker_ids may register someone as already paid.
+      paid: (data.paid && mayMarkPaid()) || false,
       exempt: isExempt,
       cancelled: false,
       waitlisted: isWaitlisted,
@@ -544,6 +548,16 @@ export function useAppData({ getUserRef, notify }) {
   };
 
   const updateReg = function (id, upd, timelineEntry, opts) {
+    // Marking or un-marking paid is limited to app_settings.payment_marker_ids (empty = no limit).
+    // Edit forms send paid back unchanged: only a real change is refused, and the rest still saves.
+    if (upd && upd.paid !== undefined && !mayMarkPaid()) {
+      var current = regs.find(function (r) { return r.id === id; });
+      var rest = Object.assign({}, upd);
+      delete rest.paid;
+      if (!current || !!current.paid !== !!upd.paid) notify("Só quem cuida dos pagamentos pode marcar como pago.");
+      if (Object.keys(rest).length === 0) return;
+      upd = rest;
+    }
     timelineEntry = timelineEntry || null;
     opts = opts || {};
     var freedSlot = false;
@@ -1102,8 +1116,18 @@ export function useAppData({ getUserRef, notify }) {
     // silent no-op into a real, checkable failure instead of a false "saved!".
     const { data, error } = await sb.from("app_settings").update({ session_ttl_hours: hours, updated_at: new Date().toISOString() }).eq("id", 1).select().single();
     if (error || !data) { notify("Erro ao salvar: " + (error?.message || "nenhuma linha afetada")); return; }
-    setSettings({ sessionTtlHours: hours });
+    setSettings((prev) => ({ ...prev, sessionTtlHours: hours }));
     notify("Duração da sessão atualizada!");
+  };
+
+  const updatePaymentMarkerIds = async (ids) => {
+    const clean = [...new Set((ids || []).map(Number))];
+    const { data, error } = await sb.from("app_settings").update({ payment_marker_ids: clean, updated_at: new Date().toISOString() }).eq("id", 1).select("payment_marker_ids").single();
+    if (error || !data) { notify("Erro ao salvar: " + (error?.message || "nenhuma linha afetada")); return false; }
+    setSettings((prev) => ({ ...prev, paymentMarkerIds: data.payment_marker_ids || [] }));
+    logAudit("payment_markers_changed", "app_settings", "1", "Quem pode marcar como pago", { to: clean });
+    notify("Lista de quem marca pagamento atualizada!");
+    return true;
   };
 
   return {
@@ -1152,6 +1176,7 @@ export function useAppData({ getUserRef, notify }) {
     setLeadersRegisterWhenPaused,
     closeRegistrations,
     updateSessionTtlHours,
+    updatePaymentMarkerIds,
     activeRegs,
     activeCount,
     isFull,

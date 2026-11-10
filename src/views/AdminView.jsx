@@ -831,7 +831,40 @@ function SessionTtlCard({ settings, updateSessionTtlHours }) {
   );
 }
 
-export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify, settings, updateSessionTtlHours, logAudit }) {
+// Who may mark registrations paid (app_settings.payment_marker_ids, migration 056). Nobody chosen = no limit.
+function PaymentMarkersCard({ dbUsers, settings, updatePaymentMarkerIds }) {
+  const saved = (settings?.paymentMarkerIds || []).map(Number);
+  const [picked, setPicked] = useState(saved);
+  const [saving, setSaving] = useState(false);
+  const active = (dbUsers || []).filter((u) => u.active !== false).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  const changed = picked.length !== saved.length || picked.some((id) => !saved.includes(id));
+  const toggle = (id) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  return (
+    <div className="card" style={{ padding: "14px 16px", marginBottom: 18, maxWidth: 420 }}>
+      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>💳 Quem pode marcar como pago</div>
+      <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10 }}>
+        Só essas pessoas marcam (ou desmarcam) uma inscrição como paga. Sem ninguém marcado, todos que já podiam continuam podendo.
+      </p>
+      <div style={{ maxHeight: 220, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4, marginBottom: 10 }}>
+        {active.map((u) => (
+          <div key={u.id} className="cb">
+            <input type="checkbox" id={`pm-${u.id}`} checked={picked.includes(Number(u.id))} onChange={() => toggle(Number(u.id))} />
+            <label htmlFor={`pm-${u.id}`}>{u.name}</label>
+          </div>
+        ))}
+      </div>
+      <button
+        className="btn btn-primary btn-sm"
+        disabled={saving || !changed || !updatePaymentMarkerIds}
+        onClick={async () => { setSaving(true); await updatePaymentMarkerIds(picked); setSaving(false); }}
+      >
+        {saving ? "Salvando…" : "Salvar"}
+      </button>
+    </div>
+  );
+}
+
+export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify, settings, updateSessionTtlHours, updatePaymentMarkerIds, logAudit }) {
   const [editing, setEditing] = useState(null); // { id, name, sysRole, initials, church }
   const [saving, setSaving] = useState(false);
   const [newPin, setNewPin] = useState(null); // { name, pin }: shown once, never stored in the browser
@@ -963,6 +996,7 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
       </p>
 
       <SessionTtlCard key={settings?.sessionTtlHours} settings={settings} updateSessionTtlHours={updateSessionTtlHours} />
+      <PaymentMarkersCard key={(settings?.paymentMarkerIds || []).join(",")} dbUsers={dbUsers} settings={settings} updatePaymentMarkerIds={updatePaymentMarkerIds} />
 
       {editing && (
         <div className="modal-bg" onClick={(e) => e.target === e.currentTarget && cancel()}>

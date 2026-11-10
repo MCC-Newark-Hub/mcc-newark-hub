@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { usePaymentAccess } from "@/context/PaymentAccessContext";
+import PaidOnlyHint from "@/components/PaidOnlyHint";
 import { useT } from "@/i18n/strings";
 import { TEAMS, ROLE_GROUPS, deadlineStatus } from "@/constants";
 import StaffContactEditor from "@/components/StaffContactEditor";
@@ -9,6 +11,7 @@ function DetailModal({
 }) {
   const teamList = dbTeams && dbTeams.length > 0 ? dbTeams.map((t) => t.name) : TEAMS;
   const t = useT();
+  const payment = usePaymentAccess();
   const [f, setF] = useState({ ...reg });
   const [customDate, setCustomDate] = useState("");
   // Show the member's current church/group, not just the snapshot taken at
@@ -112,14 +115,16 @@ function DetailModal({
           {reg.memberId && reg.memberId !== "GUEST" && <StaffContactEditor memberId={reg.memberId} lang={lang} />}
           <div className="fr3">
             {canEditPayment && (
-              <div className="cb">
+              <div className="cb" style={{ flexWrap: "wrap" }}>
                 <input
                   type="checkbox"
                   id="dp"
                   checked={!!f.paid}
+                  disabled={!payment.allowed}
                   onChange={(e) => setF({ ...f, paid: e.target.checked })}
                 />
                 <label htmlFor="dp">✓ {t.paid}</label>
+                  <PaidOnlyHint />
               </div>
             )}
             {canEditPayment && (

@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { usePaymentAccess } from "@/context/PaymentAccessContext";
+import PaidOnlyHint from "@/components/PaidOnlyHint";
 import { useT } from "@/i18n/strings";
 import { CATEGORIES, ROLE_GROUPS, TEAMS, OBREIRO_ROLES, ROLE_BADGE, fmt, teamForRole } from "@/constants";
 import { sb } from "@/lib/supabase";
@@ -44,6 +46,7 @@ function RegModal({
       }))
     : ROLE_GROUPS;
   const t = useT();
+  const payment = usePaymentAccess();
   const [mode, setMode] = useState("member");
   const [src, setSrc] = useState(prefill?.name || "");
   const [sel, setSel] = useState(prefill || null);
@@ -453,14 +456,16 @@ function RegModal({
                     </select>
                   </div>
                   <div style={{ paddingTop: 20, display: "flex", flexDirection: "column", gap: 6 }}>
-                    <div className="cb">
+                    <div className="cb" style={{ flexWrap: "wrap" }}>
                       <input
                         type="checkbox"
                         id="p1"
                         checked={f.paid}
-                        onChange={(e) => setF({ ...f, paid: e.target.checked })}
+                        disabled={!payment.allowed}
+                  onChange={(e) => setF({ ...f, paid: e.target.checked })}
                       />
                       <label htmlFor="p1">{t.paidNow}</label>
+                  <PaidOnlyHint />
                     </div>
                     {!isAutoExempt && (
                       <div className="cb">
@@ -642,14 +647,16 @@ function RegModal({
                         </select>
                       </div>
                       <div style={{ paddingTop: 20 }}>
-                        <div className="cb">
+                        <div className="cb" style={{ flexWrap: "wrap" }}>
                           <input
                             type="checkbox"
                             id="fp"
                             checked={f.paid}
-                            onChange={(e) => setF({ ...f, paid: e.target.checked })}
+                            disabled={!payment.allowed}
+                  onChange={(e) => setF({ ...f, paid: e.target.checked })}
                           />
                           <label htmlFor="fp">{t.paidNow}</label>
+                  <PaidOnlyHint />
                         </div>
                       </div>
                     </div>
@@ -896,14 +903,16 @@ function RegModal({
               </select>
             </div>
             <div className="fr">
-              <div className="cb" style={{ paddingTop: 4 }}>
+              <div className="cb" style={{ flexWrap: "wrap", paddingTop: 4 }}>
                 <input
                   type="checkbox"
                   id="mp"
                   checked={f.paid}
+                  disabled={!payment.allowed}
                   onChange={(e) => setF({ ...f, paid: e.target.checked })}
                 />
                 <label htmlFor="mp">{t.paidNow}</label>
+                  <PaidOnlyHint />
               </div>
               <div className="cb" style={{ paddingTop: 4 }}>
                 <input

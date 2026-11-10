@@ -32,7 +32,7 @@ function SettingsAdmin({ props, lang }) {
         <Sidebar navItems={navItems} activeId={sec} onSelect={setSec} />
         <div className="main-scroll">
           <div className="page-pad">
-            {sec === "users" && <AdminUsers dbUsers={props.dbUsers} setDbUsers={props.setDbUsers} churches={props.churches} dbTeams={props.dbTeams} gas={props.gas} notify={props.notify} settings={props.settings} updateSessionTtlHours={props.updateSessionTtlHours} logAudit={props.logAudit} />}
+            {sec === "users" && <AdminUsers dbUsers={props.dbUsers} setDbUsers={props.setDbUsers} churches={props.churches} dbTeams={props.dbTeams} gas={props.gas} notify={props.notify} settings={props.settings} updateSessionTtlHours={props.updateSessionTtlHours} updatePaymentMarkerIds={props.updatePaymentMarkerIds} logAudit={props.logAudit} />}
             {sec === "listas" && (
               <div className="card" style={{ padding: "18px 20px" }}>
                 <h2 style={{ fontWeight: 700, fontSize: 17, marginBottom: 18 }}>{pt ? "Listas" : "Lists"}</h2>
