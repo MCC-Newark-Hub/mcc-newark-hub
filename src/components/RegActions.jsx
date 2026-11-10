@@ -1,6 +1,7 @@
 import { Check, Printer, Ticket, RefreshCw, Mail, Trash2, Pencil, UserX, Footprints, Eraser } from "lucide-react";
 import { useT } from "@/i18n/strings";
 import MoreMenu from "@/components/MoreMenu";
+import { usePaymentAccess } from "@/context/PaymentAccessContext";
 
 // The actions of one registration, with names: the frequent ones as buttons ("✓ Pago",
 // "Presente"), the rest in "⋯ Mais". Used by the tables and the cards of Inscrições.
@@ -10,6 +11,7 @@ export default function RegActions({
   onToWaitlist, onReplace, replaceLabel, onResend, resending = false, onDelete, compact = false,
 }) {
   const t = useT();
+  const payment = usePaymentAccess();
   const live = !r.cancelled && !r.waitlisted;
   const pending = live && !r.paid && !r.exempt;
   const presence = r.presence || "unknown";
@@ -33,7 +35,7 @@ export default function RegActions({
       {r.waitlisted && onPromote && (
         <button type="button" className="btn btn-ok btn-sm" onClick={() => onPromote(r.id)}>{t.promoteWaitlist}</button>
       )}
-      {pending && canPay && onPaid && (
+      {pending && canPay && payment.allowed && onPaid && (
         <button type="button" className="btn btn-ok btn-sm" onClick={() => onPaid(r)}>{t.markPaid}</button>
       )}
       {live && onPresence && (

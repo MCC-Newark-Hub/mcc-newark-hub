@@ -8,6 +8,8 @@ import { AppDataContext } from "@/context/AppDataContext";
 import { clearSession, getSessionToken, saveSession } from "@/lib/session";
 import { viewAs, seeAs, canSeeAs, actingName } from "@/lib/roleView";
 import { mapAppUser } from "@/lib/appUsers";
+import { canMarkPaid, paymentMarkerNames } from "@/lib/paymentAccess";
+import { PaymentAccessContext } from "@/context/PaymentAccessContext";
 import SeeAsPicker from "@/components/SeeAsPicker";
 import { requestSeeAs } from "@/lib/seeAsApi";
 
@@ -205,9 +207,15 @@ export default function App() {
   };
 
   const shared = { ...appData, theme, toggleTheme, user, logout, notify, lang, setLang };
+  const markerIds = appData.settings?.paymentMarkerIds;
+  const paymentAccess = useMemo(
+    () => ({ allowed: canMarkPaid(user, markerIds), names: paymentMarkerNames(markerIds, appData.dbUsers) }),
+    [user, markerIds, appData.dbUsers]
+  );
 
   return (
     <AppDataContext.Provider value={shared}>
+    <PaymentAccessContext.Provider value={paymentAccess}>
       <LangContext.Provider value={lang}>
         <SwitchRoleContext.Provider value={user?.allRoles?.length > 1 ? () => setRoleSwitcher(true) : null}>
         <RolePickContext.Provider value={user?.allRoles?.length > 1 ? { roles: user.allRoles, active: user.sysRole, select: selectRole } : null}>
@@ -376,6 +384,7 @@ export default function App() {
         </RolePickContext.Provider>
         </SwitchRoleContext.Provider>
       </LangContext.Provider>
+    </PaymentAccessContext.Provider>
     </AppDataContext.Provider>
   );
 }
