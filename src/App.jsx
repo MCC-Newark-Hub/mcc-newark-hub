@@ -49,6 +49,7 @@ import WorshipListPublicView from "@/views/WorshipListPublicView";
 import DoorPublicView from "@/views/DoorPublicView";
 import CensusPublicView from "@/views/CensusPublicView";
 import PublicStatsView from "@/views/PublicStatsView";
+import TrumpetsPanelView from "@/views/TrumpetsPanelView";
 import PrayerPublicView from "@/views/PrayerPublicView";
 
 export default function App() {
@@ -306,6 +307,8 @@ export default function App() {
               {/* PIN-gated hub */}
               <Route element={<AuthGate user={authUser} restoring={restoring} lang={lang} onLogout={logout}
                 onPinChanged={() => { setAuthUser((u) => (u ? { ...u, mustChangePin: false } : u)); notify(lang === "en" ? "PIN changed." : "PIN alterado."); }} />}>
+                {/* Trombetas e Festas big-screen panel: PIN-gated, pastor / admin only (shows members' names) */}
+                <Route path="/assistance/trombetas/painel/:year?" element={<TrumpetsPanelView lang={lang} />} />
                 <Route element={
                   <HubShell user={user} logout={logout} lang={lang} setLang={setLang} theme={theme} toggleTheme={toggleTheme} />
                 }>

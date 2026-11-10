@@ -37,6 +37,8 @@ Run these files **in order** using the Supabase SQL editor or `psql`. Each migra
 | `031_user_church_scope.sql` | Adds `app_users.churches` and `set_user_churches()` (the church scope picked in Usuários & PINs, which never reached the database) and seeds Pr Jairo (Newark, Philadelphia) and Pr Dilton (New York). Needed by the Diretório › Visão Geral access rules. Apply **before** deploying. |
 | `048_service_groups.sql` | Creates `service_groups`, `service_group_workers`, `service_group_schedule` for Culto Profético › Grupos (RLS disabled). Apply before deploying; the list form works without it. |
 | `053_unique_submission_number.sql` | Trigger `trg_registrations_unique_submission`: a submission number (NNN in `PREFIX-MMDD-NNN-P`) is unique per event whatever the day; a reused one is refused with 23505 naming `reg_number`, which `addReg` retries. Existing rows are not checked. **Applied to production on 2026-11-07.** |
+| `054_trumpet_guests.sql` | `trumpet_guests`, `trumpet_goals`, `trumpet_editions` (Trombetas e Festas guests, goals, motivos), server-only: RLS on, no browser grants; reached through `api/trumpet-guests.js`. Apply **after 055**. Not applied yet. |
+| `055_app_users_server_writes.sql` | Takes INSERT / UPDATE on `app_users` and EXECUTE on `set_user_churches` / `set_user_show_financials` away from the browser roles; profiles are saved by `api/app-users.js` (admins only). Apply with the deploy that ships that endpoint. Not applied yet. |
 
 ## How to run
 
