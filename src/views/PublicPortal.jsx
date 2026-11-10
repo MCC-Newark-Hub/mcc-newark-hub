@@ -146,7 +146,7 @@ function PublicConfirmationInline({ regs, email, event, lang, t, onReset, onHome
       <div style={{ maxWidth: 520, margin: "0 auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 6 }}>
           {onHome && (
-            <button onClick={onHome} style={{ background: "none", border: "none", color: "rgba(255,255,255,.8)", fontSize: 13, cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 4 }}>
+            <button onClick={onHome} className="link-btn" style={{ color: "rgba(255,255,255,.85)" }}>
               <ArrowLeft size={14} /> {lang === "en" ? "Home" : "Início"}
             </button>
           )}
@@ -675,7 +675,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
     <div style={{ minHeight: "100vh", background: "linear-gradient(160deg,#8B0000 0%,#b41926 50%,#03223f 100%)", padding: "24px 16px" }}>
       <div style={{ maxWidth: 560, margin: "0 auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <button onClick={onReset || undefined} style={{ background: "none", border: "none", color: "rgba(255,255,255,.8)", fontSize: 13, cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 4 }}>
+          <button onClick={onReset || undefined} className="link-btn" style={{ color: "rgba(255,255,255,.85)" }}>
             {onReset && <><ArrowLeft size={14} /> {lang === "en" ? "Home" : "Início"}</>}
             {!onReset && <span style={{ opacity: 0.7 }}>ICM Maranatha</span>}
           </button>
@@ -699,6 +699,11 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
               </div>
             ))}
           </div>
+        )}
+        {step > 0 && (
+          <p style={{ textAlign: "center", color: "rgba(255,255,255,.85)", fontSize: 13, fontWeight: 600, marginTop: -12, marginBottom: 16 }}>
+            {lang === "en" ? `Step ${step} of ${stepLabels.length}` : `Etapa ${step} de ${stepLabels.length}`} · {stepLabels[step - 1]}
+          </p>
         )}
 
         <div style={{ background: "#fff", borderRadius: 20, padding: "24px 20px" }}>
@@ -881,24 +886,26 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
                   {!showManualPrimary && !primary && (
                     <button
                       onClick={() => { setShowManualPrimary(true); setManualPrimary((p) => ({ ...p, name: primarySearch })); }}
-                      style={{ background: "none", border: "none", padding: "4px 0 0", fontSize: 12, color: "#9ca3af", cursor: "pointer", textDecoration: "underline", textAlign: "left" }}
+                      className="link-btn"
+                      style={{ color: "var(--muted)", textDecoration: "underline" }}
                     >
                       {t.cantFindMyself} →
                     </button>
                   )}
                   {primaryResults.length > 0 && !primary && (
-                    <div style={{ border: "1.5px solid var(--border)", borderRadius: 8, marginTop: 4, overflow: "hidden", maxHeight: 200, overflowY: "auto" }}>
+                    <div className="pick-list">
                       {primaryResults.map((m) => {
                         const alreadyReg = existingMemberIds.includes(m.id);
                         return (
-                          <div key={m.id} onClick={() => { setPrimary(m); setPrimarySearch(m.name); setPrimaryNotFound(false); }} style={{ padding: "10px 14px", cursor: "pointer", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: alreadyReg ? "#fff7ed" : "" }} onMouseEnter={(e) => (e.currentTarget.style.background = alreadyReg ? "#fef3c7" : "#eff6ff")} onMouseLeave={(e) => (e.currentTarget.style.background = alreadyReg ? "#fff7ed" : "")}>
-                            <div>
-                              <span style={{ fontWeight: 600 }}>{m.name}</span>
-                              <span style={{ marginLeft: 8, fontSize: 12, color: "#6b7280" }}>{m.church}</span>
-                              {alreadyReg && <span style={{ marginLeft: 6, fontSize: 10, background: "#fee2e2", color: "#991b1b", padding: "1px 6px", borderRadius: 99, fontWeight: 700 }}>{t.alreadyRegisteredBadge}</span>}
-                            </div>
-                            <div style={{ display: "flex", gap: 5 }}><span className="badge badge-blue">{m.category}</span>{m.role && <span className={`badge ${ROLE_BADGE[m.role]}`}>{m.role}</span>}</div>
-                          </div>
+                          <button type="button" key={m.id} className="pick-row" onClick={() => { setPrimary(m); setPrimarySearch(m.name); setPrimaryNotFound(false); }}>
+                            <span className="pick-row-name">{m.name}</span>
+                            <span className="pick-row-meta">
+                              {m.church && <span>{m.church}</span>}
+                              <span className="badge badge-blue">{m.category}</span>
+                              {m.role && <span className={`badge ${ROLE_BADGE[m.role]}`}>{m.role}</span>}
+                              {alreadyReg && <span className="badge badge-yellow">{t.alreadyRegisteredBadge}</span>}
+                            </span>
+                          </button>
                         );
                       })}
                     </div>
@@ -932,10 +939,10 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
                     <div style={{ marginTop: 8, border: "1.5px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
                       <div style={{ padding: "6px 14px", background: "#f8f9fb", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase" }}>{t.didYouMean}</div>
                       {similarPrimary.map((m) => (
-                        <div key={m.id} onClick={() => openSuggestion(m, "primary")} style={{ padding: "9px 14px", cursor: "pointer", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }} onMouseEnter={(e) => (e.currentTarget.style.background = "#eff6ff")} onMouseLeave={(e) => (e.currentTarget.style.background = "")}>
-                          <span style={{ fontWeight: 600 }}>{m.name}</span>
-                          <span style={{ display: "flex", gap: 5 }}><span className="badge badge-blue">{m.category}</span><span style={{ fontSize: 12, color: "#6b7280" }}>{m.church}</span></span>
-                        </div>
+                        <button type="button" key={m.id} className="pick-row" onClick={() => openSuggestion(m, "primary")}>
+                          <span className="pick-row-name">{m.name}</span>
+                          <span className="pick-row-meta">{m.church && <span>{m.church}</span>}<span className="badge badge-blue">{m.category}</span></span>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -1031,23 +1038,23 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
                         <div style={{ fontWeight: 600, fontSize: 15 }}>{primary.name}</div>
                         <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{primary.category} · {primary.church}</div>
                         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 10 }}>
-                          <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 700, color: "#b41926" }}>{existingReg.regNumber}</span>
+                          <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 700, color: "#b41926", whiteSpace: "nowrap" }}>{existingReg.regNumber}</span>
                           <span style={{ fontSize: 12, color: "#6b7280" }}>{regDateLabel(existingReg)}</span>
                           <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 10px", borderRadius: 99, background: status.bg, color: status.color }}>{status.label}</span>
                         </div>
                         <p style={{ fontSize: 12, color: "#78350f", marginTop: 10, marginBottom: 8 }}>
                           {t.needHelpContactClerk}
                         </p>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <button onClick={() => { setAddFamilyOnly(true); setErrors({}); setStep(2); }} style={{ background: "#03223f", border: "1px solid #03223f", borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer", color: "#fff" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          <button className="btn btn-primary" style={{ padding: 12, fontSize: 15 }} onClick={() => { setAddFamilyOnly(true); setErrors({}); setStep(2); }}>
                             {t.addMyFamily}
                           </button>
                           {onLookup && (
-                            <button onClick={() => onLookup(primary.name)} style={{ background: "#f59e0b", border: "1px solid #f59e0b", borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer", color: "#fff", fontWeight: 600 }}>
+                            <button className="btn btn-ghost" onClick={() => onLookup(primary.name)}>
                               {t.viewMyConfirmation}
                             </button>
                           )}
-                          <button onClick={() => { setPrimary(null); setPrimarySearch(""); setAddFamilyOnly(false); }} style={{ background: "none", border: "1px solid #f59e0b", borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer", color: "#92400e" }}>
+                          <button className="link-btn" style={{ color: "#92400e", textDecoration: "underline", alignSelf: "center" }} onClick={() => { setPrimary(null); setPrimarySearch(""); setAddFamilyOnly(false); }}>
                             {t.searchAnotherName}
                           </button>
                         </div>
@@ -1061,15 +1068,17 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
                         {primary.verified === false && <span style={{ marginLeft: 6, fontSize: 10, background: "#fef3c7", color: "#92400e", padding: "1px 6px", borderRadius: 99, fontWeight: 600 }}>{t.unverified}</span>}
                         <span style={{ marginLeft: 8, color: "#6b7280" }}>{primary.category}{primary.church ? ` · ${primary.church}` : ""}</span>
                       </div>
-                      <button onClick={() => { setPrimary(null); setPrimarySearch(""); }} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: 18 }}>×</button>
+                      <button className="icon-btn" aria-label={t.searchAnotherName} title={t.searchAnotherName} onClick={() => { setPrimary(null); setPrimarySearch(""); }} style={{ color: "var(--muted)", fontSize: 20 }}>×</button>
                     </div>
                   )}
                   {errors.primary && <p style={{ color: "#c0392b", fontSize: 12, marginTop: 4 }}>{errors.primary}</p>}
                 </div>
 
-                <button className="btn btn-primary" style={{ padding: 12, fontSize: 15 }} onClick={() => { if (validateStep1()) setStep(2); }}>
-                  {lang === "en" ? "Next: Family →" : "Próximo: Família →"}
-                </button>
+                {!existingReg && (
+                  <button className="btn btn-primary" style={{ padding: 12, fontSize: 15 }} onClick={() => { if (validateStep1()) setStep(2); }}>
+                    {lang === "en" ? "Next: Family →" : "Próximo: Família →"}
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -1086,11 +1095,11 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
               {primary && (
                 <div style={{ background: "#f8f9fb", borderRadius: 10, padding: "12px 14px", marginBottom: 14 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: "#6b7280", marginBottom: 8, textTransform: "uppercase", letterSpacing: ".5px" }}>{t.primaryRegistrant}</div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "6px 10px" }}>
                     <span style={{ fontWeight: 600 }}>{primary.name}</span>
-                    <div style={{ display: "flex", gap: 6 }}>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                       <span className="badge badge-blue">{primary.category}</span>
-                      {addingFamily ? <span style={{ fontFamily: "monospace", fontSize: 12, fontWeight: 700, color: "#b41926" }}>{existingReg.regNumber}</span> : <span style={{ fontSize: 12, fontWeight: 600, color: "#2d8a4e" }}>{["Pastor", "Ungido"].includes(primary.role) ? t.exempt : eventFee(primary.category) === 0 ? t.free : fmt(eventFee(primary.category))}</span>}
+                      {addingFamily ? <span style={{ fontFamily: "monospace", fontSize: 12, fontWeight: 700, color: "#b41926", whiteSpace: "nowrap" }}>{existingReg.regNumber}</span> : <span style={{ fontSize: 12, fontWeight: 600, color: "#2d8a4e" }}>{["Pastor", "Ungido"].includes(primary.role) ? t.exempt : eventFee(primary.category) === 0 ? t.free : fmt(eventFee(primary.category))}</span>}
                     </div>
                   </div>
                 </div>
@@ -1108,7 +1117,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
                       </div>
                       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                         <span style={{ fontSize: 12, fontWeight: 600, color: "#2d8a4e" }}>{["Pastor", "Ungido"].includes(m.role) ? t.exempt : eventFee(m.category) === 0 ? t.free : fmt(eventFee(m.category))}</span>
-                        <button onClick={() => setFamilyMembers((prev) => prev.filter((_, j) => j !== i))} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: 18, lineHeight: 1 }}>×</button>
+                        <button className="icon-btn" aria-label={lang === "en" ? `Remove ${m.name}` : `Remover ${m.name}`} onClick={() => setFamilyMembers((prev) => prev.filter((_, j) => j !== i))} style={{ color: "var(--muted)", fontSize: 20, lineHeight: 1 }}>×</button>
                       </div>
                     </div>
                   ))}
@@ -1122,26 +1131,24 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
                   <input value={famSearch} onChange={(e) => { setFamSearch(e.target.value); setFamNotFound(false); }} placeholder={t.searchPlaceholder} />
                 </div>
                 {famResults.length > 0 && (
-                  <div style={{ border: "1.5px solid var(--border)", borderRadius: 8, marginTop: 4, overflow: "hidden", maxHeight: 180, overflowY: "auto" }}>
+                  <div className="pick-list">
                     {famResults.map((m) => {
                       const alreadyReg = existingMemberIds.includes(m.id);
                       return (
-                        <div
+                        <button
+                          type="button"
                           key={m.id}
-                          onClick={() => { if (!alreadyReg) { setFamilyMembers((prev) => [...prev, { ...m, verified: true }]); setFamSearch(""); } }}
-                          style={{ padding: "9px 14px", cursor: alreadyReg ? "default" : "pointer", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: alreadyReg ? "#f9fafb" : "" }}
-                          onMouseEnter={(e) => { if (!alreadyReg) e.currentTarget.style.background = "#eff6ff"; }}
-                          onMouseLeave={(e) => { if (!alreadyReg) e.currentTarget.style.background = ""; }}
+                          className="pick-row"
+                          disabled={alreadyReg}
+                          onClick={() => { setFamilyMembers((prev) => [...prev, { ...m, verified: true }]); setFamSearch(""); }}
                         >
-                          <div>
-                            <span style={{ fontWeight: 600, color: alreadyReg ? "#6b7280" : "inherit" }}>{m.name}</span>
-                            {alreadyReg && <span style={{ marginLeft: 6, fontSize: 10, background: "#fee2e2", color: "#991b1b", padding: "1px 6px", borderRadius: 99, fontWeight: 700 }}>{t.alreadyRegisteredBadge}</span>}
-                          </div>
-                          <div style={{ display: "flex", gap: 5 }}>
+                          <span className="pick-row-name">{m.name}</span>
+                          <span className="pick-row-meta">
                             <span className="badge badge-blue">{m.category}</span>
-                            <span style={{ fontSize: 12, color: "#6b7280" }}>{m.gender}</span>
-                          </div>
-                        </div>
+                            <span>{m.gender}</span>
+                            {alreadyReg && <span className="badge badge-yellow">{t.alreadyRegisteredBadge}</span>}
+                          </span>
+                        </button>
                       );
                     })}
                   </div>
@@ -1151,10 +1158,10 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
                   <div style={{ marginTop: 8, border: "1.5px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
                     <div style={{ padding: "6px 14px", background: "#f8f9fb", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase" }}>{t.didYouMean}</div>
                     {similarFam.map((m) => (
-                      <div key={m.id} onClick={() => openSuggestion(m, "family")} style={{ padding: "9px 14px", cursor: "pointer", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }} onMouseEnter={(e) => (e.currentTarget.style.background = "#eff6ff")} onMouseLeave={(e) => (e.currentTarget.style.background = "")}>
-                        <span style={{ fontWeight: 600 }}>{m.name}</span>
-                        <span style={{ display: "flex", gap: 5 }}><span className="badge badge-blue">{m.category}</span><span style={{ fontSize: 12, color: "#6b7280" }}>{m.gender}</span></span>
-                      </div>
+                      <button type="button" key={m.id} className="pick-row" onClick={() => openSuggestion(m, "family")}>
+                        <span className="pick-row-name">{m.name}</span>
+                        <span className="pick-row-meta"><span className="badge badge-blue">{m.category}</span><span>{m.gender}</span></span>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -1224,7 +1231,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
               )}
 
               <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-                <button className="btn btn-ghost" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }} onClick={() => setStep(1)}><ArrowLeft size={14} /> {t.back}</button>
+                <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setStep(1)}>{t.back}</button>
                 <button className="btn btn-primary" style={{ flex: 2 }} disabled={addingFamily && familyMembers.length === 0} onClick={() => setStep(3)}>{lang === "en" ? "Next: Health →" : "Próximo: Saúde →"}</button>
               </div>
             </div>
@@ -1243,7 +1250,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
                   problem={showHealthErr ? healthProblem(pruneHealth(specialNeeds, allParticipants), allParticipants.length <= 1) : null} />
               </div>
               <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
-                <button className="btn btn-ghost" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }} onClick={() => setStep(2)}><ArrowLeft size={14} /> {t.back}</button>
+                <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setStep(2)}>{t.back}</button>
                 <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => {
                   const single = allParticipants.length <= 1;
                   if (healthProblem(pruneHealth(allergies, allParticipants), single) || healthProblem(pruneHealth(specialNeeds, allParticipants), single)) { setShowHealthErr(true); return; }
@@ -1411,7 +1418,7 @@ function PublicPortal({ event, members: propMembers, setMembers, churches, gas, 
               {submitError && <p style={{ color: "#c0392b", fontSize: 13, marginBottom: 8, display: "flex", alignItems: "center", gap: 4 }}><AlertTriangle size={13} /> {submitError}</p>}
 
               <div style={{ display: "flex", gap: 10 }}>
-                <button className="btn btn-ghost" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }} onClick={() => setStep(3)} disabled={submitting}><ArrowLeft size={14} /> {t.back}</button>
+                <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setStep(3)} disabled={submitting}>{t.back}</button>
                 <button className="btn btn-accent" style={{ flex: 2, fontSize: 15 }} onClick={handleSubmit} disabled={submitting}>
                   {submitting ? (lang === "en" ? "Submitting…" : "Enviando…") : effectivelyFull ? (lang === "en" ? "Join Waitlist →" : "Entrar na Lista de Espera →") : `${lang === "en" ? "Submit Registration" : "Confirmar Inscrição"} →`}
                 </button>

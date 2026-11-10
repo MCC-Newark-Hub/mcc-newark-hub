@@ -319,6 +319,20 @@ label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase
   .lang-btn{min-height:40px;min-width:44px;}
 }
 
+/* Text-only button (a link that does something): no chrome, but a 44px-tall hit area. */
+.link-btn{background:none;border:none;padding:0;min-height:44px;display:inline-flex;align-items:center;gap:4px;font:inherit;font-size:13px;cursor:pointer;text-align:left;}
+.link-btn:active{opacity:.7;}
+
+/* ── PICK LIST: search results you tap to choose (name on top, details below) ── */
+.pick-list{border:1.5px solid var(--border);border-radius:10px;margin-top:6px;max-height:280px;overflow-y:auto;}
+.pick-row{display:block;width:100%;min-height:52px;padding:10px 14px;border:0;border-top:1px solid var(--border);background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;transition:background-color 150ms ease;}
+.pick-row:first-child{border-top:0;}
+.pick-row:active{background:var(--sidebar-active-bg);}
+@media (hover:hover) and (pointer:fine){.pick-row:hover{background:var(--sidebar-active-bg);}}
+.pick-row:disabled{cursor:default;opacity:.6;background:transparent;}
+.pick-row-name{display:block;font-weight:600;font-size:15px;overflow-wrap:anywhere;}
+.pick-row-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin-top:4px;font-size:12px;color:var(--muted);}
+
 /* Bare icon button (×, ✎) with no chrome: centered glyph, real hit area. */
 .icon-btn{background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;min-width:28px;min-height:28px;padding:4px;border-radius:6px;transition:transform 160ms ease-out;}
 .icon-btn:active{transform:scale(.92);}
