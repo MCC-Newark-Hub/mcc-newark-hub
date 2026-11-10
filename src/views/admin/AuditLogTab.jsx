@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, Fragment } from "react";
 import { sb } from "@/lib/supabase";
+import { useLang } from "@/i18n/strings";
 
 const ACTION_LABELS = {
   registration_created: "Inscrição criada",
@@ -97,7 +98,10 @@ const fmtDetails = (details) => {
 };
 
 export default function AuditLogTab({ dbUsers }) {
+  const en = useLang() === "en";
   const [rows, setRows] = useState([]);
+  // Rows matching the current filters, across every page (not just the ones loaded).
+  const [total, setTotal] = useState(null);
   const [loading, setLoading] = useState(true);
   const pageRef = useRef(0);
   const [hasMore, setHasMore] = useState(false);
@@ -112,7 +116,7 @@ export default function AuditLogTab({ dbUsers }) {
 
   const load = async (pageNum, append) => {
     setLoading(true);
-    let q = sb.from("audit_log").select("*").order("created_at", { ascending: false })
+    let q = sb.from("audit_log").select("*", { count: pageNum === 0 ? "exact" : undefined }).order("created_at", { ascending: false })
       .range(pageNum * PAGE_SIZE, pageNum * PAGE_SIZE + PAGE_SIZE - 1);
     if (actorFilter) q = q.eq("actor_name", actorFilter);
     if (actionFilter) q = q.eq("action", actionFilter);
@@ -123,8 +127,9 @@ export default function AuditLogTab({ dbUsers }) {
       const s = appliedSearch.trim().replace(/[%_]/g, "");
       q = q.or(`actor_name.ilike.%${s}%,entity_label.ilike.%${s}%`);
     }
-    const { data, error } = await q;
+    const { data, error, count } = await q;
     if (error) { console.error("audit_log load error:", error); setLoading(false); return; }
+    if (pageNum === 0) setTotal(typeof count === "number" ? count : null);
     setHasMore((data || []).length === PAGE_SIZE);
     setRows((prev) => (append ? [...prev, ...(data || [])] : (data || [])));
     setLoading(false);
@@ -204,6 +209,18 @@ export default function AuditLogTab({ dbUsers }) {
         </div>
       </div>
 
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8, minHeight: 20 }}>
+        {total !== null && (
+          <>
+            <strong style={{ fontSize: 15 }}>{total.toLocaleString(en ? "en-US" : "pt-BR")}</strong>
+            <span style={{ fontSize: 13, color: "var(--muted)" }}>
+              {en ? (total === 1 ? "record" : "records") : (total === 1 ? "registro" : "registros")}
+              {(actorFilter || actionFilter || entityFilter || dateFrom || dateTo || appliedSearch) && (en ? " match the filters" : " com os filtros")}
+              {rows.length < total && ` · ${en ? "showing" : "mostrando"} ${rows.length}`}
+            </span>
+          </>
+        )}
+      </div>
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         <div className="table-wrap">
           <table className="table table-stack ts-auto">
