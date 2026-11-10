@@ -320,7 +320,7 @@ export default function BadgeGeneratorTab({ regs, event, rosters, notify }) {
 
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         <div className="table-wrap">
-          <table className="table">
+          <table className="table table-stack ts-auto">
             <thead>
               <tr>
                 <th style={{ width: 36 }}>

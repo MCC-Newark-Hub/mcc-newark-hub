@@ -156,7 +156,7 @@ label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase
 .stat-card{background:var(--card);border-radius:var(--r);padding:18px 20px;border:1px solid var(--border);box-shadow:var(--shadow);transition:background .25s;}
 
 /* ── TABS ── */
-.tab{padding:7px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--muted);transition:all .15s;white-space:nowrap;letter-spacing:.02em;}
+.tab{padding:7px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--muted);transition:background-color 150ms ease,color 150ms ease,box-shadow 150ms ease;white-space:nowrap;letter-spacing:.02em;}
 .tab.active{background:var(--tab-active-bg);color:var(--tab-active-text);box-shadow:var(--shadow);}
 
 /* ── LAYOUT ── */
@@ -265,13 +265,16 @@ label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase
   .role-bar-link:active{transform:scale(.97);}
   .role-bar-link.active{background:#fff;color:var(--icm-navy-deep);border-color:#fff;cursor:default;}
   .role-bar-link:focus-visible{outline:2px solid #fff;outline-offset:2px;}
-  .main-scroll{padding:14px;padding-bottom:80px;}
+  .main-scroll{padding:16px;padding-bottom:calc(84px + env(safe-area-inset-bottom));}
   .sidebar-desktop{display:none;}
-  .bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--sidebar-bg);border-top:1px solid var(--border);z-index:100;padding:4px 0;overflow-x:auto;-webkit-overflow-scrolling:touch;justify-content:space-around;scrollbar-width:none;}
-  .bottom-nav::-webkit-scrollbar{display:none;}
-  .bn-item{flex:0 0 auto;min-width:60px;display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 2px;cursor:pointer;font-size:9px;font-weight:600;color:var(--muted);border:none;background:transparent;}
+  .bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--sidebar-bg);border-top:1px solid var(--border);z-index:100;padding:4px 4px calc(4px + env(safe-area-inset-bottom));}
+  /* Equal slots, never a sideways-scrolling strip: Sidebar.jsx caps the bar at 4 items + "Mais". */
+  .bn-item{flex:1 1 0;min-width:0;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 2px;cursor:pointer;font-size:11px;font-weight:600;color:var(--muted);border:none;background:transparent;border-radius:10px;font-family:inherit;transition:transform 160ms ease-out,color 160ms ease;}
+  .bn-item:active{transform:scale(.95);}
+  .bn-label{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .bn-item.active{color:var(--primary);}
-  .bn-icon{font-size:18px;line-height:1;}
+  .bn-item.active .bn-icon{background:var(--sidebar-active-bg);}
+  .bn-icon{font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;width:44px;height:26px;border-radius:99px;transition:background-color 160ms ease;}
   .modal-bg{padding:0;align-items:flex-end;}
   .modal{border-radius:20px 20px 0 0;max-width:100%;max-height:92vh;padding:20px 18px;}
   .fr{grid-template-columns:1fr;}
@@ -279,7 +282,7 @@ label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase
   .stat-grid-3{grid-template-columns:repeat(3,1fr);gap:8px;}
   .stat-card{padding:14px;}
   .page-pad{max-width:100%;}
-  .tab{padding:6px 10px;font-size:11px;}
+  .tab{padding:8px 12px;font-size:12px;min-height:40px;}
   .table{font-size:12px;}
   .table th{padding:8px 10px;}
   .table td{padding:8px 10px;}
@@ -288,7 +291,85 @@ label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase
   .fr3{grid-template-columns:1fr 1fr;}
   .stat-grid-3{grid-template-columns:repeat(2,1fr);}
   .btn{padding:8px 14px;font-size:13px;}
-  .btn-sm{padding:5px 10px;font-size:11px;}
+  .btn-sm{padding:6px 10px;font-size:12px;}
+}
+
+/* ── PHONES: no zoom-on-focus, nothing too small to tap ──
+   !important is deliberate: hundreds of inline style={{fontSize:11…}} on inputs would otherwise win,
+   and any input under 16px makes iOS Safari zoom the whole page on focus. */
+@media(max-width:768px){
+  input:not([type=checkbox]):not([type=radio]),select,textarea{font-size:16px !important;min-height:44px;}
+  input[type=checkbox],input[type=radio]{width:20px;height:20px;flex:none;}
+  .bn-sheet-bg{z-index:1100;}
+  .bn-sheet{padding:16px 16px calc(20px + env(safe-area-inset-bottom));}
+  .bn-sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;font-family:'Lora',Georgia,serif;font-weight:700;font-size:17px;color:var(--text);}
+  .bn-sheet-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .bn-sheet-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:76px;padding:10px 6px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text);font-family:inherit;font-size:12px;font-weight:600;text-align:center;line-height:1.25;cursor:pointer;overflow-wrap:anywhere;transition:transform 160ms ease-out,background-color 160ms ease;}
+  .bn-sheet-item:active{transform:scale(.97);}
+  .bn-sheet-item.active{border-color:var(--primary);background:var(--sidebar-active-bg);color:var(--primary);}
+  /* Lists that scroll inside a fixed-height box on desktop: on a phone, let the page scroll instead. */
+  .table-scroll{max-height:none !important;}
+}
+@media(pointer:coarse){
+  .btn{min-height:44px;}
+  .btn-sm{min-height:40px;min-width:40px;}
+  .btn-xs{min-height:40px;min-width:40px;}
+  .btn-sm,.btn-xs{display:inline-flex;align-items:center;justify-content:center;gap:4px;}
+  .topbar > button,.topbar-more-btn{min-width:44px;min-height:44px;justify-content:center;}
+  .lang-btn{min-height:40px;min-width:44px;}
+}
+
+/* Text-only button (a link that does something): no chrome, but a 44px-tall hit area. */
+.link-btn{background:none;border:none;padding:0;min-height:44px;display:inline-flex;align-items:center;gap:4px;font:inherit;font-size:13px;cursor:pointer;text-align:left;}
+.link-btn:active{opacity:.7;}
+
+/* ── PICK LIST: search results you tap to choose (name on top, details below) ── */
+.pick-list{border:1.5px solid var(--border);border-radius:10px;margin-top:6px;max-height:280px;overflow-y:auto;}
+.pick-row{display:block;width:100%;min-height:52px;padding:10px 14px;border:0;border-top:1px solid var(--border);background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;transition:background-color 150ms ease;}
+.pick-row:first-child{border-top:0;}
+.pick-row:active{background:var(--sidebar-active-bg);}
+@media (hover:hover) and (pointer:fine){.pick-row:hover{background:var(--sidebar-active-bg);}}
+.pick-row:disabled{cursor:default;opacity:.6;background:transparent;}
+.pick-row-name{display:block;font-weight:600;font-size:15px;overflow-wrap:anywhere;}
+.pick-row-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin-top:4px;font-size:12px;color:var(--muted);}
+
+/* Bare icon button (×, ✎) with no chrome: centered glyph, real hit area. */
+.icon-btn{background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;min-width:28px;min-height:28px;padding:4px;border-radius:6px;transition:transform 160ms ease-out;}
+.icon-btn:active{transform:scale(.92);}
+@media(pointer:coarse){.icon-btn{min-width:44px;min-height:44px;}}
+
+/* ── STACKED TABLE ──
+   Add className="table table-stack" and the rows turn into cards on phones instead of a table you
+   scroll sideways. Cell roles: .ts-check (selection box), .ts-title (the row's name, full width),
+   .ts-actions (buttons, full-width row at the bottom), .ts-break (starts a new line), .ts-hide (desktop-only detail).
+   Or add .ts-auto / .ts-auto-title (below) and let column position decide.
+   data-label="…" on a cell prints that label in front of its value. */
+@media(max-width:640px){
+  .table.table-stack{min-width:0 !important;font-size:14px;}
+  .table-stack thead{display:none;}
+  .table-stack,.table-stack tbody{display:block;}
+  .table-stack tr{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:12px 14px;border-bottom:1px solid var(--border);}
+  .table-stack tbody tr:hover td{background:transparent;}
+  .table-stack td{display:block;padding:0 !important;border:0 !important;max-width:none !important;}
+  .table-stack td[colspan]{flex:1 1 100%;}
+  .table-stack .ts-hide{display:none;}
+  .table-stack .ts-check{order:-2;}
+  .table-stack .ts-title{order:-1;flex:1 1 9rem;min-width:0;font-size:15px;overflow-wrap:anywhere;}
+  .table-stack td[data-label]::before{content:attr(data-label) " ";font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-right:4px;}
+  .table-stack .ts-break{flex-basis:100%;}
+  /* .ts-actions-cell: a couple of icon buttons that sit on the title line instead of their own row */
+  .table-stack .ts-actions-cell{order:-1;}
+  .table-stack .ts-actions{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}
+  .table-stack .ts-actions > *{margin:0 !important;}
+  .table-stack .ts-actions .btn{flex:1 1 auto;font-size:15px;}
+  .table-stack .ts-actions > div{flex:1 1 100%;}
+  /* Same roles by column position, for the common shapes, so cells need no class:
+     .ts-auto = [checkbox, name, …, icon buttons]; .ts-auto-title = [name, …, icon buttons]. */
+  .table-stack.ts-auto td:first-child{order:-2;}
+  .table-stack.ts-auto td:nth-child(2),.table-stack.ts-auto-title td:first-child{order:-1;flex:1 1 9rem;min-width:0;font-size:15px;overflow-wrap:anywhere;}
+  .table-stack.ts-auto td:last-child,.table-stack.ts-auto-title td:last-child{order:-1;}
+  .table-stack.ts-auto td[colspan],.table-stack.ts-auto-title td[colspan]{order:0;flex:1 1 100%;font-size:inherit;}
+  .table-stack td select{width:auto;max-width:100%;}
 }
 
 /* ── TAB BAR ── */

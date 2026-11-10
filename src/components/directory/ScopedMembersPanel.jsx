@@ -84,7 +84,7 @@ export default function ScopedMembersPanel({ list, members, setMembers, families
           <span style={{ fontSize: 12, color: "var(--muted)" }}>{shown.length}</span>
         </div>
         <div className="table-wrap">
-          <table className="table">
+          <table className="table table-stack ts-auto-title">
             <thead style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--card-bg, #fff)" }}>
               <tr><th>{t.memberName}</th><th>{t.cargo}</th><th>{t.cat}</th><th>{t.dirFamily}</th><th>{t.actions}</th></tr>
             </thead>

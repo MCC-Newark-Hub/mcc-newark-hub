@@ -182,11 +182,13 @@ export default function RegistrationsTab(props) {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          flexWrap: "wrap",
+          gap: 10,
           marginBottom: 14,
         }}
       >
         <h2 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 22 }}>{t.registrations}</h2>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {bulkSel.length > 0 && (
             <>
               <button className="btn btn-ghost btn-sm" onClick={() => {
@@ -340,11 +342,12 @@ export default function RegistrationsTab(props) {
                     )}
                   </td>
                   <td
+                   
                     style={{
                       fontFamily: "monospace",
                       fontSize: 11,
                       fontWeight: 600,
-                      color: "#1a3a6b",
+                      color: "var(--text)",
                       whiteSpace: "nowrap",
                     }}
                   >
@@ -353,25 +356,25 @@ export default function RegistrationsTab(props) {
                   <td>
                     <div style={{ fontWeight: 600 }}>{r.memberName}</div>
                     {r.badgeName && r.badgeName !== r.memberName && (
-                      <div style={{ fontSize: 11, color: "#6b7280" }}>🏷 {r.badgeName}</div>
+                      <div style={{ fontSize: 11, color: "var(--muted)" }}>🏷 {r.badgeName}</div>
                     )}
                   </td>
                   <td>
                     {r.role ? (
                       <span className={`badge ${ROLE_BADGE[r.role]}`}>{r.role}</span>
                     ) : (
-                      <span style={{ color: "#9ca3af", fontSize: 12 }}>—</span>
+                      <span style={{ color: "var(--muted)", fontSize: 12 }}>—</span>
                     )}
                   </td>
                   <td>
                     <span className="badge badge-blue">{r.category}</span>
                   </td>
-                  <td style={{ fontSize: 12, color: "#6b7280" }}>{liveChurchOf(r)}</td>
+                  <td style={{ fontSize: 12, color: "var(--muted)" }}>{liveChurchOf(r)}</td>
                   <td style={{ fontSize: 12 }}>{r.team}</td>
                   <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
-                    {r.exempt ? <span style={{ color: "#6b7280" }}>{t.exempt}</span> : fmt(r.fee)}
+                    {r.exempt ? <span style={{ color: "var(--muted)" }}>{t.exempt}</span> : fmt(r.fee)}
                   </td>
-                  <td style={{ fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
+                  <td style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>
                     {r.registeredAtTs
                       ? new Date(r.registeredAtTs).toLocaleString("pt-BR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
                       : r.registeredAt || "—"}
