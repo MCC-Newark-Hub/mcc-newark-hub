@@ -310,7 +310,7 @@ export default function RegistrationsTab(props) {
                     onChange={(e) => setBulkSel(e.target.checked ? filtered.map((r) => r.id) : [])} />
                 </th>
                 <th style={{ width: 36, textAlign: "right", color: "var(--muted)", fontSize: 11 }}>#</th>
-                <th>{t.regNum}</th>
+                <Th k="statusSort">{t.statusH}</Th>
                 <Th k="memberName">{t.memberName}</Th>
                 <Th k="role">{t.cargo}</Th>
                 <Th k="category">{t.cat}</Th>
@@ -318,7 +318,7 @@ export default function RegistrationsTab(props) {
                 <Th k="team">{t.teamH}</Th>
                 <Th k="fee">{t.feeH}</Th>
                 <Th k="registeredAtTs">{t.regDate}</Th>
-                <Th k="statusSort">{t.statusH}</Th>
+                <th>{t.regNum}</th>
                 <th className="sticky-actions">{t.actions}</th>
               </tr>
             </thead>
@@ -339,16 +339,8 @@ export default function RegistrationsTab(props) {
                       </span>
                     )}
                   </td>
-                  <td
-                    style={{
-                      fontFamily: "monospace",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: "#1a3a6b",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {r.regNumber}
+                  <td>
+                    <StatusBadge r={r} event={event} allRegs={all} />
                   </td>
                   <td>
                     <div style={{ fontWeight: 600 }}>{r.memberName}</div>
@@ -376,8 +368,16 @@ export default function RegistrationsTab(props) {
                       ? new Date(r.registeredAtTs).toLocaleString("pt-BR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
                       : r.registeredAt || "—"}
                   </td>
-                  <td>
-                    <StatusBadge r={r} event={event} allRegs={all} />
+                  <td
+                    style={{
+                      fontFamily: "monospace",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "#1a3a6b",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {r.regNumber}
                   </td>
                   <td className="sticky-actions">
                     <RegActions reg={r} {...actionProps} resending={resendingId === r.id} />
