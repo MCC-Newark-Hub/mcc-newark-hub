@@ -44,7 +44,7 @@ function CMSScoped({ props, lang, kind }) {
         ]),
   ];
   const membersPanel = (
-    <ScopedMembersPanel list={scoped.list} members={members} setMembers={props.setMembers} families={scoped.families} setFamilies={props.setFamilies}
+    <ScopedMembersPanel gaTools={kind === "clerk"} list={scoped.list} members={members} setMembers={props.setMembers} families={scoped.families} setFamilies={props.setFamilies}
       gas={scoped.gas} churches={props.churches} defaultChurch={scoped.church} regs={props.regs} setRegs={props.setRegs}
       canDelete={kind === "clerk"} notify={props.notify} logAudit={props.logAudit} />
   );

@@ -20,3 +20,37 @@ export function groupGasByChurch(gas = [], members = []) {
       return { church, gas: sorted, members: sorted.reduce((n, g) => n + (perGa.get(g.id) || 0), 0) };
     });
 }
+
+// Member lists (Diretório › Membros of a church secretary): filter and group by the member's GA (`member.gaId`).
+// Ids are compared as strings because they come as text or number.
+export const GA_NONE = "__none__";
+const sameId = (a, b) => a != null && b != null && String(a) === String(b);
+
+// The GA of a member, or null when it has none or points to a group that is not in `gas`.
+export function gaOf(member, gas) {
+  if (member?.gaId == null || member.gaId === "") return null;
+  return (gas || []).find((g) => sameId(g.id, member.gaId)) || null;
+}
+
+// filter: "" (everyone), GA_NONE (members without a known group) or a GA id.
+export function filterByGa(members, gas, filter) {
+  if (!filter) return members || [];
+  if (filter === GA_NONE) return (members || []).filter((m) => !gaOf(m, gas));
+  return (members || []).filter((m) => sameId(gaOf(m, gas)?.id, filter));
+}
+
+// [{ gaId, gaName, members }] — groups in natural name order, members in the given order, the ones without a group last.
+export function groupByGa(members, gas, noneLabel) {
+  const byId = new Map();
+  const none = [];
+  for (const m of members || []) {
+    const ga = gaOf(m, gas);
+    if (!ga) { none.push(m); continue; }
+    const key = String(ga.id);
+    if (!byId.has(key)) byId.set(key, { gaId: ga.id, name: ga.name || "—", members: [] });
+    byId.get(key).members.push(m);
+  }
+  const groups = [...byId.values()].sort(byName).map(({ gaId, name, members: list }) => ({ gaId, gaName: name, members: list }));
+  if (none.length) groups.push({ gaId: null, gaName: noneLabel, members: none });
+  return groups;
+}

@@ -7,16 +7,19 @@ import RoleBadges from "@/components/directory/RoleBadges";
 import MemberEditModal from "@/components/directory/MemberEditModal";
 import { newMemberForm, memberToForm } from "@/lib/memberForm";
 import { groupByFamily, familyIdOf } from "@/lib/family";
+import { GA_NONE, filterByGa, groupByGa } from "@/lib/gaGroups";
 
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 // Diretório › Membros for a scoped profile (church secretary, GA leader): the members in `list` only, with search,
 // group-by-family, new and edit (church-locked MemberEditModal). Delete is opt-in (`canDelete`) and refused while the
 // member still has an active registration — same rules the secretary already had under Eventos.
-export default function ScopedMembersPanel({ list, members, setMembers, families, setFamilies, gas, churches, defaultChurch, regs, setRegs, canDelete, notify, logAudit }) {
+// `gaTools` (church secretary) adds a filter by assistance group and "Agrupar por Grupo" next to "Agrupar por Família".
+export default function ScopedMembersPanel({ gaTools = false, list, members, setMembers, families, setFamilies, gas, churches, defaultChurch, regs, setRegs, canDelete, notify, logAudit }) {
   const t = useT();
   const [search, setSearch] = useState("");
-  const [groupByFam, setGroupByFam] = useState(false);
+  const [groupBy, setGroupBy] = useState(""); // "" | "family" | "ga"
+  const [gaFilter, setGaFilter] = useState(""); // "" | GA_NONE | GA id
   const [editingMember, setEditingMember] = useState(null);
   const [savingMember, setSavingMember] = useState(false);
   const [newFamilyName, setNewFamilyName] = useState("");
@@ -24,7 +27,8 @@ export default function ScopedMembersPanel({ list, members, setMembers, families
   const [deleting, setDeleting] = useState(false);
 
   const q = norm(search);
-  const shown = (list || []).filter((m) => norm(m.name).includes(q)).sort((a, b) => (a.name || "").localeCompare(b.name || "", "pt"));
+  const gaOptions = [...(gas || [])].sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "pt", { numeric: true }));
+  const shown = filterByGa(list, gas, gaTools ? gaFilter : "").filter((m) => norm(m.name).includes(q)).sort((a, b) => (a.name || "").localeCompare(b.name || "", "pt"));
 
   const openNew = () => { setEditingMember(newMemberForm()); setNewFamilyName(""); };
   const openEdit = (m) => { setEditingMember(memberToForm(m, families)); setNewFamilyName(""); };
@@ -74,7 +78,17 @@ export default function ScopedMembersPanel({ list, members, setMembers, families
           <span className="si-icon"><Search size={16} /></span>
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.dirSearchMember} />
         </div>
-        <button className={`btn btn-sm ${groupByFam ? "btn-primary" : "btn-ghost"}`} onClick={() => setGroupByFam((p) => !p)}>👪 {t.dirGroupByFamily}</button>
+        {gaTools && (
+          <select value={gaFilter} onChange={(e) => setGaFilter(e.target.value)} aria-label={t.dirGaFilterLabel} title={t.dirGaFilterLabel} style={{ maxWidth: 260 }}>
+            <option value="">{t.dirGaFilterAll}</option>
+            {gaOptions.map((g) => <option key={g.id} value={String(g.id)}>{g.name}</option>)}
+            <option value={GA_NONE}>{t.dirGaNone}</option>
+          </select>
+        )}
+        <button className={`btn btn-sm ${groupBy === "family" ? "btn-primary" : "btn-ghost"}`} aria-pressed={groupBy === "family"} onClick={() => setGroupBy((p) => (p === "family" ? "" : "family"))}>👪 {t.dirGroupByFamily}</button>
+        {gaTools && (
+          <button className={`btn btn-sm ${groupBy === "ga" ? "btn-primary" : "btn-ghost"}`} aria-pressed={groupBy === "ga"} onClick={() => setGroupBy((p) => (p === "ga" ? "" : "ga"))}>🤝 {t.dirGroupByGa}</button>
+        )}
         <button className="btn btn-primary" onClick={openNew}>+ {t.dirNewMember}</button>
       </div>
 
@@ -90,7 +104,16 @@ export default function ScopedMembersPanel({ list, members, setMembers, families
             </thead>
             <tbody>
               {shown.length === 0 && <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--muted)", padding: 28 }}>{t.noRecords}</td></tr>}
-              {!groupByFam
+              {groupBy === "ga"
+                ? groupByGa(shown, gas, t.dirGaNone).flatMap((g) => [
+                    <tr key={`gg-${g.gaId ?? "none"}`} style={{ background: "var(--bg2)" }}>
+                      <td colSpan={5} style={{ fontWeight: 700, fontSize: 12, padding: "6px 10px" }}>
+                        🤝 {g.gaName} <span style={{ opacity: .65, fontWeight: 400 }}>({g.members.length})</span>
+                      </td>
+                    </tr>,
+                    ...g.members.map(row),
+                  ])
+                : groupBy !== "family"
                 ? shown.map(row)
                 : groupByFamily(shown, families).flatMap((g) => [
                     <tr key={`fg-${g.familyId ?? "none"}`} style={{ background: "var(--bg2)" }}>
