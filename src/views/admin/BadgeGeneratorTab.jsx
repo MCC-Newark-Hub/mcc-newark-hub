@@ -1,5 +1,7 @@
 import { useState } from "react";
 import logoSrc from "@/assets/images/logo/icm-logo.png";
+import { useAppDataContext } from "@/context/AppDataContext";
+import { liveBadgeRegs } from "@/lib/badgeData";
 
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
@@ -185,10 +187,9 @@ export default function BadgeGeneratorTab({ regs, event, rosters, notify }) {
   const [selected, setSelected] = useState([]);
   const [generating, setGenerating] = useState(false);
 
-  const rosterTeamOf = (memberId) =>
-    (rosters || []).find((ro) => ro.eventId === event?.id && (ro.memberIds || []).includes(memberId))?.team || null;
-
-  const active = (regs || []).filter((r) => r.eventId === event?.id && !r.cancelled && !r.waitlisted);
+  const data = useAppDataContext();
+  // Badges show the live directory data and the event rosters, not the copy saved on each registration.
+  const active = liveBadgeRegs((regs || []).filter((r) => r.eventId === event?.id && !r.cancelled && !r.waitlisted), { members: data?.members, rosters: rosters || data?.rosters, teams: data?.dbTeams });
   const churchOptions = [...new Set(active.map((r) => r.church).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const categoryOptions = [...new Set(active.map((r) => r.category).filter(Boolean))].sort((a, b) => a.localeCompare(b));
 
@@ -220,7 +221,7 @@ export default function BadgeGeneratorTab({ regs, event, rosters, notify }) {
       const parts = badgeName.split(/\s+/);
       const nome = (parts[0] || "").toUpperCase();
       const sobrenome = parts.slice(1).join(" ").toUpperCase();
-      const teamName = rosterTeamOf(r.memberId) || (r.team && r.team !== "Participante" ? r.team : null);
+      const teamName = (r.team && r.team !== "Participante" ? r.team : null);
       const equipe = teamName ? teamName.toUpperCase() : "PARTICIPANTE";
       const checkinUrl = `${window.location.origin}?checkin=${r.regNumber}`;
       return [nome, sobrenome, equipe, r.category || "", churchCity(r.church), r.regNumber || "", local, mesEAno, checkinUrl];
@@ -252,7 +253,7 @@ export default function BadgeGeneratorTab({ regs, event, rosters, notify }) {
       }
       const doc = new JsPDF({ orientation: "landscape", unit: "pt", format: [144, 216] });
       toGenerate.forEach((r, idx) => {
-        const resolvedTeam = rosterTeamOf(r.memberId) || (r.team && r.team !== "Participante" ? r.team : "");
+        const resolvedTeam = (r.team && r.team !== "Participante" ? r.team : "");
         drawBadge(doc, { ...r, team: resolvedTeam }, event, idx === 0, qrMap[r.id]);
       });
       const filename = `crachas-${(event?.name || "evento").replace(/\s+/g, "-").toLowerCase()}.pdf`;
@@ -341,7 +342,7 @@ export default function BadgeGeneratorTab({ regs, event, rosters, notify }) {
                   <td><input type="checkbox" checked={selected.includes(r.id)} onChange={() => toggleOne(r.id)} /></td>
                   <td style={{ fontWeight: 500 }}>{r.memberName}</td>
                   <td><span className="badge badge-blue">{r.category}</span></td>
-                  <td style={{ fontSize: 12 }}>{(() => { const t = rosterTeamOf(r.memberId) || (r.team && r.team !== "Participante" ? r.team : null); return t || <span style={{ color: "var(--muted)" }}>—</span>; })()}</td>
+                  <td style={{ fontSize: 12 }}>{(() => { const t = (r.team && r.team !== "Participante" ? r.team : null); return t || <span style={{ color: "var(--muted)" }}>—</span>; })()}</td>
                   <td style={{ fontSize: 12 }}>{r.church}</td>
                 </tr>
               ))}

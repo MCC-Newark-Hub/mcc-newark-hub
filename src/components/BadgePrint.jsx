@@ -1,8 +1,13 @@
 import { useState } from "react";
 import QRCode from "qrcode";
 import logoSrc from "@/assets/images/logo/icm-logo.png";
+import { useAppDataContext } from "@/context/AppDataContext";
+import { liveBadgeRegs } from "@/lib/badgeData";
 
-export default function BadgePrint({ regs, event, lang }) {
+// The badges always show the live directory data (name, church, category, team), not the copy saved on the registration.
+export default function BadgePrint({ regs: savedRegs, event, lang }) {
+  const data = useAppDataContext();
+  const regs = liveBadgeRegs(savedRegs, { members: data?.members, rosters: data?.rosters, teams: data?.dbTeams });
   const [generating, setGenerating] = useState(false);
   const [pdfDone, setPdfDone] = useState(false);
   const [pdfError, setPdfError] = useState(false);
