@@ -43,6 +43,8 @@ import { syncRegistrationNames, syncMemberToRegistrations } from "@/lib/syncMemb
 import { groupByFamily, familyIdOf } from "@/lib/family";
 import PauseControl from "@/components/PauseControl";
 import AcessibilidadeField from "@/components/directory/AcessibilidadeField";
+import NoGroupConfirm, { NoGroupTag } from "@/components/directory/NoGroupConfirm";
+import { isHubChurch, missingHubGroup } from "@/lib/hubGroup";
 import StaffContactEditor from "@/components/StaffContactEditor";
 import { isCiaCategory } from "@/lib/acessibilidade";
 import { leadersMayRegisterWhenPaused } from "@/lib/teamRegistration";
@@ -1295,6 +1297,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
   const [filterGender, setFilterGender] = useState(""); // "" | "M" | "F"
   const [editing, setEditing] = useState(null);
   const [formData, setFormData] = useState({});
+  const [askNoGroup, setAskNoGroup] = useState(null); // save callback waiting for "Salvar sem grupo"
   const [deleting, setDeleting] = useState(null); // { ids:[], label:"" }
   const [instSort, setInstSort] = useState("order"); // Instrumentos: "order" | "name"
   const [memberView, setMemberView] = useViewMode("dir_members");
@@ -1690,7 +1693,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
         const renderMemberCard = (m) => (
           <InfoCard
             key={m.id}
-            title={<>{(m.firstName && m.lastName) ? `${m.firstName} ${m.lastName}` : m.name}{m.isGuest && <span className="badge badge-gray" style={{ fontSize: 10, marginLeft: 6 }}>Visitante</span>}</>}
+            title={<>{(m.firstName && m.lastName) ? `${m.firstName} ${m.lastName}` : m.name}{m.isGuest && <span className="badge badge-gray" style={{ fontSize: 10, marginLeft: 6 }}>Visitante</span>}{missingHubGroup(m, churches) && <NoGroupTag />}</>}
             code={m.badgeName && m.badgeName !== m.name ? `🏷 ${m.badgeName}` : null}
             meta={<>
               <span>{m.church || "—"}</span>
@@ -1717,6 +1720,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
             <td style={{ fontWeight: 500 }}>
               <span>{(m.firstName && m.lastName) ? `${m.firstName} ${m.lastName}` : m.name}</span>
               {m.isGuest && <span className="badge badge-gray" style={{ fontSize: 9, marginLeft: 5, verticalAlign: "middle" }}>Visitante</span>}
+              {missingHubGroup(m, churches) && <NoGroupTag />}
             </td>
             <td style={{ color: "var(--muted)", fontSize: 12 }}>{m.badgeName}</td>
             <td><span className="badge badge-gray">{m.gender}</span></td>
@@ -1876,7 +1880,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
                       </div>
                     )}
                     <div>
-                      <label>GA (Grupo de Assistência){churches.find((c) => c.display === formData.church)?.is_hub ? " *" : " (opcional)"}</label>
+                      <label>GA (Grupo de Assistência){!isHubChurch(formData.church, churches) && " (opcional)"}{isHubChurch(formData.church, churches) && !formData.gaId && <NoGroupTag />}</label>
                       <SearchSelect
                         value={formData.gaId || ""}
                         onSelect={(v) => setFormData({ ...formData, gaId: v })}
@@ -1946,7 +1950,7 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
                     <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setEditing(null)}>Cancelar</button>
                     <button className="btn btn-primary" style={{ flex: 2 }} disabled={saving} onClick={() => {
                       if (!formData.name?.trim() && !formData.firstName?.trim()) { notify("Nome obrigatório."); return; }
-                      if (churches.find((c) => c.display === formData.church)?.is_hub && !formData.gaId) { notify("Grupo é obrigatório para igrejas do Pólo."); return; }
+                      const save = () => {
                       const fullName = formData.name?.trim() || ((formData.firstName || '') + ' ' + (formData.lastName || '')).trim();
                       const row = { name: fullName, first_name: formData.firstName || null, last_name: formData.lastName || null, badge_name: formData.badgeName || fullName, gender: formData.gender || "M", category: formData.category || "Adulto", church: formData.church || "", ...memberRoleFields(formData.roles), family_id: formData.familyId || null, ga_id: formData.gaId || null, allergies: formData.allergies || null, special_needs: formData.specialNeeds || null, acessibilidade: isCiaCategory(formData.category || "Adulto") && !!formData.acessibilidade, notes: formData.notes || null, is_guest: formData.isGuest || false, invited_by: formData.isGuest ? (formData.invitedBy || null) : null, translation_languages: formData.translationLanguages || [], voice_type: formData.voiceType || null, ...(formData.voiceLowestNote ? { voice_lowest_note: formData.voiceLowestNote } : {}), ...(formData.voiceHighestNote ? { voice_highest_note: formData.voiceHighestNote } : {}), instruments: formData.instruments || [], ...(formData.immigrationStatus ? { immigration_status: formData.immigrationStatus } : {}) };
                       if (isNew) {
@@ -1960,10 +1964,17 @@ export function AdminDirectory({ churches, setChurches, members, setMembers, fam
                       if (!isNew) {
                         syncMemberToRegistrations({ memberId: editing.id, memberName: fullName, badgeName: row.badge_name, category: row.category, church: row.church, acessibilidade: row.acessibilidade, setRegs });
                       }
+                      };
+                      // A Pólo church member should have a group: not required, but ask before saving without one.
+                      if (isHubChurch(formData.church, churches) && !formData.gaId) { setAskNoGroup(() => save); return; }
+                      save();
                     }}>{saving ? "Salvando…" : "Salvar"}</button>
                   </div>
                 </div>
               </div>
+            )}
+            {askNoGroup && (
+              <NoGroupConfirm onCancel={() => setAskNoGroup(null)} onSave={() => { const save = askNoGroup; setAskNoGroup(null); save(); }} />
             )}
             {deleting && <ConfirmDelete label={deleting.label} count={deleting.ids.length}
               onCancel={() => setDeleting(null)}

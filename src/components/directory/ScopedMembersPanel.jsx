@@ -8,6 +8,8 @@ import MemberEditModal from "@/components/directory/MemberEditModal";
 import { newMemberForm, memberToForm } from "@/lib/memberForm";
 import { groupByFamily, familyIdOf } from "@/lib/family";
 import { GA_NONE, filterByGa, groupByGa } from "@/lib/gaGroups";
+import { missingHubGroup } from "@/lib/hubGroup";
+import { NoGroupTag } from "@/components/directory/NoGroupConfirm";
 
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
@@ -56,7 +58,7 @@ export default function ScopedMembersPanel({ gaTools = false, list, members, set
   const row = (m) => (
     <tr key={m.id}>
       <td>
-        <div style={{ fontWeight: 600 }}>{m.name}</div>
+        <div style={{ fontWeight: 600 }}>{m.name}{missingHubGroup(m, churches) && <NoGroupTag />}</div>
         {m.badgeName && m.badgeName !== m.name && <div style={{ fontSize: 11, color: "var(--muted)" }}>🏷 {m.badgeName}</div>}
       </td>
       <td><RoleBadges member={m} /></td>
