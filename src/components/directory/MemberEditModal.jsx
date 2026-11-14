@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { CATEGORIES } from "@/constants";
 import { sb } from "@/lib/supabase";
 import { mapMember } from "@/hooks/useAppData";
@@ -11,6 +12,8 @@ import { syncMemberToRegistrations } from "@/lib/syncMemberName";
 import StaffContactEditor from "@/components/StaffContactEditor";
 import AcessibilidadeField from "@/components/directory/AcessibilidadeField";
 import { isCiaCategory } from "@/lib/acessibilidade";
+import { isHubChurch as hubChurch } from "@/lib/hubGroup";
+import NoGroupConfirm, { NoGroupTag } from "@/components/directory/NoGroupConfirm";
 
 // Church-locked member editor: the acting user's church is always the value written to
 // `members.church`, regardless of what's shown/typed elsewhere — mirrors GroupsPanel's
@@ -33,24 +36,25 @@ export default function MemberEditModal({
   setRegs,
   logAudit,
 }) {
+  const [askNoGroup, setAskNoGroup] = useState(false);
   if (!editingMember) return null;
 
-  // Hub churches (Newark, Philadelphia, New York, Toms River) must have every member
-  // in a group — outside the hub, a group may not exist yet, so it stays optional.
-  const isHubChurch = (churches || []).find((c) => c.display === defaultChurch)?.is_hub;
+  // Hub churches (Newark, Philadelphia, New York, Toms River) should have every member in a group. It is not
+  // required: saving without one asks first, and the lists flag the member (NoGroupTag) until a group is set.
+  const isHubChurch = hubChurch(defaultChurch, churches);
 
   const MINOR_CATEGORIES = ["0-3", "Criança", "Intermediário", "Adolescente"];
   const isMinor = MINOR_CATEGORIES.includes(editingMember.category);
   const isCia = isCiaCategory(editingMember.category);
 
-  const saveMember = async () => {
+  const saveMember = async (withoutGroup = false) => {
     const fn = editingMember.firstName.trim();
     const ln = editingMember.lastName.trim();
     const fullName = (fn + " " + ln).trim();
     if (!fullName) { notify("Nome é obrigatório."); return; }
-    if (isHubChurch && !editingMember.gaId) { notify("Grupo é obrigatório para igrejas do Pólo."); return; }
     if (isMinor && !editingMember.emergencyContact?.trim()) { notify("Contato de emergência é obrigatório para menores."); return; }
     if (editingMember.familyId === "__new__" && !newFamilyName.trim()) { notify("Nome da família é obrigatório."); return; }
+    if (isHubChurch && !editingMember.gaId && !withoutGroup) { setAskNoGroup(true); return; }
     setSavingMember(true);
     try {
       const row = {
@@ -168,7 +172,7 @@ export default function MemberEditModal({
           <p style={{ fontSize: 11, color: "var(--muted)", margin: 0 }}>Telefone e e-mail podem ser adicionados depois de salvar o membro.</p>
         )}
         <div>
-          <label>Grupo (GA){isHubChurch ? " *" : " (opcional)"}</label>
+          <label>Grupo (GA){!isHubChurch && " (opcional)"}{isHubChurch && !editingMember.gaId && <NoGroupTag />}</label>
           <SearchSelect
             value={editingMember.gaId}
             onSelect={(v) => setEditingMember({ ...editingMember, gaId: v })}
@@ -281,8 +285,11 @@ export default function MemberEditModal({
       </div>
       <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
         <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setEditingMember(null)} disabled={savingMember}>Cancelar</button>
-        <button className="btn btn-primary" style={{ flex: 2 }} onClick={saveMember} disabled={savingMember}>{savingMember ? "Salvando…" : "Salvar"}</button>
+        <button className="btn btn-primary" style={{ flex: 2 }} onClick={() => saveMember()} disabled={savingMember}>{savingMember ? "Salvando…" : "Salvar"}</button>
       </div>
+      {askNoGroup && (
+        <NoGroupConfirm onCancel={() => setAskNoGroup(false)} onSave={() => { setAskNoGroup(false); saveMember(true); }} />
+      )}
     </Modal>
   );
 }
