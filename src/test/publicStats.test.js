@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { summarizeStats, daysUntil, shortChurch, TOP_CHURCHES } from "@/lib/publicStats";
+import { summarizeStats, daysUntil, shortChurch } from "@/lib/publicStats";
 
 const base = { event_id: "EVT003", name: "Seminário", capacity: 150, active: 0, waitlist: 0, by_category: {}, by_church: {} };
 const s = (over, today = "2026-11-02") => summarizeStats({ ...base, ...over }, today);
@@ -32,13 +32,15 @@ describe("summarizeStats", () => {
     expect(r.categories.at(-1)).toEqual({ key: "Adulto", count: 70, waitlist: 3 });
   });
 
-  it("shows the biggest churches and sums the rest as others", () => {
-    const by_church = Object.fromEntries(Array.from({ length: TOP_CHURCHES + 2 }, (_, i) => [`Church ${i}, NJ`, 20 - i]));
-    by_church[""] = 1;
+  it("lists every church, biggest first, with the ones without a church last", () => {
+    const by_church = Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`Church ${i}, NJ`, 20 - i]));
+    by_church["Provo, UT"] = 1;
+    by_church[""] = 2;
     const r = s({ by_church });
-    expect(r.churches).toHaveLength(TOP_CHURCHES + 1);
+    expect(r.churches).toHaveLength(14);
     expect(r.churches[0]).toEqual({ name: "Church 0, NJ", count: 20 });
-    expect(r.churches.at(-1)).toEqual({ name: "", count: 12 + 11 + 1, other: true });
+    expect(r.churches.at(-2)).toEqual({ name: "Provo, UT", count: 1 });
+    expect(r.churches.at(-1)).toEqual({ name: "", count: 2, other: true });
   });
 
   it("carries no names or money", () => {
