@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import QRCode from "qrcode";
 import { Maximize } from "lucide-react";
@@ -10,10 +10,42 @@ import { todayLocal } from "@/lib/prayerSlots";
 const POLL_MS = 20000;
 const REGISTER_PATH = "/events/register";
 const STAGE_COLOR = { open: "var(--ok)", filling: "var(--warn)", almost: "var(--danger)", full: "var(--danger)" };
+const FIT_MIN_WIDTH = 900; // phones and narrow windows scroll; wider screens (TV, projector, laptop) fit without scrolling
+
+// Shrinks the card (CSS zoom) until it fits the window height, widening it by the same factor so it still fills the
+// width. Runs on load, on every resize and whenever the numbers change (more churches = taller list).
+function useFitToScreen(ref, deps) {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const apply = (z) => {
+      el.style.zoom = z === 1 ? "" : String(z);
+      el.style.width = z === 1 ? "" : `${100 / z}%`;
+      el.style.maxWidth = z === 1 ? "" : `${1800 / z}px`;
+    };
+    const fit = () => {
+      apply(1);
+      if (window.innerWidth < FIT_MIN_WIDTH) return;
+      // Measure the whole page: shrink until it no longer scrolls (widening the card reflows it, so a few passes).
+      let z = 1;
+      for (let i = 0; i < 4; i++) {
+        const over = document.documentElement.scrollHeight / window.innerHeight;
+        if (over <= 1.002) break;
+        z = Math.max(0.4, (z / over) * 0.995);
+        apply(z);
+      }
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    document.fonts?.ready?.then(fit).catch(() => {});
+    return () => window.removeEventListener("resize", fit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+}
 
 // Sized for a projector across the room, still usable on a phone.
 const CSS = `
-.ps-page{min-height:100vh;box-sizing:border-box;background:linear-gradient(160deg,var(--icm-crimson-deep) 0%,var(--icm-crimson) 50%,var(--icm-navy-deep) 100%);padding:clamp(8px,min(2vw,1.6vh),32px) 16px;display:flex;justify-content:center}
+.ps-page{min-height:100vh;min-height:100dvh;box-sizing:border-box;background:linear-gradient(160deg,var(--icm-crimson-deep) 0%,var(--icm-crimson) 50%,var(--icm-navy-deep) 100%);padding:clamp(8px,min(2vw,1.6vh),32px) 16px;display:flex;justify-content:center}
 .ps-card{background:var(--card);color:var(--text);border-radius:20px;width:100%;max-width:1800px;padding:clamp(16px,min(2vw,3vh),40px);box-shadow:var(--shadow-lg);display:flex;flex-direction:column;gap:clamp(10px,min(1.4vw,2.2vh),28px)}
 .ps-head{display:flex;align-items:center;gap:clamp(10px,1.4vw,24px);flex-wrap:wrap}
 .ps-head h1{font-family:'Lora',Georgia,serif;font-size:clamp(22px,2.6vw,48px);margin:0;line-height:1.1}
@@ -38,7 +70,7 @@ const CSS = `
 .ps-qr div{font-weight:800;font-size:clamp(14px,1.4vw,26px)}
 .ps-qr small{display:block;font-weight:600;color:var(--muted);font-size:clamp(11px,.9vw,16px)}
 .ps-rows{display:flex;flex-direction:column;gap:clamp(6px,.7vw,12px)}
-.ps-row{display:grid;grid-template-columns:minmax(0,9em) minmax(0,1fr) auto;align-items:center;gap:10px;font-size:clamp(13px,1.2vw,22px)}
+.ps-row{display:grid;grid-template-columns:minmax(0,14em) minmax(0,1fr) auto;align-items:center;gap:10px;font-size:clamp(13px,1.2vw,22px)}
 .ps-row .ps-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
 .ps-row .ps-bar{height:clamp(10px,1.1vw,20px);border-radius:999px;background:var(--border);overflow:hidden}
 .ps-row .ps-bar i{display:block;height:100%;width:100%;background:var(--primary);transform-origin:left center;transition:transform .9s cubic-bezier(.2,.8,.2,1)}
@@ -79,6 +111,7 @@ export default function PublicStatsView({ lang = "pt", setLang }) {
   const [state, setState] = useState({ status: "loading", data: null });
   const [qr, setQr] = useState("");
   const [isFull, setIsFull] = useState(false);
+  const cardRef = useRef(null);
   const registerUrl = `${window.location.origin}${REGISTER_PATH}`;
 
   useEffect(() => {
@@ -127,11 +160,12 @@ export default function PublicStatsView({ lang = "pt", setLang }) {
   const churchItems = (d?.churches || []).map((c) => ({ key: c.name || "_other", label: c.other ? tt.statsOtherChurches : shortChurch(c.name), count: c.count }));
   const catItems = (d?.categories || []).map((c) => ({ key: c.key || "_other", label: c.key ? tt.statsCategories[c.key] || c.key : tt.statsOtherCategory, count: c.count, waitlist: c.waitlist }));
   const maxOf = (items) => items.reduce((m, it) => Math.max(m, it.count), 0);
+  useFitToScreen(cardRef, [state, isFull, lang]);
 
   return (
     <div className="ps-page">
       <style>{CSS}</style>
-      <div className="ps-card">
+      <div className="ps-card" ref={cardRef}>
         <div className="ps-head">
           <ICMLogo height={48} />
           <div>

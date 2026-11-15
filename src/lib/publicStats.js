@@ -9,7 +9,6 @@ export async function fetchPublicStats(eventId) {
   return { stats: data || null, error: null };
 }
 
-export const TOP_CHURCHES = 8;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const count = (v) => Math.max(0, Number(v) || 0);
@@ -56,11 +55,10 @@ export function summarizeStats(stats, today) {
     .map(([name, n]) => ({ name, count: count(n) }))
     .filter((c) => c.count > 0)
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-  // A blank church goes with the rest.
+  // Every church with someone registered is listed; registrations with no church come last, as one row.
   const named = sorted.filter((c) => c.name);
-  const top = named.slice(0, TOP_CHURCHES);
-  const rest = named.slice(TOP_CHURCHES).concat(sorted.filter((c) => !c.name));
-  const churches = rest.length ? [...top, { name: "", count: rest.reduce((s, c) => s + c.count, 0), other: true }] : top;
+  const blank = sorted.filter((c) => !c.name).reduce((s, c) => s + c.count, 0);
+  const churches = blank ? [...named, { name: "", count: blank, other: true }] : named;
 
   return {
     eventId: stats.event_id,
