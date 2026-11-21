@@ -11,6 +11,7 @@ import CapBar from "@/components/CapBar";
 import StatusBadge from "@/components/StatusBadge";
 import RegModal from "@/components/RegModal";
 import DetailModal from "@/components/DetailModal";
+import ExemptConfirm from "@/components/ExemptConfirm";
 import Modal from "@/components/Modal";
 import FamiliesPanel from "@/components/directory/FamiliesPanel";
 import GroupsPanel from "@/components/directory/GroupsPanel";
@@ -98,6 +99,7 @@ function ClerkView(props) {
   const [tab, setTab] = useState("active");
   const [showReg, setShowReg] = useState(false);
   const [detail, setDetail] = useState(null);
+  const [confirmExempt, setConfirmExempt] = useState(null);
   const [viewMode, setViewMode] = useViewMode("clerk_regs");
   const [prefill, setPrefill] = useState(null);
   const [replaceTarget, setReplaceTarget] = useState(null);
@@ -222,6 +224,16 @@ function ClerkView(props) {
     onToWaitlist: props.sendToWaitlist,
     onReplace: (r) => { setReplaceTarget(r); setReplaceSearch(""); setReplaceCandidate(null); },
     replaceLabel: t.actReplaceRequest,
+    onExtend: (r) => {
+      submitApproval({
+        eventId: event.id, memberId: r.memberId, memberName: r.memberName, regId: r.id,
+        type: "deadline_extension", category: r.category, church: r.church, badgeName: r.badgeName,
+        team: r.team, role: r.role, fee: r.fee, requestedBy: user?.name, requestedById: user?.id,
+      });
+      notify(t.extendRequested);
+    },
+    extendLabel: t.actRequestExtend,
+    onExempt: setConfirmExempt,
     onResend: handleResend,
   };
 
@@ -489,6 +501,17 @@ function ClerkView(props) {
         </div>
       </div>
       {showReg && <RegModal event={event} members={myMembers} setMembers={setMembers} families={families} gas={gas} dbTeams={dbTeams} dbCategories={dbCategories} dbFunctions={dbFunctions} isFull={isFull} existingRegs={allActive} prefill={prefill} onClose={() => { setShowReg(false); setPrefill(null); }} onSave={(d) => { addReg(d); setShowReg(false); setPrefill(null); }} onRequestOverride={(d) => submitApproval({ ...d, requestedBy: user?.name, requestedById: user?.id })} />}
+      {confirmExempt && (
+        <ExemptConfirm
+          reg={confirmExempt}
+          onCancel={() => setConfirmExempt(null)}
+          onConfirm={() => {
+            updateReg(confirmExempt.id, { exempt: true }, { status: "Isento pelo Pastor", note: "Marcado como isento pelo pastor" });
+            notify(t.exemptDone.replace("{name}", confirmExempt.memberName || ""));
+            setConfirmExempt(null);
+          }}
+        />
+      )}
       {detail && (
         <DetailModal
           reg={detail}

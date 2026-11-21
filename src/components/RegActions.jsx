@@ -1,4 +1,4 @@
-import { Check, Printer, Ticket, RefreshCw, Mail, Trash2, Pencil, UserX, Footprints, Eraser } from "lucide-react";
+import { Check, Printer, Ticket, RefreshCw, Mail, Trash2, Pencil, UserX, Footprints, Eraser, CalendarClock, BadgeCheck } from "lucide-react";
 import { useT } from "@/i18n/strings";
 import MoreMenu from "@/components/MoreMenu";
 import { usePaymentAccess } from "@/context/PaymentAccessContext";
@@ -8,7 +8,7 @@ import { usePaymentAccess } from "@/context/PaymentAccessContext";
 // Each handler is optional; an action without its handler is not offered.
 export default function RegActions({
   reg: r, canPay = true, onPaid, onPresence, onPromote, onEdit, onPrintBadge,
-  onToWaitlist, onReplace, replaceLabel, onResend, resending = false, onDelete, compact = false,
+  onToWaitlist, onReplace, replaceLabel, onExtend, extendLabel, onExempt, onResend, resending = false, onDelete, compact = false,
 }) {
   const t = useT();
   const payment = usePaymentAccess();
@@ -24,6 +24,8 @@ export default function RegActions({
     onPresence && live && presence !== "absent" && { key: "absent", label: t.actMarkAbsent, icon: <UserX size={14} />, onClick: () => onPresence(r.id, "absent") },
     onPresence && live && presence !== "walk_in" && { key: "walkin", label: t.actMarkWalkIn, icon: <Footprints size={14} />, onClick: () => onPresence(r.id, "walk_in") },
     onPresence && live && presence !== "unknown" && { key: "clear", label: t.actClearPresence, icon: <Eraser size={14} />, onClick: () => onPresence(r.id, "unknown") },
+    onExtend && pending && { key: "extend", label: extendLabel || t.actExtend, icon: <CalendarClock size={14} />, onClick: () => onExtend(r) },
+    onExempt && pending && { key: "exempt", label: t.actExempt, icon: <BadgeCheck size={14} />, onClick: () => onExempt(r) },
     onToWaitlist && live && { key: "waitlist", label: t.actToWaitlist, icon: <Ticket size={14} />, onClick: () => onToWaitlist(r.id) },
     onReplace && live && { key: "replace", label: replaceLabel || t.actReplace, icon: <RefreshCw size={14} />, onClick: () => onReplace(r) },
     onResend && { key: "resend", label: resending ? "…" : t.actResend, icon: <Mail size={14} />, disabled: resending, onClick: () => onResend(r) },

@@ -47,6 +47,30 @@ describe("registration actions", () => {
     expect(screen.queryByRole("button", { name: /Presente/ })).toBeNull();
   });
 
+  it("offers Estender prazo and Isento pelo pastor only while payment is pending", () => {
+    const onExtend = vi.fn(), onExempt = vi.fn();
+    const { rerender } = render(<RegActions reg={pending} onExtend={onExtend} onExempt={onExempt} />);
+    fireEvent.click(screen.getByRole("button", { name: /Mais ações — Ana/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Estender prazo" }));
+    expect(onExtend).toHaveBeenCalledWith(pending);
+    fireEvent.click(screen.getByRole("button", { name: /Mais ações — Ana/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Isento pelo pastor" }));
+    expect(onExempt).toHaveBeenCalledWith(pending);
+
+    rerender(<RegActions reg={pending} onExtend={onExtend} extendLabel="Solicitar extensão de prazo" onExempt={onExempt} />);
+    fireEvent.click(screen.getByRole("button", { name: /Mais ações — Ana/ }));
+    expect(screen.getByRole("menuitem", { name: "Solicitar extensão de prazo" })).toBeTruthy();
+
+    for (const r of [{ ...pending, paid: true }, { ...pending, exempt: true }, { ...pending, cancelled: true }]) {
+      rerender(<RegActions reg={r} onExtend={onExtend} onExempt={onExempt} onEdit={vi.fn()} />);
+      const more = screen.getByRole("button", { name: /Mais ações — Ana/ });
+      if (!screen.queryByRole("menu")) fireEvent.click(more);
+      const names = screen.getAllByRole("menuitem").map((b) => b.textContent);
+      expect(names).not.toContain("Estender prazo");
+      expect(names).not.toContain("Isento pelo pastor");
+    }
+  });
+
   it("can't mark paid when the profile may not", () => {
     render(<RegActions reg={pending} canPay={false} onPaid={vi.fn()} />);
     expect(screen.queryByRole("button", { name: "✓ Pago" })).toBeNull();
