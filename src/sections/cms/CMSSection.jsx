@@ -10,6 +10,8 @@ import ImmigrationReport from "@/components/directory/ImmigrationReport";
 import ScopedMembersPanel from "@/components/directory/ScopedMembersPanel";
 import FamiliesPanel from "@/components/directory/FamiliesPanel";
 import GroupsPanel from "@/components/directory/GroupsPanel";
+import OrgChartPanel from "@/components/directory/OrgChartPanel";
+import { ORG_CHART_USER_IDS } from "@/constants";
 import { scopedDirectory } from "@/lib/directoryStats";
 import { AdminDirectory, AdminGA, AdminImport } from "@/views/AdminView";
 
@@ -23,7 +25,7 @@ export default function CMSSection({ lang }) {
   if (roles.includes("admin")) return <CMSAdmin props={props} lang={lang} />;
   if (roles.includes("clerk")) return <CMSScoped props={props} lang={lang} kind="clerk" />;
   if (roles.includes("ga_leader") && !roles.includes("pastor")) return <CMSScoped props={props} lang={lang} kind="ga_leader" />;
-  if (roles.includes("pastor")) return <CMSOverviewOnly lang={lang} />;
+  if (roles.includes("pastor")) return <CMSOverviewOnly props={props} lang={lang} />;
   return <CMSPlaceholder lang={lang} />;
 }
 
@@ -78,11 +80,34 @@ function CMSScoped({ props, lang, kind }) {
   );
 }
 
-function CMSOverviewOnly({ lang }) {
-  useTopbarContent({ title: lang === "en" ? "Directory" : "Diretório" });
+function CMSOverviewOnly({ props, lang }) {
+  const pt = lang !== "en";
+  const [sec, setSec] = useState("overview");
+  useTopbarContent({ title: pt ? "Diretório" : "Directory" });
+  // The pastors on ORG_CHART_USER_IDS also get the Organograma (read-only), same as in Eventos.
+  const showOrg = ORG_CHART_USER_IDS.includes(props.user?.id);
+  if (!showOrg) {
+    return (
+      <div className="app-shell">
+        <div className="main-scroll"><div className="page-pad"><OverviewPanel /></div></div>
+      </div>
+    );
+  }
+  const navItems = [
+    { id: "overview", icon: <LayoutDashboard size={16} />, label: pt ? "Visão Geral" : "Overview" },
+    { id: "org", icon: <Network size={16} />, label: pt ? "Organograma" : "Org chart" },
+  ];
   return (
     <div className="app-shell">
-      <div className="main-scroll"><div className="page-pad"><OverviewPanel /></div></div>
+      <div className="body-with-sidebar">
+        <Sidebar navItems={navItems} activeId={sec} onSelect={setSec} />
+        <div className="main-scroll">
+          <div className="page-pad">
+            {sec === "overview" && <OverviewPanel />}
+            {sec === "org" && <OrgChartPanel churches={props.churches} members={props.members} />}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -17,6 +17,7 @@ import { fetchContactStatus, staffGetContacts } from "@/lib/contactApi";
 import { contactExportRows, CONTACT_EXPORT_HEADERS, toCsv } from "@/lib/contactExport";
 import ContactChangeRequests from "@/components/ContactChangeRequests";
 import RegActions from "@/components/RegActions";
+import ExemptConfirm from "@/components/ExemptConfirm";
 import InfoCard from "@/components/InfoCard";
 import ViewToggle from "@/components/ViewToggle";
 import { useViewMode } from "@/hooks/useViewMode";
@@ -53,6 +54,7 @@ export default function RegistrationsTab(props) {
   } = props;
   const liveChurchOf = (r) => (members || []).find((m) => m.id === r.memberId)?.church || r.church || "—";
   const [confirmDelete, setConfirmDelete] = useState(null); // single reg
+  const [confirmExempt, setConfirmExempt] = useState(null);
   const [confirmBulkCancel, setConfirmBulkCancel] = useState(false);
   const [bulkSel, setBulkSel] = useState([]);
   const [replaceTarget, setReplaceTarget] = useState(null);
@@ -163,6 +165,16 @@ export default function RegistrationsTab(props) {
   }).map((r) => ({ ...r, statusSort: statusSortOf(r) }));
   const { sorted: filtered, Th } = useSortable(preFiltered, "memberName");
   // Same actions for the table rows and the cards.
+  // Extends each registration's payment deadline by the event's extension days (default 5), with a timeline note.
+  const pendingPayment = (r) => r && !r.paid && !r.exempt && !r.cancelled && !r.waitlisted;
+  const extendDeadlines = (list) => {
+    const days = event?.paymentExtensionDays ?? event?.payment_extension_days ?? 5;
+    const date = addDays(new Date().toISOString().slice(0, 10), days);
+    list.forEach((r) => updateReg(r.id, { deadlineExtendedTo: date }, { status: "Prazo Estendido", note: "Prazo estendido até " + date }, { silent: true }));
+    return date;
+  };
+  const bulkExtendable = bulkSel.map((id) => all.find((x) => x.id === id)).filter(pendingPayment);
+
   const actionProps = {
     onPaid: (r) => updateReg(r.id, { paid: true }),
     onPresence: updatePresence ? (id, value) => updatePresence(id, value, "manual") : undefined,
@@ -171,6 +183,11 @@ export default function RegistrationsTab(props) {
     onPrintBadge: setBadgeReg,
     onToWaitlist: sendToWaitlist,
     onReplace: (r) => { setReplaceTarget(r); setReplaceSearch(""); setReplaceCandidate(null); },
+    onExtend: (r) => {
+      const date = extendDeadlines([r]);
+      notify && notify(t.extendDone.replace("{name}", r.memberName || "").replace("{date}", date.split("-").reverse().join("/")));
+    },
+    onExempt: setConfirmExempt,
     onResend: handleResend,
     onDelete: setConfirmDelete,
   };
@@ -197,6 +214,15 @@ export default function RegistrationsTab(props) {
               }}>
                 🎫 Lista de espera ({bulkSel.length})
               </button>
+              {bulkExtendable.length > 0 && (
+                <button className="btn btn-ghost btn-sm" onClick={() => {
+                  const date = extendDeadlines(bulkExtendable);
+                  notify && notify(t.extendBulkDone.replace("{n}", bulkExtendable.length).replace("{date}", date.split("-").reverse().join("/")));
+                  setBulkSel([]);
+                }}>
+                  ⏰ {t.actExtend} ({bulkExtendable.length})
+                </button>
+              )}
               <button className="btn btn-warn btn-sm" onClick={() => setConfirmBulkCancel(true)}>
                 🚫 Cancelar {bulkSel.length} selecionado(s)
               </button>
@@ -546,6 +572,17 @@ export default function RegistrationsTab(props) {
             {t.close}
           </button>
         </Modal>
+      )}
+      {confirmExempt && (
+        <ExemptConfirm
+          reg={confirmExempt}
+          onCancel={() => setConfirmExempt(null)}
+          onConfirm={() => {
+            updateReg(confirmExempt.id, { exempt: true }, { status: "Isento pelo Pastor", note: "Marcado como isento pelo pastor" });
+            notify && notify(t.exemptDone.replace("{name}", confirmExempt.memberName || ""));
+            setConfirmExempt(null);
+          }}
+        />
       )}
       {confirmDelete && (
         <div className="modal-bg" onClick={(e) => e.target === e.currentTarget && setConfirmDelete(null)}>
