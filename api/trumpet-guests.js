@@ -5,6 +5,8 @@
 //
 //   POST { action: "list",    year }                         → { guests }
 //   POST { action: "create",  year, gaId, name, phone?, email?, invitedByMemberId?, notes? } → { guest }
+//   POST { action: "import",  year, guests: [{ gaId, name, phone, ... }] } → { guests, skipped }  all or nothing;
+//        rows already on file (same name + phone, guestKey) or repeated in the batch are skipped, not errors
 //   POST { action: "update",  id, gaId, name, ... }          → { guest }
 //   POST { action: "attend",  id, attended }                 → { guest }
 //   POST { action: "delete",  id }                           → { ok: true }
@@ -16,7 +18,7 @@
 //   POST { action: "setEdition", year, reasons, reasonsEn }  → { ok: true }   admin / pastor
 
 import { restClient, currentUser } from "./_lib/auth.js";
-import { listGaIds, summaryGaIds, canManagePanel, toGuest, cleanGuestInput, buildStats, buildSummary } from "../src/lib/trumpets.js";
+import { listGaIds, summaryGaIds, canManagePanel, toGuest, cleanGuestInput, buildStats, buildSummary, guestKey, IMPORT_MAX } from "../src/lib/trumpets.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const COLS = "id,year,church,ga_id,name,phone,email,invited_by_member_id,attended_at,notes,created_at,updated_at";
@@ -110,6 +112,43 @@ export default async function handler(req, res) {
       if (!r.ok || !r.data?.[0]) throw new Error(`guest_create_failed:${r.status}`);
       await audit("trumpet_guest_created", r.data[0].id, fields.ga_id, { year });
       return res.status(200).json({ guest: toGuest(r.data[0]) });
+    }
+
+    if (body.action === "import") {
+      const year = yearOf(body.year);
+      if (!year) return fail(400, "invalid_year");
+      const list = Array.isArray(body.guests) ? body.guests : null;
+      if (!list || !list.length || list.length > IMPORT_MAX) return fail(400, "invalid_import");
+      const cleaned = [];
+      for (let i = 0; i < list.length; i++) {
+        const { error, fields } = cleanGuestInput(list[i] || {});
+        if (error) return res.status(400).json({ error, row: i });
+        if (!allowed.has(fields.ga_id)) return res.status(403).json({ error: "forbidden", row: i });
+        cleaned.push(fields);
+      }
+      const gaIds = [...new Set(cleaned.map((f) => f.ga_id))];
+      const onFile = await fetchAll(rest, `trumpet_guests?year=eq.${year}&ga_id=in.(${[...allowed].join(",")})&select=name,phone,id&order=id`);
+      const seenKeys = new Set(onFile.map((r) => guestKey(r.name, r.phone)));
+      const fresh = cleaned.filter((f) => {
+        const k = guestKey(f.name, f.phone);
+        if (seenKeys.has(k)) return false;
+        seenKeys.add(k);
+        return true;
+      });
+      const skipped = cleaned.length - fresh.length;
+      if (!fresh.length) return res.status(200).json({ guests: [], skipped });
+      // one insert: PostgREST runs it as a single statement, so either every row is saved or none is
+      const r = await rest(`trumpet_guests?select=${COLS}`, {
+        method: "POST",
+        body: fresh.map((f) => ({ ...f, year, church: gaById[f.ga_id].church || "", created_by: by, updated_by: by })),
+        prefer: "return=representation",
+      });
+      if (!r.ok || (r.data || []).length !== fresh.length) throw new Error(`guest_import_failed:${r.status}`);
+      for (const gaId of gaIds) {
+        const count = r.data.filter((x) => x.ga_id === gaId).length;
+        if (count) await audit("trumpet_guests_imported", gaId, gaId, { year, count }); // counts only, no names or phones
+      }
+      return res.status(200).json({ guests: r.data.map(toGuest), skipped });
     }
 
     if (body.action === "update") {

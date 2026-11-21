@@ -1,7 +1,7 @@
 // `npm run dev` has no serverless functions: an in-memory stand-in for api/trumpet-guests.js,
 // seeded from the dev directory. No scope checks (the tab already filters by scope). Dev only.
 import { INIT_GAS, INIT_MEMBERS } from "@/dev/seeds";
-import { toGuest, cleanGuestInput, buildStats, buildSummary } from "@/lib/trumpets";
+import { toGuest, cleanGuestInput, buildStats, buildSummary, guestKey } from "@/lib/trumpets";
 
 const rows = [];
 const goals = [];
@@ -23,6 +23,18 @@ export function devTrumpets(body) {
       const row = { ...fields, id: `dev-${++seq}`, year, church: churchOf(fields.ga_id), attended_at: null, created_at: now(), updated_at: now() };
       rows.push(row);
       return { guest: toGuest(row) };
+    }
+    case "import": {
+      const cleaned = (body.guests || []).map((g) => {
+        const { error, fields } = cleanGuestInput(g);
+        if (error) err(error);
+        return fields;
+      });
+      const keys = new Set(rows.filter((r) => r.year === year).map((r) => guestKey(r.name, r.phone)));
+      const fresh = cleaned.filter((f) => !keys.has(guestKey(f.name, f.phone)) && keys.add(guestKey(f.name, f.phone)));
+      const added = fresh.map((f) => ({ ...f, id: `dev-${++seq}`, year, church: churchOf(f.ga_id), attended_at: null, created_at: now(), updated_at: now() }));
+      rows.push(...added);
+      return { guests: added.map(toGuest), skipped: cleaned.length - fresh.length };
     }
     case "update": {
       const row = find(body.id);

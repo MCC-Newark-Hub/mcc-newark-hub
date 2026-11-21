@@ -268,3 +268,16 @@ This **replaces Revision 2 items 3 and 5** and changes the original access rules
 
 Data: migration 054 (still unapplied) keeps `trumpet_guests` and `trumpet_goals` and adds
 `trumpet_editions (year int PK, reasons text, reasons_en text, updated_at, updated_by)`, server-only.
+
+---
+
+## Revision 4 (2026-11-21) — Importar CSV
+
+GA leaders can add many guests at once: "Importar CSV" on their list opens a modal → pick a file → preview
+(valid / with errors and why / duplicate) → "Importar N convidados" → summary. Columns are matched by header in PT
+or EN (`mapColumns`, `src/lib/trumpetsImport.js`); name and phone are required, GA defaults to the GA on screen,
+"Convidado por" is a member of the GA's church by name. Duplicate = same `guestKey` (folded name + last 10 phone
+digits), against the year's list or an earlier line. The server action `import { year, guests }` (≤ 500) re-runs
+`cleanGuestInput` and the GA scope on every row and refuses the whole batch on any error, skips rows already on
+file, inserts in one request and audits only counts per GA. The parser (`src/lib/csv.js`) is shared with
+Diretório › Importar.

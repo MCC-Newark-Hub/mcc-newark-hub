@@ -48,6 +48,7 @@ import { isHubChurch, missingHubGroup } from "@/lib/hubGroup";
 import StaffContactEditor from "@/components/StaffContactEditor";
 import { isCiaCategory } from "@/lib/acessibilidade";
 import { leadersMayRegisterWhenPaused } from "@/lib/teamRegistration";
+import { parseCsvObjects, decodeCsvBuffer } from "@/lib/csv";
 
 // Accent-insensitive search: "joao" matches "João"
 const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -620,49 +621,6 @@ const CSV_TEMPLATES = {
   },
 };
 
-function sanitizeText(s) {
-  if (typeof s !== "string") return s;
-  var result = "";
-  for (var i = 0; i < s.length; i++) {
-    var c = s.charCodeAt(i);
-    // Smart single quotes (U+2018, U+2019) -> straight apostrophe
-    if (c === 0x2018 || c === 0x2019) { result += "'"; continue; }
-    // Smart double quotes (U+201C, U+201D) -> straight double quote
-    if (c === 0x201C || c === 0x201D) { result += '"'; continue; }
-    // Unicode replacement character (U+FFFD) -> skip
-    if (c === 0xFFFD) { continue; }
-    result += s[i];
-  }
-  return result;
-}
-function splitCSVLine(line) {
-  var cells = [], cur = "", inQ = false;
-  for (var i = 0; i < line.length; i++) {
-    var ch = line[i];
-    if (ch === '"') {
-      if (inQ && line[i+1] === '"') { cur += '"'; i++; } // escaped quote
-      else inQ = !inQ;
-    } else if (ch === ',' && !inQ) {
-      cells.push(cur.trim()); cur = "";
-    } else cur += ch;
-  }
-  cells.push(cur.trim());
-  return cells;
-}
-function parseCSV(text) {
-  text = sanitizeText(text);
-  var lines = text.trim().split(/\r?\n/);
-  if (lines.length < 2) return [];
-  var headers = splitCSVLine(lines[0]).map(h => h.replace(/^"|"$/g, "").trim());
-  var rows = [];
-  for (var i = 1; i < lines.length; i++) {
-    var cells = splitCSVLine(lines[i]).map(c => sanitizeText(c.replace(/^"|"$/g, "").trim()));
-    if (cells.every(c => !c)) continue;
-    var obj = {}; headers.forEach((h, j) => { obj[h] = cells[j] || ""; });
-    rows.push(obj);
-  }
-  return rows;
-}
 function makeCSV(headers,rows) { var lines=[headers.join(",")]; rows.forEach(row=>{lines.push(headers.map(h=>{var v=String(row[h]||""); return v.includes(",")?'"'+v+'"':v;}).join(","));}); return lines.join("\n"); }
 function downloadCSV(filename,text) { var blob=new Blob([text],{type:"text/csv"}); var url=URL.createObjectURL(blob); var a=document.createElement("a"); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url); }
 
@@ -680,15 +638,9 @@ export function AdminImport({ members, setMembers, families, setFamilies, gas, s
     var file = e.target.files[0]; if (!file) return;
     var reader = new FileReader();
     reader.onload = (ev) => {
-      // Try UTF-8 first; if replacement chars appear, re-decode as Windows-1252
-      var buffer = ev.target.result;
-      var text;
-      try {
-        text = new TextDecoder("utf-8", { fatal: true }).decode(buffer);
-      } catch (_) {
-        text = new TextDecoder("windows-1252").decode(buffer);
-      }
-      var rows = parseCSV(text);
+      // UTF-8 when it decodes cleanly, else Windows-1252 (old Excel)
+      var text = decodeCsvBuffer(ev.target.result);
+      var rows = parseCsvObjects(text);
       setPreview({ rows: rows.map((row, i) => ({ row, errs: tpl.validate(row, { churches }), idx: i })), template: activeTab });
       setImportDone(null);
     };

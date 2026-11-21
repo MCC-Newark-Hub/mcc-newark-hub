@@ -73,6 +73,14 @@ export function cleanGuestInput(body = {}) {
   return { fields: { ga_id: gaId, name, phone, email: email || null, invited_by_member_id: inviter || null, notes: notes || null } };
 }
 
+// Same person for the duplicate check of an import: name without accents / case / extra spaces, and the phone's
+// last 10 digits (so "+1 (973) 555-0101" and "973-555-0101" match).
+export const foldText = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+export const guestKey = (name, phone) => `${foldText(name)}|${String(phone || "").replace(/\D/g, "").slice(-10)}`;
+
+// Most guests one import may send (the server enforces it too).
+export const IMPORT_MAX = 500;
+
 export function sumTotals(guests = []) {
   const invited = guests.length;
   const attended = guests.filter((g) => g.attendedAt).length;

@@ -1,20 +1,12 @@
 import { useEffect, useState } from "react";
-import { Plus, Download } from "lucide-react";
+import { Plus, Download, FileUp } from "lucide-react";
 import { fill } from "@/i18n/strings";
 import { guestsCsv } from "@/lib/trumpets";
 import { listGuests, createGuest, updateGuest, setAttended, deleteGuest } from "@/lib/trumpetsApi";
 import TrumpetGuestModal from "./TrumpetGuestModal";
 import TrumpetsSheetButton from "./TrumpetsSheetButton";
-
-function downloadCsv(filename, text) {
-  const blob = new Blob(["\uFEFF" + text], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+import TrumpetsImportModal from "./TrumpetsImportModal";
+import { downloadCsvFile } from "@/lib/csv";
 
 const byName = (a, b) => a.name.localeCompare(b.name, "pt");
 
@@ -26,6 +18,7 @@ export default function TrumpetsLeaderList({ tt, year, myGas, gas, members, noti
   const [query, setQuery] = useState("");
   const [guests, setGuests] = useState(null);
   const [modal, setModal] = useState(null); // null | { guest?: Guest }
+  const [importing, setImporting] = useState(false);
   const fail = (e) => notify(tt.errors[e?.message] || tt.errors.generic);
 
   useEffect(() => {
@@ -97,10 +90,13 @@ export default function TrumpetsLeaderList({ tt, year, myGas, gas, members, noti
         <button className="btn btn-primary" onClick={() => setModal({})} style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <Plus size={16} /> {tt.add}
         </button>
+        <button className="btn btn-ghost" disabled={guests === null} onClick={() => setImporting(true)} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <FileUp size={16} /> {tt.importCsv}
+        </button>
         <TrumpetsSheetButton tt={tt} label={tt.groupImage} className="btn btn-ghost" filename={`trombetas-${year}-${ga?.id}`}
           title={`${tt.title} ${year}`} subtitle={ga?.name} reasonsText={reasonsText}
           rows={inGa.map((g) => ({ name: g.name, by: memberName[g.invitedByMemberId] || "" }))} />
-        <button className="btn btn-ghost" disabled={!inGa.length} onClick={() => downloadCsv(`trombetas_${year}_${ga?.id}.csv`, guestsCsv(inGa, { gas, members, labels: csvLabels }))} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <button className="btn btn-ghost" disabled={!inGa.length} onClick={() => downloadCsvFile(`trombetas_${year}_${ga?.id}.csv`, guestsCsv(inGa, { gas, members, labels: csvLabels }))} style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <Download size={16} /> {tt.exportCsv}
         </button>
       </div>
@@ -123,6 +119,23 @@ export default function TrumpetsLeaderList({ tt, year, myGas, gas, members, noti
             </div>
           ))}
         </div>
+      )}
+
+      {importing && (
+        <TrumpetsImportModal
+          tt={tt}
+          year={year}
+          myGas={myGas}
+          defaultGaId={ga?.id}
+          members={members}
+          existing={guests || []}
+          onImported={({ guests: added }) => {
+            if (!added.length) return;
+            setGuests((prev) => [...(prev || []), ...added]);
+            changed();
+          }}
+          onClose={() => setImporting(false)}
+        />
       )}
 
       {modal && (
