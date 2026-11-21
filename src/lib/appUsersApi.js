@@ -21,3 +21,21 @@ export async function saveAppUser({ id, ...profile }) {
 export async function setAppUserActive(id, active) {
   await call({ action: "setActive", id, active: !!active });
 }
+
+// Deletes several accounts at once; returns the ids actually removed. Throws the server's error code
+// (cannot_delete_self, last_admin, …).
+export async function deleteAppUsers(ids) {
+  return (await call({ action: "delete", ids })).deleted || [];
+}
+
+// New PINs for several users at once. Each plain PIN comes back once, here; only the hash is stored.
+export async function resetPins(userIds) {
+  const res = await fetch("/api/user-pin", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ userIds }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `http_${res.status}`);
+  return { pins: data.pins || [], failed: data.failed || [] };
+}

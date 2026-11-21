@@ -10,6 +10,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Configurações › Usuários & PINs: select users (one by one, all, or "Selecionar inativas") and, in bulk, generate new PINs (shown once in a list, with a copy-message button per person) or delete the accounts. Deleting is audited per user and never removes your own account; `api/app-users` gets a `delete` action and `api/user-pin` accepts `userIds`.
+
+### Added
 - Inscrições, "⋯ Mais" menu: "Estender prazo" (admin extends by the event's default days; Secretaria gets "Solicitar extensão de prazo", sent to the pastor) and "Isento pelo pastor" (asks for confirmation, then waives the fee). Both show only while the payment is pending.
 - Inscrições, bulk selection: "⏰ Estender prazo (n)" extends every selected registration that is still pending payment.
 - Diretório: Pr Nairon (the pastors on `ORG_CHART_USER_IDS`) now sees the Organograma there too, read-only, next to Visão Geral.

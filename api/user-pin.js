@@ -28,6 +28,22 @@ export default async function handler(req, res) {
       return;
     }
 
+    // One user ({ userId }) → { pin }, or several at once ({ userIds: [..] }) → { pins: [{ userId, pin }], failed: [ids] }.
+    if (Array.isArray(req.body?.userIds)) {
+      const ids = [...new Set(req.body.userIds.map(Number))];
+      if (!ids.length || ids.length > 200 || ids.some((id) => !Number.isInteger(id) || id <= 0)) {
+        res.status(400).json({ error: "missing_user_id" });
+        return;
+      }
+      const pins = [];
+      const failed = [];
+      for (const id of ids) {
+        try { pins.push({ userId: id, pin: await assignNewPin(rest, id, PIN_PEPPER) }); } catch { failed.push(id); }
+      }
+      res.status(200).json({ pins, failed });
+      return;
+    }
+
     const userId = Number(req.body?.userId);
     if (!Number.isInteger(userId) || userId <= 0) {
       res.status(400).json({ error: "missing_user_id" });

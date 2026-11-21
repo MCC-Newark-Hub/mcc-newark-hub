@@ -3,7 +3,7 @@ import { LayoutDashboard, ClipboardList, Users, Clock, BarChart2, Calendar, Chec
 import { useT, fill } from "@/i18n/strings";
 import { CATEGORIES, TEAMS, ROLE_BADGE, ROLE_GROUPS, fmt, classifyVoice, normalizeNote, isValidNote } from "@/constants";
 import { sb } from "@/lib/supabase";
-import { saveAppUser, setAppUserActive } from "@/lib/appUsersApi";
+import { saveAppUser, setAppUserActive, deleteAppUsers, resetPins } from "@/lib/appUsersApi";
 import { authHeaders } from "@/lib/session";
 import { groupGasByChurch } from "@/lib/gaGroups";
 import { eventSubtitle } from "@/lib/registrationDeadline";
@@ -823,6 +823,10 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
   const [saving, setSaving] = useState(false);
   const [newPin, setNewPin] = useState(null); // { name, pin }: shown once, never stored in the browser
   const [pinBusy, setPinBusy] = useState(null); // user id while its PIN is being generated
+  const [sel, setSel] = useState([]); // selected user ids (bulk: new PINs, delete)
+  const [bulkPins, setBulkPins] = useState(null); // [{ name, pin }]: shown once, never stored
+  const [confirmBulk, setConfirmBulk] = useState(null); // "pin" | "delete"
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [sk, setSk] = useState("name");
   const [sd, setSd] = useState("asc");
   const toggle = (k) => { if (sk === k) setSd((d) => (d === "asc" ? "desc" : "asc")); else { setSk(k); setSd("asc"); } };
@@ -887,6 +891,45 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
     }
     setDbUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, active } : x)));
     if (active) notify("Conta reativada. Se a pessoa não tiver PIN, use \"Novo PIN\".");
+  };
+
+  const selUsers = (dbUsers || []).filter((u) => sel.includes(u.id));
+  const toggleSel = (id) => setSel((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  const inactiveIds = (dbUsers || []).filter((u) => u.active === false).map((u) => u.id);
+  const pinMessage = (name, pin) => `Olá, ${name}! Seu PIN de acesso ao MCC Newark Hub é ${pin}. Entre em ${window.location.origin}/login. Não compartilhe este PIN.`;
+
+  // New PINs for everyone selected; the old ones stop working. Shown once in a list, to pass on privately.
+  const bulkResetPins = async () => {
+    setBulkBusy(true);
+    try {
+      const { pins, failed } = await resetPins(selUsers.map((u) => u.id));
+      const byId = Object.fromEntries(selUsers.map((u) => [u.id, u]));
+      pins.forEach((p) => logAudit?.("app_user_pin_generated", "app_user", p.userId, byId[p.userId]?.name, { bulk: true }));
+      setBulkPins(pins.map((p) => ({ name: byId[p.userId]?.name || String(p.userId), pin: p.pin })));
+      if (failed.length) notify(`Não foi possível gerar o PIN de ${failed.length} usuário(s).`);
+      setSel([]);
+    } catch (err) {
+      notify(err.message === "not_signed_in" ? "Sua sessão expirou. Entre de novo para gerar PINs." : "Não foi possível gerar os PINs: " + err.message);
+    } finally {
+      setBulkBusy(false);
+      setConfirmBulk(null);
+    }
+  };
+
+  const bulkDelete = async () => {
+    setBulkBusy(true);
+    try {
+      const deleted = await deleteAppUsers(selUsers.map((u) => u.id)); // server: admin check, not self, last-admin guard, audit
+      setDbUsers((prev) => prev.filter((u) => !deleted.includes(u.id)));
+      notify(`${deleted.length} usuário(s) excluído(s).`);
+      setSel([]);
+    } catch (err) {
+      const msg = { cannot_delete_self: "Você não pode excluir a sua própria conta.", last_admin: "Não dá para excluir o último administrador ativo." }[err.message];
+      notify(msg || "Erro ao excluir: " + err.message);
+    } finally {
+      setBulkBusy(false);
+      setConfirmBulk(null);
+    }
   };
 
   const save = async () => {
@@ -1135,9 +1178,76 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
         </div>
       )}
 
+      {confirmBulk && (
+        <div className="modal-bg" onClick={(e) => e.target === e.currentTarget && !bulkBusy && setConfirmBulk(null)}>
+          <div className="modal" role="alertdialog" aria-labelledby="users-bulk-title" style={{ maxWidth: 420 }}>
+            <h3 id="users-bulk-title" style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 18, marginBottom: 8 }}>
+              {confirmBulk === "delete" ? `Excluir ${selUsers.length} usuário(s)?` : `Gerar novo PIN para ${selUsers.length} usuário(s)?`}
+            </h3>
+            <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 10 }}>
+              {confirmBulk === "delete"
+                ? "As contas são apagadas e deixam de entrar no sistema. Esta ação não pode ser desfeita (o log de auditoria guarda os nomes)."
+                : "Os PINs atuais deixam de funcionar. Os novos aparecem uma única vez, para você enviar no particular."}
+            </p>
+            <ul style={{ maxHeight: 180, overflowY: "auto", fontSize: 13, margin: "0 0 16px", paddingLeft: 18 }}>
+              {selUsers.map((u) => <li key={u.id}>{u.name}{u.active === false ? " (inativa)" : ""}</li>)}
+            </ul>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setConfirmBulk(null)} disabled={bulkBusy}>Cancelar</button>
+              <button className={`btn ${confirmBulk === "delete" ? "btn-danger" : "btn-primary"}`} style={{ flex: 1 }} disabled={bulkBusy}
+                onClick={confirmBulk === "delete" ? bulkDelete : bulkResetPins}>
+                {bulkBusy ? "Aguarde…" : confirmBulk === "delete" ? "Excluir" : "Gerar PINs"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bulkPins && (
+        <div className="modal-bg">
+          <div className="modal" style={{ maxWidth: 460 }}>
+            <h3 style={{ fontFamily: "'Lora',Georgia,serif", fontSize: 18, marginBottom: 6 }}>Novos PINs ({bulkPins.length})</h3>
+            <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 12 }}>
+              Envie cada um no particular (nunca em grupo). Estes PINs não aparecem de novo.
+            </p>
+            <div style={{ maxHeight: 320, overflowY: "auto", marginBottom: 14 }}>
+              {bulkPins.map((p) => (
+                <div key={p.name + p.pin} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
+                  <span style={{ flex: 1, fontWeight: 600, fontSize: 13 }}>{p.name}</span>
+                  <span style={{ fontFamily: "monospace", fontSize: 16, fontWeight: 700, letterSpacing: 3 }}>{p.pin}</span>
+                  <button className="btn btn-ghost btn-sm" title="Copiar mensagem (WhatsApp)" aria-label={`Copiar mensagem para ${p.name}`}
+                    onClick={() => copyText(pinMessage(p.name, p.pin), `Mensagem de ${p.name} copiada.`)}>
+                    <Copy size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button className="btn btn-primary" style={{ width: "100%" }} onClick={() => setBulkPins(null)}>Já enviei, fechar</button>
+          </div>
+        </div>
+      )}
+
+      {sel.length > 0 ? (
+        <div className="fr" style={{ alignItems: "center", gap: 8, padding: "10px 14px", background: "var(--sidebar-active-bg)", border: "1.5px solid var(--primary)", borderRadius: 8, marginBottom: 10, flexWrap: "wrap" }}>
+          <strong style={{ fontSize: 13, color: "var(--primary)" }}>{sel.length} selecionado(s)</strong>
+          <button className="btn btn-ghost btn-sm" onClick={() => setSel([])}>Limpar seleção</button>
+          <button className="btn btn-ghost btn-sm" style={{ display: "flex", alignItems: "center", gap: 4 }} onClick={() => setConfirmBulk("pin")}>
+            <KeyRound size={13} /> Novo PIN ({sel.length})
+          </button>
+          <button className="btn btn-danger btn-sm" style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }} onClick={() => setConfirmBulk("delete")}>
+            <Trash2 size={13} /> Excluir {sel.length}
+          </button>
+        </div>
+      ) : inactiveIds.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          <button className="btn btn-ghost btn-sm" onClick={() => setSel(inactiveIds)}>Selecionar inativas ({inactiveIds.length})</button>
+        </div>
+      )}
+
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         <table className="table" style={{ tableLayout: "fixed" }}>
           <colgroup>
+            <col style={{ width: 36 }} />
             <col style={{ width: 40 }} />
             <col style={{ width: 160 }} />
             <col style={{ width: 220 }} />
@@ -1147,6 +1257,11 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
           </colgroup>
           <thead style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--card-bg, #fff)" }}>
             <tr>
+              <th>
+                <input type="checkbox" aria-label="Selecionar todos os usuários"
+                  checked={dbUsers.length > 0 && sel.length === dbUsers.length}
+                  onChange={(e) => setSel(e.target.checked ? dbUsers.map((u) => u.id) : [])} />
+              </th>
               <th></th>
               <Th k="name">Nome</Th>
               <Th k="sys_role">Função</Th>
@@ -1157,7 +1272,8 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
           </thead>
           <tbody>
             {sortData(dbUsers, sk, sd).map((u) => (
-              <tr key={u.id} style={{ opacity: u.active === false ? 0.55 : 1 }}>
+              <tr key={u.id} style={{ opacity: u.active === false ? 0.55 : 1, background: sel.includes(u.id) ? "var(--sidebar-active-bg)" : "" }}>
+                <td><input type="checkbox" aria-label={`Selecionar ${u.name}`} checked={sel.includes(u.id)} onChange={() => toggleSel(u.id)} /></td>
                 <td>
                   <div className="avatar" style={{ width: 28, height: 28, fontSize: 10 }}>{u.initials || u.name?.slice(0, 2).toUpperCase()}</div>
                 </td>
@@ -1195,7 +1311,7 @@ export function AdminUsers({ dbUsers, setDbUsers, churches, dbTeams, gas, notify
               </tr>
             ))}
             {dbUsers.length === 0 && (
-              <tr><td colSpan={6} style={{ textAlign: "center", color: "var(--muted)", padding: 24 }}>Nenhum usuário cadastrado no banco de dados.</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: "center", color: "var(--muted)", padding: 24 }}>Nenhum usuário cadastrado no banco de dados.</td></tr>
             )}
           </tbody>
         </table>
