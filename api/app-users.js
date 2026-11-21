@@ -6,6 +6,7 @@
 //   POST { action: "create", name, primaryRole, sysRoles, initials, church, gaIds, teamLeads, churches, showFinancials } → { user }
 //   POST { action: "update", id, ...same }                                                                          → { user }
 //   POST { action: "setActive", id, active }                                                                        → { ok: true }
+//   POST { action: "delete", ids: [..] }                                                                            → { deleted: [ids] }
 
 import { restClient, currentUser, hasRole } from "./_lib/auth.js";
 import { cleanProfileInput } from "../src/lib/appUserRules.js";
@@ -80,6 +81,29 @@ export default async function handler(req, res) {
       if (!r.ok || !r.data?.length) return fail(404, "user_not_found");
       await audit(active ? "app_user_reactivated" : "app_user_deactivated", t.row);
       return res.status(200).json({ ok: true });
+    }
+
+    // Removes accounts for good (e.g. the old shared PINs, now that everyone has their own). The audit log keeps
+    // each name. Never the caller's own account, and never so that no active admin is left.
+    if (body.action === "delete") {
+      const ids = [...new Set((Array.isArray(body.ids) ? body.ids : []).map(Number))];
+      if (!ids.length || ids.length > 200 || ids.some((id) => !Number.isInteger(id) || id <= 0)) return fail(400, "invalid_ids");
+      if (ids.includes(Number(caller.id))) return fail(409, "cannot_delete_self");
+      const list = `(${ids.join(",")})`;
+      const found = await rest(`app_users?id=in.${list}&select=${COLS}`);
+      if (!found.ok) throw new Error(`users_read_failed:${found.status}`);
+      const rows = found.data || [];
+      if (!rows.length) return fail(404, "user_not_found");
+      if (rows.some((u) => rolesOf(u).includes("admin") && u.active !== false)) {
+        const r = await rest("app_users?active=is.true&sys_roles=cs.{admin}&select=id");
+        if (!r.ok) throw new Error(`admins_read_failed:${r.status}`);
+        if (!(r.data || []).some((u) => !ids.includes(Number(u.id)))) return fail(409, "last_admin");
+      }
+      const del = await rest(`app_users?id=in.(${rows.map((u) => u.id).join(",")})&select=id`, { method: "DELETE", prefer: "return=representation" });
+      if (!del.ok) throw new Error(`users_delete_failed:${del.status}`);
+      const deleted = (del.data || []).map((u) => u.id);
+      for (const u of rows.filter((x) => deleted.includes(x.id))) await audit("app_user_deleted", u, { sysRole: u.sys_role, church: u.church });
+      return res.status(200).json({ deleted });
     }
 
     return fail(400, "unknown_action");
