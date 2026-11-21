@@ -281,3 +281,54 @@ describe("/api/trumpet-guests summary and motivos", () => {
     expect(calls.find((c) => c.path.startsWith("trumpet_guests?")).path).toMatch(/order=created_at,id&/);
   });
 });
+
+describe("/api/trumpet-guests import", () => {
+  const row = (over = {}) => ({ gaId: "GA1", name: "Nova", phone: "(973) 555-0110", email: "", invitedByMemberId: "", notes: "", ...over });
+
+  it("inserts the GA leader's rows in one request, skipping guests already on file and repeats", async () => {
+    const calls = fakeDb();
+    const res = await call({ action: "import", year: 2026, guests: [row(), row({ name: "rita", phone: "+1 973 555 0101" }), row({ name: "NOVA" })] }, 2);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.skipped).toBe(2);
+    const inserts = calls.filter((c) => c.path.startsWith("trumpet_guests") && c.method === "POST");
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0].body).toEqual([expect.objectContaining({ name: "Nova", ga_id: "GA1", year: 2026, church: "Newark, NJ - EUA", created_by: "Líder" })]);
+  });
+
+  it("audits counts per GA, never names or phones", async () => {
+    const calls = fakeDb();
+    await call({ action: "import", year: 2026, guests: [row()] }, 2);
+    const [entry] = auditOf(calls);
+    expect(entry).toMatchObject({ action: "trumpet_guests_imported", details: { year: 2026, count: 1 } });
+    expect(JSON.stringify(entry)).not.toMatch(/Nova|555/);
+  });
+
+  it("rejects the whole batch when one row is outside the leader's GAs or invalid", async () => {
+    let calls = fakeDb();
+    let res = await call({ action: "import", year: 2026, guests: [row(), row({ gaId: "GA2" })] }, 2);
+    expect(res.statusCode).toBe(403);
+    expect(res.body).toEqual({ error: "forbidden", row: 1 });
+    expect(calls.some((c) => c.method === "POST" && c.path.startsWith("trumpet_guests"))).toBe(false);
+
+    calls = fakeDb();
+    res = await call({ action: "import", year: 2026, guests: [row({ phone: "12" })] }, 2);
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: "invalid_phone", row: 0 });
+    expect(calls.some((c) => c.method === "POST" && c.path.startsWith("trumpet_guests"))).toBe(false);
+  });
+
+  it("staff without a GA list can't import; empty or oversized batches are refused", async () => {
+    fakeDb();
+    expect((await call({ action: "import", year: 2026, guests: [row()] }, 1)).statusCode).toBe(403);
+    expect((await call({ action: "import", year: 2026, guests: [] }, 2)).body.error).toBe("invalid_import");
+    const many = Array.from({ length: 501 }, (_, i) => row({ name: `G${i}` }));
+    expect((await call({ action: "import", year: 2026, guests: many }, 2)).body.error).toBe("invalid_import");
+  });
+
+  it("returns nothing new when every row is already on file", async () => {
+    const calls = fakeDb();
+    const res = await call({ action: "import", year: 2026, guests: [row({ name: "Rita", phone: "9735550101" })] }, 2);
+    expect(res.body).toEqual({ guests: [], skipped: 1 });
+    expect(calls.some((c) => c.method === "POST" && c.path.startsWith("trumpet_guests"))).toBe(false);
+  });
+});

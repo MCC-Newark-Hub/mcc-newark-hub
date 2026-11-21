@@ -9,6 +9,7 @@ const api = vi.hoisted(() => ({
   saveEdition: vi.fn(async () => {}),
   listGuests: vi.fn(),
   createGuest: vi.fn(),
+  importGuests: vi.fn(),
   updateGuest: vi.fn(),
   setAttended: vi.fn(),
   deleteGuest: vi.fn(),
@@ -162,4 +163,39 @@ describe("Trombetas e Festas tab", () => {
     expect(screen.queryByText("Ano atual atrasado")).toBeNull();
     expect(screen.getByText("Ano anterior")).toBeTruthy();
   });
+
+  it("GA leader imports a CSV: preview with valid / invalid / duplicate rows, then only the valid ones are sent", async () => {
+    api.importGuests.mockImplementation(async (_y, list) => ({ guests: list.map((g, i) => ({ ...rita, id: `imp${i}`, name: g.name, phone: g.phone })), skipped: 0 }));
+    renderAs({ name: "GA", sysRoles: ["ga_leader"], gaIds: ["GA1"] });
+    await screen.findByText("Rita");
+    fireEvent.click(screen.getByRole("button", { name: /Importar CSV/ }));
+    expect(screen.getByRole("button", { name: /Baixar modelo/ })).toBeTruthy();
+    const csv = "Nome;Telefone;Convidado por\nRita;9735550101;\nNova;(973) 555-0120;Ana\nSem fone;;\n";
+    const file = new File([csv], "convidados.csv", { type: "text/csv" });
+    fireEvent.change(screen.getByTestId("tfi-file"), { target: { files: [file] } });
+    const confirm = await screen.findByRole("button", { name: "Importar 1 convidados" });
+    // starts on the rows with errors
+    expect(screen.getByText("Sem telefone")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Todas · 3/ }));
+    expect(screen.getByText("Já está na lista")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Duplicadas · 1/ })).toBeTruthy();
+    expect(api.importGuests).not.toHaveBeenCalled();
+    fireEvent.click(confirm);
+    expect(await screen.findByText("1 convidados adicionados.")).toBeTruthy();
+    expect(screen.getByText("2 linhas não entraram (erro ou duplicadas).")).toBeTruthy();
+    expect(api.importGuests).toHaveBeenCalledWith(expect.any(Number), [
+      { gaId: "GA1", name: "Nova", phone: "(973) 555-0120", email: "", invitedByMemberId: "M1", notes: "" },
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    expect(screen.getByText("Nova")).toBeTruthy();
+  });
+
+  it("an import file without the phone column says which column is missing", async () => {
+    renderAs({ name: "GA", sysRoles: ["ga_leader"], gaIds: ["GA1"] });
+    await screen.findByText("Rita");
+    fireEvent.click(screen.getByRole("button", { name: /Importar CSV/ }));
+    fireEvent.change(screen.getByTestId("tfi-file"), { target: { files: [new File(["Nome\nAna"], "x.csv")] } });
+    expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Faltam colunas obrigatórias: Telefone. Use o modelo.");
+  });
 });
+

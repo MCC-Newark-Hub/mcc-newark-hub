@@ -20,6 +20,10 @@ async function call(body) {
 
 export const listGuests = async (year) => (await call({ action: "list", year })).guests || [];
 export const createGuest = async (year, input) => (await call({ action: "create", year, ...input })).guest;
+export const importGuests = async (year, guests) => {
+  const r = await call({ action: "import", year, guests });
+  return { guests: r.guests || [], skipped: r.skipped || 0 };
+};
 export const updateGuest = async (id, input) => (await call({ action: "update", id, ...input })).guest;
 export const setAttended = async (id, attended) => (await call({ action: "attend", id, attended: !!attended })).guest;
 export const deleteGuest = async (id) => { await call({ action: "delete", id }); };
