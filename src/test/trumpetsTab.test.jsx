@@ -114,37 +114,34 @@ describe("Trombetas e Festas tab", () => {
     await waitFor(() => expect(api.setAttended).toHaveBeenCalledWith("g1", true));
   });
 
-  it("GA leader adds a guest: phone is required, the modal keeps the values on error", async () => {
-    api.createGuest.mockRejectedValueOnce(new Error("forbidden")).mockResolvedValueOnce({ ...rita, id: "g3", name: "Nova" });
+  it("GA leader adds a guest: phone is optional but checked when typed, the modal keeps the values on error", async () => {
+    api.createGuest.mockRejectedValueOnce(new Error("forbidden")).mockResolvedValueOnce({ ...rita, id: "g3", name: "Nova", phone: "" });
     renderAs({ name: "GA", sysRoles: ["ga_leader"], gaIds: ["GA1"] });
     await screen.findByText("Rita");
     fireEvent.click(screen.getByRole("button", { name: /Convidado/ }));
     fireEvent.change(screen.getByLabelText("Nome"), { target: { value: "Nova" } });
-    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
-    expect(await screen.findByText("Informe o telefone.")).toBeTruthy();
-    expect(api.createGuest).not.toHaveBeenCalled();
-    fireEvent.change(screen.getByLabelText("Telefone"), { target: { value: "abc" } });
+    fireEvent.change(screen.getByLabelText("Telefone (opcional)"), { target: { value: "abc" } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     expect(await screen.findByText("Telefone inválido.")).toBeTruthy();
     expect(api.createGuest).not.toHaveBeenCalled();
-    fireEvent.change(screen.getByLabelText("Telefone"), { target: { value: "9735550199" } });
+    fireEvent.change(screen.getByLabelText("Telefone (opcional)"), { target: { value: "" } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     expect(await screen.findByText("Você não tem acesso a este GA.")).toBeTruthy();
     expect(screen.getByLabelText("Nome").value).toBe("Nova");
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     expect(await screen.findByText("Nova")).toBeTruthy();
-    expect(api.createGuest).toHaveBeenLastCalledWith(expect.any(Number), expect.objectContaining({ gaId: "GA1", name: "Nova", phone: "9735550199" }));
+    expect(api.createGuest).toHaveBeenLastCalledWith(expect.any(Number), expect.objectContaining({ gaId: "GA1", name: "Nova", phone: "" }));
   });
 
   it("GA leader edit is checked before it closes: an invalid phone keeps the modal and saves nothing", async () => {
     renderAs({ name: "GA", sysRoles: ["ga_leader"], gaIds: ["GA1"] });
     fireEvent.click(await screen.findByRole("button", { name: "Rita" }));
-    fireEvent.change(screen.getByLabelText("Telefone"), { target: { value: "abc" } });
+    fireEvent.change(screen.getByLabelText("Telefone (opcional)"), { target: { value: "abc" } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     expect(await screen.findByText("Telefone inválido.")).toBeTruthy();
     expect(api.updateGuest).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText("E-mail (opcional)"), { target: { value: "nope" } });
-    fireEvent.change(screen.getByLabelText("Telefone"), { target: { value: "9735550199" } });
+    fireEvent.change(screen.getByLabelText("Telefone (opcional)"), { target: { value: "9735550199" } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     expect(await screen.findByText("E-mail inválido.")).toBeTruthy();
     expect(api.updateGuest).not.toHaveBeenCalled();
@@ -170,32 +167,33 @@ describe("Trombetas e Festas tab", () => {
     await screen.findByText("Rita");
     fireEvent.click(screen.getByRole("button", { name: /Importar CSV/ }));
     expect(screen.getByRole("button", { name: /Baixar modelo/ })).toBeTruthy();
-    const csv = "Nome;Telefone;Convidado por\nRita;9735550101;\nNova;(973) 555-0120;Ana\nSem fone;;\n";
+    const csv = "Nome;Telefone;Convidado por\nRita;9735550101;\nNova;(973) 555-0120;Ana\nSem fone;;\nRuim;123;\n";
     const file = new File([csv], "convidados.csv", { type: "text/csv" });
     fireEvent.change(screen.getByTestId("tfi-file"), { target: { files: [file] } });
-    const confirm = await screen.findByRole("button", { name: "Importar 1 convidados" });
+    const confirm = await screen.findByRole("button", { name: "Importar 2 convidados" });
     // starts on the rows with errors
-    expect(screen.getByText("Sem telefone")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /Todas · 3/ }));
+    expect(screen.getByText("Telefone inválido: 123")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Todas · 4/ }));
     expect(screen.getByText("Já está na lista")).toBeTruthy();
     expect(screen.getByRole("button", { name: /Duplicadas · 1/ })).toBeTruthy();
     expect(api.importGuests).not.toHaveBeenCalled();
     fireEvent.click(confirm);
-    expect(await screen.findByText("1 convidados adicionados.")).toBeTruthy();
+    expect(await screen.findByText("2 convidados adicionados.")).toBeTruthy();
     expect(screen.getByText("2 linhas não entraram (erro ou duplicadas).")).toBeTruthy();
     expect(api.importGuests).toHaveBeenCalledWith(expect.any(Number), [
       { gaId: "GA1", name: "Nova", phone: "(973) 555-0120", email: "", invitedByMemberId: "M1", notes: "" },
+      { gaId: "GA1", name: "Sem fone", phone: "", email: "", invitedByMemberId: "", notes: "" },
     ]);
     fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
     expect(screen.getByText("Nova")).toBeTruthy();
   });
 
-  it("an import file without the phone column says which column is missing", async () => {
+  it("an import file without the name column says which column is missing", async () => {
     renderAs({ name: "GA", sysRoles: ["ga_leader"], gaIds: ["GA1"] });
     await screen.findByText("Rita");
     fireEvent.click(screen.getByRole("button", { name: /Importar CSV/ }));
-    fireEvent.change(screen.getByTestId("tfi-file"), { target: { files: [new File(["Nome\nAna"], "x.csv")] } });
-    expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Faltam colunas obrigatórias: Telefone. Use o modelo.");
+    fireEvent.change(screen.getByTestId("tfi-file"), { target: { files: [new File(["Telefone\n9735550101"], "x.csv")] } });
+    expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Faltam colunas obrigatórias: Nome. Use o modelo.");
   });
 });
 

@@ -281,3 +281,11 @@ digits), against the year's list or an earlier line. The server action `import {
 `cleanGuestInput` and the GA scope on every row and refuses the whole batch on any error, skips rows already on
 file, inserts in one request and audits only counts per GA. The parser (`src/lib/csv.js`) is shared with
 Diretório › Importar.
+
+---
+
+## Revision 5 (2026-11-21) — phone optional
+
+Leonard, 2026-11-21: the phone is optional. This replaces Revision 2 item 1 / Revision 3 "Phone required":
+only the name is required (modal and import); a phone that is filled in is still validated; an empty one is
+stored as null. Import duplicates without a phone match on the name among guests that also have no phone.

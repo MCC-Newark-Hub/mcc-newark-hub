@@ -111,7 +111,7 @@ export default function TrumpetsLeaderList({ tt, year, myGas, gas, members, noti
             <div key={g.id} className="tf-row">
               <div style={{ minWidth: 0 }}>
                 <button type="button" className="tf-name" onClick={() => setModal({ guest: g })}>{g.name}</button>
-                <div className="tf-muted"><a href={`tel:${g.phone}`}>{g.phone}</a>{g.email ? ` · ${g.email}` : ""}</div>
+                <div className="tf-muted">{g.phone && <a href={`tel:${g.phone}`}>{g.phone}</a>}{g.phone && g.email ? " · " : ""}{g.email}</div>
               </div>
               <div className="tf-muted tf-hide">{memberName[g.invitedByMemberId] || "—"}</div>
               <div className="tf-muted tf-hide" title={g.notes}>{g.notes}</div>

@@ -55,9 +55,10 @@ describe("cleanGuestInput", () => {
     expect(cleanGuestInput({ gaId: "GA1", name: "A", phone: "abc" }).error).toBe("invalid_phone");
     expect(cleanGuestInput({ gaId: "GA1", name: "A", phone: "9735550101", email: "nope" }).error).toBe("invalid_email");
   });
-  it("phone is required", () => {
-    expect(cleanGuestInput({ gaId: "GA1", name: "A" }).error).toBe("invalid_phone");
-    expect(cleanGuestInput({ gaId: "GA1", name: "A", phone: "  " }).error).toBe("invalid_phone");
+  it("phone is optional (stored as null) but checked when filled in", () => {
+    expect(cleanGuestInput({ gaId: "GA1", name: "A" }).fields.phone).toBeNull();
+    expect(cleanGuestInput({ gaId: "GA1", name: "A", phone: "  " }).fields.phone).toBeNull();
+    expect(cleanGuestInput({ gaId: "GA1", name: "A", phone: "123" }).error).toBe("invalid_phone");
   });
   it("empty e-mail / inviter become null", () => {
     expect(cleanGuestInput({ gaId: "GA1", name: "A", phone: "9735550101" }).fields).toMatchObject({ email: null, invited_by_member_id: null });

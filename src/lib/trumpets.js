@@ -66,11 +66,11 @@ export function cleanGuestInput(body = {}) {
   const inviter = body.invitedByMemberId ? String(body.invitedByMemberId) : "";
   if (inviter && !ID.test(inviter)) return { error: "invalid_member" };
   const phone = normalizePhone(body.phone);
-  if (!phone || !isValidPhone(phone)) return { error: "invalid_phone" };
+  if (phone && !isValidPhone(phone)) return { error: "invalid_phone" };
   const email = normalizeEmail(body.email);
   if (email && !isValidEmail(email)) return { error: "invalid_email" };
   const notes = String(body.notes || "").trim().slice(0, 500);
-  return { fields: { ga_id: gaId, name, phone, email: email || null, invited_by_member_id: inviter || null, notes: notes || null } };
+  return { fields: { ga_id: gaId, name, phone: phone || null, email: email || null, invited_by_member_id: inviter || null, notes: notes || null } };
 }
 
 // Same person for the duplicate check of an import: name without accents / case / extra spaces, and the phone's
