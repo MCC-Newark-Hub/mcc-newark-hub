@@ -257,7 +257,7 @@ label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase
   .topbar-more-btn{display:flex;}
   .topbar-pending-full{display:none;}
   .topbar-pending-dot{display:block;}
-  .role-bar{display:flex;align-items:center;gap:8px;position:sticky;top:52px;z-index:49;background:var(--topbar-bg);border-top:1px solid rgba(255,255,255,.12);padding:4px 14px 6px;box-shadow:0 2px 8px rgba(0,0,0,.2);}
+  .role-bar{display:flex;align-items:center;gap:8px;position:relative;z-index:49;background:var(--topbar-bg);border-top:1px solid rgba(255,255,255,.12);padding:4px 14px 6px;box-shadow:0 2px 8px rgba(0,0,0,.2);}
   .role-bar-label{flex:none;font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:rgba(255,255,255,.7);}
   .role-bar-links{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;min-width:0;}
   .role-bar-links::-webkit-scrollbar{display:none;}
@@ -510,6 +510,8 @@ label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase
 .table .sticky-actions{position:sticky;right:0;z-index:1;background:var(--card);box-shadow:-6px 0 8px -6px rgba(3,34,63,.25);white-space:nowrap;}
 .table th.sticky-actions{background:var(--table-header-bg);z-index:3;}
 .table tr:hover td.sticky-actions{background:var(--table-hover-bg);}
+/* Phones: a pinned actions column takes half the screen and hides the names under it, so it scrolls with the row */
+@media(max-width:768px){.table .sticky-actions{position:static;box-shadow:none;}}
 .view-toggle{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--card);}
 .view-toggle-btn{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:6px 12px;border:none;background:transparent;color:var(--muted);font:600 12px 'Montserrat',sans-serif;cursor:pointer;transition:transform 120ms ease-out;}
 .view-toggle-btn + .view-toggle-btn{border-left:1px solid var(--border);}
@@ -536,3 +538,15 @@ label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase
   .more-menu-item{min-height:44px;}
 }
 @media(prefers-reduced-motion:reduce){ .view-toggle-btn{transition:none;} .view-toggle-btn:active{transform:none;} }
+
+/* ── PHONES: remaining touch targets and two-column screens ── */
+@media(max-width:768px){
+  .view-toggle-btn,.pt-btn{min-height:44px;}
+  /* Configurações › Listas: the 190px type list sat beside the editor and cut it off; stack them */
+  .listas-layout{flex-direction:column;min-height:0 !important;}
+  .listas-types{width:auto !important;border-right:0 !important;padding-right:0 !important;display:flex;flex-wrap:wrap;gap:6px;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:12px;}
+  .listas-types > button{width:auto !important;display:inline-flex !important;align-items:center;gap:6px;min-height:44px;margin:0 !important;border:1px solid var(--border) !important;}
+  .listas-content{padding-left:0 !important;}
+  .worship-page{padding:16px !important;}
+  .worship-tabs > button{min-height:44px;}
+}

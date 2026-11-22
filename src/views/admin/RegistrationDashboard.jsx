@@ -199,6 +199,7 @@ export default function RegistrationDashboard({ regs, wlRegs, event, members, ch
         >
           Composição dos Inscritos
         </div>
+        <div className="table-wrap">
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--card-bg, #fff)" }}>
             <tr>
@@ -253,6 +254,7 @@ export default function RegistrationDashboard({ regs, wlRegs, event, members, ch
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* ── By church + by category ────────────────────────────────────── */}

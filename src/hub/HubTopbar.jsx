@@ -64,7 +64,7 @@ export default function HubTopbar({ user, logout, lang, setLang, theme, toggleTh
 
   return (
     <>
-    <div className="topbar" style={{ display: "flex", alignItems: "center", gap: 12, padding: "0 20px", position: "relative" }}>
+    <div className="topbar" style={{ display: "flex", alignItems: "center", gap: 12 }}>
       {showHelp && <HelpModal lang={lang} path={helpPath} onClose={() => setShowHelp(false)} />}
 
       <button onClick={() => navigate("/")} style={{ ...iconBtnStyle, opacity: 0.85, flexShrink: 0 }} title="Hub">

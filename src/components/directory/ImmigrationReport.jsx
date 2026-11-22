@@ -130,6 +130,7 @@ export default function ImmigrationReport() {
             <span style={{ fontWeight: 700, fontSize: 14 }}>Situação Imigratória</span>
             <span className="badge badge-blue">{filtTotal} membros</span>
           </div>
+          <div className="table-wrap">
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
@@ -206,6 +207,7 @@ export default function ImmigrationReport() {
               </tr>
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -255,6 +257,7 @@ export default function ImmigrationReport() {
       {/* By GA */}
       {immDim === "ga" && (
         <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <div className="table-wrap">
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
@@ -298,6 +301,7 @@ export default function ImmigrationReport() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

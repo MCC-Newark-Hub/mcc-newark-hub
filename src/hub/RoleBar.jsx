@@ -3,7 +3,7 @@ import { RolePickContext } from "@/context/switchRole";
 import { roleName } from "@/lib/roleView";
 
 // Phones only (CSS shows it under 768px): the profiles of someone who has more than one,
-// right under the blue bar, so the one in use is always visible and switching is one tap.
+// right under the blue bar; it scrolls with the page (only the blue bar stays pinned), and switching is one tap.
 // On larger screens the "Trocar Função" button in the top bar does the same.
 export default function RoleBar({ lang }) {
   const pick = useContext(RolePickContext);
