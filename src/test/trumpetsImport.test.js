@@ -37,7 +37,8 @@ describe("mapColumns", () => {
   it("lists unknown and repeated columns, and the required ones that are missing", () => {
     const m = mapColumns(["Nome", "Idade", "Nome", ""]);
     expect(m.unknown).toEqual(["Idade", "Nome"]);
-    expect(m.missing).toEqual(["phone"]);
+    expect(m.missing).toEqual([]);
+    expect(mapColumns(["Telefone", "E-mail"]).missing).toEqual(["name"]);
   });
 
   it("the template headers map back to every field, in both languages", () => {
@@ -95,9 +96,21 @@ describe("buildImportPreview", () => {
     expect(p.rows.map((r) => r.input.invitedByMemberId)).toEqual(["M4", "M3"]);
   });
 
-  it("a missing phone is its own reason, and a missing default GA asks for the GA", () => {
+  it("the phone is optional: no phone column, or an empty cell, is a valid row", () => {
+    const noColumn = preview("Nome,E-mail\nRita,r@x.com");
+    expect(noColumn.rows[0]).toMatchObject({ status: "valid", input: { name: "Rita", phone: "", email: "r@x.com" } });
+    const emptyCell = preview("Nome,Telefone\nRita,");
+    expect(emptyCell.rows[0]).toMatchObject({ status: "valid", input: { phone: "" } });
+  });
+
+  it("without a phone, the same name is a duplicate only of another guest without a phone", () => {
+    const p = preview("Nome,Telefone\nRita,\nrita,\nRita,9735550101", { existing: [{ name: "Beto", phone: "" }] });
+    expect(p.rows.map((r) => r.status)).toEqual(["valid", "duplicate", "valid"]);
+  });
+
+  it("a missing default GA asks for the GA", () => {
     const p = preview("Nome,Telefone\nRita,", { defaultGaId: "", gas: [] });
-    expect(p.rows[0].reasons.map((r) => r.code)).toEqual(["missing_phone", "missing_ga"]);
+    expect(p.rows[0].reasons.map((r) => r.code)).toEqual(["missing_ga"]);
   });
 
   it("flags duplicates against the list and inside the file (same name and phone, format ignored)", () => {
@@ -115,8 +128,8 @@ describe("buildImportPreview", () => {
   });
 
   it("stops with no rows when a required column is missing or the file is too big", () => {
-    const missing = preview("Nome,E-mail\nRita,r@x.com");
-    expect(missing.missing).toEqual(["phone"]);
+    const missing = preview("Telefone,E-mail\n9735550101,r@x.com");
+    expect(missing.missing).toEqual(["name"]);
     expect(missing.rows).toEqual([]);
     const big = preview("Nome,Telefone\n" + Array.from({ length: IMPORT_MAX + 1 }, (_, i) => `G${i},97355${String(i).padStart(5, "0")}`).join("\n"));
     expect(big.tooMany).toBe(true);

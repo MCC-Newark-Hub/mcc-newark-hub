@@ -5,12 +5,12 @@ import { cleanGuestInput, foldText, guestKey, IMPORT_MAX } from "./trumpets.js";
 import { isValidEmail, isValidPhone, normalizeEmail, normalizePhone } from "./contact.js";
 
 export const IMPORT_FIELDS = ["name", "phone", "email", "invitedBy", "ga", "notes"];
-export const REQUIRED_FIELDS = ["name", "phone"];
+export const REQUIRED_FIELDS = ["name"];
 
 // Header text after foldHeader(), in PT and EN. "E-mail (opcional)" folds to "e mail opcional".
 const ALIASES = {
   name: ["nome", "name", "nome do convidado", "nome completo", "convidado", "convidada", "guest", "guest name", "full name"],
-  phone: ["telefone", "phone", "celular", "cel", "fone", "tel", "whatsapp", "mobile", "cell", "cell phone", "phone number", "numero", "telefone celular"],
+  phone: ["telefone", "phone", "celular", "cel", "fone", "tel", "whatsapp", "mobile", "cell", "cell phone", "phone number", "numero", "telefone celular", "telefone opcional", "phone optional"],
   email: ["email", "e mail", "e mail opcional", "email opcional", "e mail optional", "email optional", "mail"],
   invitedBy: ["convidado por", "quem convidou", "convidou", "membro", "invited by", "inviter", "member"],
   ga: ["ga", "grupo", "grupo de assistencia", "group", "assistance group"],
@@ -84,8 +84,7 @@ export function buildImportPreview(parsed, { gas = [], defaultGaId = "", members
     const reasons = [];
     if (!raw.name) reasons.push({ code: "missing_name" });
     else if (raw.name.length > 120) reasons.push({ code: "invalid_name" });
-    if (!raw.phone) reasons.push({ code: "missing_phone" });
-    else if (!isValidPhone(normalizePhone(raw.phone))) reasons.push({ code: "invalid_phone", value: raw.phone });
+    if (raw.phone && !isValidPhone(normalizePhone(raw.phone))) reasons.push({ code: "invalid_phone", value: raw.phone });
     if (raw.email && !isValidEmail(normalizeEmail(raw.email))) reasons.push({ code: "invalid_email", value: raw.email });
     const ga = findGa(raw.ga, gas, defaultGaId);
     if (!ga) reasons.push({ code: raw.ga ? "unknown_ga" : "missing_ga", value: raw.ga });

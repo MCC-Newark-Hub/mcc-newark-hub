@@ -332,3 +332,16 @@ describe("/api/trumpet-guests import", () => {
     expect(calls.some((c) => c.method === "POST" && c.path.startsWith("trumpet_guests"))).toBe(false);
   });
 });
+
+describe("/api/trumpet-guests without a phone", () => {
+  it("create and import save a guest with no phone as null", async () => {
+    let calls = fakeDb();
+    let res = await call({ action: "create", year: 2026, gaId: "GA1", name: "Sem fone" }, 2);
+    expect(res.statusCode).toBe(200);
+    expect(calls.find((c) => c.method === "POST" && c.path.startsWith("trumpet_guests")).body).toMatchObject({ name: "Sem fone", phone: null });
+    calls = fakeDb();
+    res = await call({ action: "import", year: 2026, guests: [{ gaId: "GA1", name: "Sem fone" }] }, 2);
+    expect(res.statusCode).toBe(200);
+    expect(calls.find((c) => c.method === "POST" && c.path.startsWith("trumpet_guests")).body).toEqual([expect.objectContaining({ name: "Sem fone", phone: null })]);
+  });
+});
