@@ -26,6 +26,7 @@ import { useSortable } from "@/hooks/useSortable";
 import { groupByFamily, familyIdOf } from "@/lib/family";
 import { matchesRegNumber } from "@/lib/regNumber";
 import { clerkCities, inClerkScope, regChurchFilter } from "@/lib/clerkScope";
+import { badgeCsvRegs, badgeCsvRows, badgeCsvText, badgeCsvFilename, downloadBadgeCsv } from "@/lib/badgeCsv";
 import MultiCheckList from "@/components/MultiCheckList";
 import RegActions from "@/components/RegActions";
 import InfoCard from "@/components/InfoCard";
@@ -189,6 +190,13 @@ function ClerkView(props) {
     { id: "functions", icon: <BookOpen size={16} />, label: "Membros com Funções" },
   ];
   const switchSec = (id) => { setSec(id); setSearch(""); };
+  // Crachás CSV: the active registrations of the churches picked in the filter (their own church by default).
+  const exportBadgeCSV = () => {
+    const picked = badgeCsvRegs(regs, event?.id, inRegScope);
+    if (!picked.length) { notify(t.badgeCsvEmpty); return; }
+    const suffix = regChurchMode === "mine" && singleChurch ? myChurch.split(",")[0] : "";
+    downloadBadgeCsv(badgeCsvFilename(event, suffix), badgeCsvText(badgeCsvRows(picked, event, members)));
+  };
 
   const openNewMember = () => { setEditingMember(newMemberForm()); setNewFamilyName(""); };
   const openEditMember = (m) => { setEditingMember(memberToForm(m, families)); setNewFamilyName(""); };
@@ -330,6 +338,7 @@ function ClerkView(props) {
                 {regChurchMode === "pick" && regChurchPick.length > 0 && (
                   <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{regChurchPick.length} selecionada(s)</span>
                 )}
+                <button type="button" className="btn btn-ghost btn-sm" onClick={exportBadgeCSV} title={t.badgeCsvClerkTitle} style={{ marginLeft: "auto" }}>🪪 {t.badgeCsv}</button>
               </div>
               {regChurchMode === "pick" && (
                 <div className="card" style={{ padding: 12, marginBottom: 10, maxWidth: 420 }}>

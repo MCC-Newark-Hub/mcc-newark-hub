@@ -15,6 +15,7 @@ import { useSortable } from "@/hooks/useSortable";
 import { eventRequiresContact, needsOwnContact, hasFullContact } from "@/lib/contact";
 import { fetchContactStatus, staffGetContacts } from "@/lib/contactApi";
 import { contactExportRows, CONTACT_EXPORT_HEADERS, toCsv } from "@/lib/contactExport";
+import { badgeCsvRegs, badgeCsvRows, badgeCsvText, badgeCsvFilename, downloadBadgeCsv } from "@/lib/badgeCsv";
 import ContactChangeRequests from "@/components/ContactChangeRequests";
 import RegActions from "@/components/RegActions";
 import ExemptConfirm from "@/components/ExemptConfirm";
@@ -76,24 +77,8 @@ export default function RegistrationsTab(props) {
   const t = useT();
 
   const exportBadgeCSV = () => {
-    const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-    const eventDate = new Date((event?.date || "") + "T12:00:00");
-    const mesAno = `${MESES[eventDate.getMonth()]} ${eventDate.getFullYear()}`;
-    const local = (event?.location || "").split(",")[0].trim();
-    const rows = regs.filter((r) => r.eventId === event?.id && !r.cancelled && !r.waitlisted);
-    const headers = ["NOME","SOBRENOME","EQUIPE","IGREJA","CATEGORIA","LOCAL","MÊS E ANO","Nro da Inscrição"];
-    const escape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-    const csvRows = rows.map((r) => {
-      const member = (members || []).find((m) => m.id === r.memberId);
-      const nome = member?.firstName || r.memberName.trim().split(" ")[0];
-      const sobrenome = member?.lastName || r.memberName.trim().split(" ").slice(1).join(" ");
-      return [nome, sobrenome, r.team || "Participante", r.church || "", r.category || "", local, mesAno, r.regNumber || ""].map(escape).join(",");
-    });
-    const csv = "﻿" + [headers.join(","), ...csvRows].join("\r\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
-    const a = document.createElement("a");
-    a.href = url; a.download = `crachas-${(event?.name || "evento").replace(/\s+/g,"-")}.csv`; a.click();
-    URL.revokeObjectURL(url);
+    const rows = badgeCsvRows(badgeCsvRegs(regs, event?.id), event, members);
+    downloadBadgeCsv(badgeCsvFilename(event), badgeCsvText(rows));
   };
   const [exportingContacts, setExportingContacts] = useState(false);
   const exportContactsCSV = async () => {
@@ -231,7 +216,7 @@ export default function RegistrationsTab(props) {
               </button>
             </>
           )}
-          <button className="btn btn-ghost btn-sm" onClick={exportBadgeCSV} title="Exportar CSV para impressão de crachás no Canva">🪪 Crachás CSV</button>
+          <button className="btn btn-ghost btn-sm" onClick={exportBadgeCSV} title={t.badgeCsvTitle}>🪪 {t.badgeCsv}</button>
           <button className="btn btn-ghost btn-sm" onClick={exportContactsCSV} disabled={exportingContacts} title={t.contactsCsvTitle}>📇 {exportingContacts ? "…" : t.contactsCsv}</button>
           {event?.registrations_locked && (
             <span style={{ fontSize: 12, fontWeight: 700, color: "#dc2626", padding: "6px 10px", background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 6 }}>🔒 Encerrado</span>
