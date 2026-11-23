@@ -3,6 +3,7 @@
 // The server checks everything again (api/trumpet-guests.js, action "import").
 import { cleanGuestInput, foldText, guestKey, IMPORT_MAX } from "./trumpets.js";
 import { isValidEmail, isValidPhone, normalizeEmail, normalizePhone } from "./contact.js";
+import { nameSimilarity } from "./similarity.js";
 
 export const IMPORT_FIELDS = ["name", "phone", "email", "invitedBy", "ga", "notes"];
 export const REQUIRED_FIELDS = ["name"];
@@ -50,24 +51,60 @@ function findGa(cell, gas, defaultGaId) {
   return gas.find((g) => foldText(g.name) === f) || gas.find((g) => foldText(g.id) === f) || null;
 }
 
-// An inviter is a member of the GA's church, by name (accents and case ignored) or id. When the name matches
-// several, one in the GA itself wins; otherwise the row is ambiguous.
-function findInviter(cell, ga, members) {
-  if (!cell) return { id: null };
-  const f = foldText(cell);
-  const pool = members.filter((m) => !ga?.church || m.church === ga.church);
-  const hits = pool.filter((m) => foldText(m.name) === f || foldText(m.id) === f);
-  if (hits.length === 1) return { id: hits[0].id, name: hits[0].name };
-  const inGa = hits.filter((m) => ga && m.gaId === ga.id);
-  if (inGa.length === 1) return { id: inGa[0].id, name: inGa[0].name };
-  return { error: hits.length ? "ambiguous_inviter" : "unknown_inviter" };
+// Name words, accents and case ignored, without the connectives ("da", "de", "dos"…) people add or drop.
+const PARTICLES = new Set(["da", "de", "do", "das", "dos", "e", "d"]);
+const nameWords = (s) => foldText(s).split(/[^a-z0-9]+/).filter((w) => w && !PARTICLES.has(w));
+
+// How well a typed name fits a directory name, 0–100: 100 the same text, 95 the same words ("Afonso da Costa" =
+// "Afonso Costa"), 85 same first and last word and one name holds every word of the other ("Ana Lima" ~ "Ana Souza
+// Lima"), else up to 80 for a close spelling ("Afonço Costa"), 0 below that.
+function nameScore(typed, name) {
+  if (foldText(typed) === foldText(name)) return 100;
+  const a = nameWords(typed);
+  const b = nameWords(name);
+  if (!a.length || !b.length) return 0;
+  if (a.join(" ") === b.join(" ")) return 95;
+  if (a[0] === b[0] && a[a.length - 1] === b[b.length - 1] && Math.min(a.length, b.length) >= 2) {
+    const [short, long] = a.length <= b.length ? [a, b] : [b, a];
+    if (short.every((w) => long.includes(w))) return 85;
+  }
+  const sim = nameSimilarity(a.join(" "), b.join(" "));
+  return sim >= 0.75 ? Math.round(sim * 80) : 0;
 }
+
+// Who the "Convidado por" text may be, among the members of the GA's church (all members when the GA is unknown).
+// → { exact, auto, candidates }: `exact` the one member with that very name or id (a member of the GA wins a tie);
+// `auto` a clear best guess (85+ and ahead of the next) to confirm; `candidates` the best few, for the leader to pick.
+export function suggestInviters(typed, ga, members, { limit = 5 } = {}) {
+  const pool = (members || []).filter((m) => !ga?.church || m.church === ga.church);
+  const f = foldText(typed);
+  const byId = pool.filter((m) => foldText(m.id) === f);
+  if (byId.length === 1) return { exact: byId[0], auto: null, candidates: byId };
+  const scored = pool
+    .map((m) => ({ m, score: nameScore(typed, m.name) + (ga && m.gaId === ga.id ? 2 : 0) }))
+    .filter((x) => x.score >= 60)
+    .sort((x, y) => y.score - x.score || String(x.m.name).localeCompare(String(y.m.name), "pt"));
+  const [top, second] = scored;
+  const clear = top && (!second || top.score > second.score);
+  return {
+    exact: clear && top.score >= 100 ? top.m : null,
+    auto: clear && top.score >= 85 && top.score < 100 ? top.m : null,
+    candidates: scored.slice(0, limit).map((x) => x.m),
+  };
+}
+
+// The key a leader's choice is kept under: the same typed name in the same church is the same person in every row.
+export const inviterPickKey = (typed, ga) => `${foldText(typed)}|${ga?.church || ""}`;
 
 // parsed: { headers, records } from parseCsv. gas: the leader's GAs; defaultGaId: the GA picked on the list (used
 // when the GA column is missing or empty); members: the directory; existing: this year's guests already on file.
 // → { columns, unknown, missing, tooMany, rows, counts }; each row: { line, status, reasons, input, view }.
 // status "valid" rows are the ones to send (`input` is what api create/import take).
-export function buildImportPreview(parsed, { gas = [], defaultGaId = "", members = [], existing = [] } = {}) {
+// inviterPicks: Map inviterPickKey → member id, or "" for no inviter — the leader's choices in the match step. A row with
+// "Convidado por" filled in has `inviter` { typed, key, church, state, candidates }: state "exact" (found), "suggested"
+// (the clear best guess, used unless changed), "picked" (the leader chose), "pick" (several fit: choose) or "missing"
+// (nobody fits: search or leave it blank); `id` is the member used (null = none).
+export function buildImportPreview(parsed, { gas = [], defaultGaId = "", members = [], existing = [], inviterPicks = new Map() } = {}) {
   const { columns, unknown, missing } = mapColumns(parsed?.headers || []);
   const records = parsed?.records || [];
   const empty = { valid: 0, invalid: 0, duplicate: 0 };
@@ -78,6 +115,7 @@ export function buildImportPreview(parsed, { gas = [], defaultGaId = "", members
   const onFile = new Set(existing.map((g) => guestKey(g.name, g.phone)));
   const exampleKey = guestKey(EXAMPLE.name, EXAMPLE.phone);
   const firstLine = new Map(); // guestKey → line of the first valid row
+  const memberById = new Map(members.map((m) => [m.id, m]));
 
   const rows = records.map(({ line, cells }) => {
     const raw = Object.fromEntries(IMPORT_FIELDS.map((f) => [f, cell(cells, f)]));
@@ -88,8 +126,25 @@ export function buildImportPreview(parsed, { gas = [], defaultGaId = "", members
     if (raw.email && !isValidEmail(normalizeEmail(raw.email))) reasons.push({ code: "invalid_email", value: raw.email });
     const ga = findGa(raw.ga, gas, defaultGaId);
     if (!ga) reasons.push({ code: raw.ga ? "unknown_ga" : "missing_ga", value: raw.ga });
-    const inviter = findInviter(raw.invitedBy, ga, members);
-    if (inviter.error) reasons.push({ code: inviter.error, value: raw.invitedBy });
+    let inviterId = null;
+    let inviterInfo = null;
+    if (raw.invitedBy) {
+      const key = inviterPickKey(raw.invitedBy, ga);
+      const sug = suggestInviters(raw.invitedBy, ga, members);
+      let state;
+      if (inviterPicks.has(key)) {
+        const picked = inviterPicks.get(key);
+        state = "picked";
+        inviterId = picked && memberById.has(picked) ? picked : null;
+      } else if (sug.exact) { state = "exact"; inviterId = sug.exact.id; }
+      else if (sug.auto) { state = "suggested"; inviterId = sug.auto.id; }
+      else {
+        state = sug.candidates.length ? "pick" : "missing";
+        reasons.push({ code: state === "pick" ? "ambiguous_inviter" : "unknown_inviter", value: raw.invitedBy });
+      }
+      inviterInfo = { typed: raw.invitedBy, key, church: ga?.church || "", state, id: inviterId, candidates: sug.candidates };
+    }
+    const inviter = inviterId ? { id: inviterId, name: memberById.get(inviterId)?.name } : { id: null };
 
     const input = { gaId: ga?.id || "", name: raw.name, phone: raw.phone, email: raw.email, invitedByMemberId: inviter.id || "", notes: raw.notes };
     if (!reasons.length) {
@@ -110,7 +165,8 @@ export function buildImportPreview(parsed, { gas = [], defaultGaId = "", members
       status,
       reasons,
       input: status === "valid" ? input : null,
-      view: { name: raw.name, phone: raw.phone, email: raw.email, ga: ga?.name || raw.ga, invitedBy: inviter.name || raw.invitedBy, notes: raw.notes },
+      inviter: inviterInfo,
+      view: { name: raw.name, phone: raw.phone, email: raw.email, ga: ga?.name || raw.ga, invitedBy: inviter.name || (inviterInfo?.state === "picked" ? "" : raw.invitedBy), notes: raw.notes },
     };
   });
 

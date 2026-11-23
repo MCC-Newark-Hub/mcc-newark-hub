@@ -188,6 +188,24 @@ describe("Trombetas e Festas tab", () => {
     expect(screen.getByText("Nova")).toBeTruthy();
   });
 
+  it("an inviter not found in the Directory is matched once, by search, for every row with that name", async () => {
+    api.importGuests.mockImplementation(async (_y, list) => ({ guests: list.map((g, i) => ({ ...rita, id: `imp${i}`, name: g.name, phone: g.phone })), skipped: 0 }));
+    renderAs({ name: "GA", sysRoles: ["ga_leader"], gaIds: ["GA1"] });
+    await screen.findByText("Rita");
+    fireEvent.click(screen.getByRole("button", { name: /Importar CSV/ }));
+    const csv = "Nome,Convidado por\nBia,Aninha Souza\nCaio,aninha souza\nDuda,\n";
+    fireEvent.change(screen.getByTestId("tfi-file"), { target: { files: [new File([csv], "c.csv")] } });
+    expect(await screen.findByRole("button", { name: "Importar 1 convidados" })).toBeTruthy();
+    expect(screen.getAllByText("Não encontrado: busque ou deixe em branco · vale para as 2 linhas com este nome")).toHaveLength(2);
+    fireEvent.change(screen.getAllByLabelText("No arquivo: Aninha Souza")[0], { target: { value: "__search" } });
+    fireEvent.change(screen.getByLabelText("Buscar no Diretório…"), { target: { value: "an" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ana" }));
+    fireEvent.click(screen.getByRole("button", { name: /Todas · 3/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Importar 3 convidados" }));
+    await screen.findByText("3 convidados adicionados.");
+    expect(api.importGuests.mock.calls.at(-1)[1].map((g) => g.invitedByMemberId)).toEqual(["M1", "M1", ""]);
+  });
+
   it("an import file without the name column says which column is missing", async () => {
     renderAs({ name: "GA", sysRoles: ["ga_leader"], gaIds: ["GA1"] });
     await screen.findByText("Rita");
