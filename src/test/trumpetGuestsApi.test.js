@@ -20,7 +20,7 @@ const GAS = [
 const G1 = { id: "11111111-1111-1111-1111-111111111111", year: 2026, church: "Newark, NJ - EUA", ga_id: "GA1", name: "Rita", phone: "9735550101", email: null, invited_by_member_id: null, attended_at: null, notes: null, created_at: "c", updated_at: "u" };
 const G2 = { ...G1, id: "22222222-2222-2222-2222-222222222222", ga_id: "GA2", name: "Beto" };
 
-function fakeDb({ guests = [G1, G2], editions = [] } = {}) {
+function fakeDb({ guests = [G1, G2], editions = [], links = [] } = {}) {
   const calls = [];
   vi.stubGlobal("fetch", vi.fn(async (url, opts = {}) => {
     const path = decodeURIComponent(url.replace("https://db.test/rest/v1/", ""));
@@ -40,7 +40,8 @@ function fakeDb({ guests = [G1, G2], editions = [] } = {}) {
     else if (path.startsWith("trumpet_guests?") && method === "GET") {
       const one = path.match(/id=eq\.([0-9a-f-]+)/);
       const inGa = path.match(/ga_id=in\.\(([^)]*)\)/);
-      out = guests.filter((g) => (!one || g.id === one[1]) && (!inGa || inGa[1].split(",").includes(g.ga_id)));
+      const eqGa = path.match(/ga_id=eq\.([^&]+)/);
+      out = guests.filter((g) => (!one || g.id === one[1]) && (!inGa || inGa[1].split(",").includes(g.ga_id)) && (!eqGa || g.ga_id === eqGa[1]));
     } else if (path.startsWith("trumpet_guests") && method === "POST") out = [{ ...G1, ...body, id: "33333333-3333-3333-3333-333333333333" }];
     else if (path.startsWith("trumpet_guests?") && method === "PATCH") {
       const one = path.match(/id=eq\.([0-9a-f-]+)/)[1];
@@ -54,6 +55,12 @@ function fakeDb({ guests = [G1, G2], editions = [] } = {}) {
     else if (path.startsWith("trumpet_goals") && method === "POST") out = [body];
     else if (path.startsWith("trumpet_goals?") && method === "DELETE") out = [{ year: 2026 }];
     else if (path.startsWith("members?")) out = [{ id: "M1", name: "Ana" }];
+    else if (path.startsWith("trumpet_share_links?") && method === "GET") {
+      const tok = path.match(/token=eq\.([^&]+)/);
+      out = tok ? links.filter((l) => l.token === tok[1]) : links.filter((l) => path.includes(`ga_id=eq.${l.ga_id}`));
+    }
+    else if (path.startsWith("trumpet_share_links") && method === "POST") out = [{ token: body.token, created_at: body.created_at }];
+    else if (path.startsWith("trumpet_share_links?") && method === "DELETE") out = [];
     else if (path.startsWith("trumpet_editions?") && method === "GET") out = editions;
     else if (path.startsWith("trumpet_editions") && method === "POST") out = [body];
     return { ok: true, status: 200, text: async () => JSON.stringify(out) };
@@ -343,5 +350,52 @@ describe("/api/trumpet-guests without a phone", () => {
     res = await call({ action: "import", year: 2026, guests: [{ gaId: "GA1", name: "Sem fone" }] }, 2);
     expect(res.statusCode).toBe(200);
     expect(calls.find((c) => c.method === "POST" && c.path.startsWith("trumpet_guests")).body).toEqual([expect.objectContaining({ name: "Sem fone", phone: null })]);
+  });
+});
+
+describe("/api/trumpet-guests shareable link (migration 057)", () => {
+  const TOKEN = "AbCdEfGhIjKlMnOpQrStUvWx";
+  const LINK = { year: 2026, ga_id: "GA1", token: TOKEN, created_at: "2026-11-22T12:00:00Z" };
+
+  it("the public page needs no sign-in and gets names, inviter and attendance only", async () => {
+    const calls = fakeDb({ guests: [{ ...G1, invited_by_member_id: "M1", email: "r@x.com", notes: "secret", attended_at: "t" }, G2], links: [LINK] });
+    const res = { statusCode: 0, body: null, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; } };
+    await handler({ method: "POST", body: { action: "shared", token: TOKEN }, headers: {} }, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.list).toEqual({ year: 2026, ga: "GA Central", church: "Newark, NJ - EUA", guests: [{ name: "Rita", invitedBy: "Ana", attended: true }] });
+    expect(JSON.stringify(res.body)).not.toMatch(/9735550101|r@x\.com|secret/);
+    expect(calls.some((c) => c.path.startsWith("app_users"))).toBe(false);
+  });
+
+  it("an unknown, turned-off or malformed token is 404", async () => {
+    fakeDb({ links: [] });
+    for (const token of ["ZZZZZZZZZZZZZZZZZZZZZZZZ", "short", "bad token with spaces!!", undefined]) {
+      const res = { statusCode: 0, body: null, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; } };
+      await handler({ method: "POST", body: { action: "shared", token }, headers: {} }, res);
+      expect(res.statusCode).toBe(404);
+      expect(res.body.error).toBe("link_not_found");
+    }
+  });
+
+  it("only the GA's leader gets, creates or turns off the link; each change is audited", async () => {
+    fakeDb({ links: [LINK] });
+    expect((await call({ action: "shareGet", year: 2026, gaId: "GA1" }, 2)).body.link).toEqual({ token: TOKEN, createdAt: LINK.created_at });
+    expect((await call({ action: "shareGet", year: 2026, gaId: "GA2" }, 2)).statusCode).toBe(403);
+    expect((await call({ action: "shareCreate", year: 2026, gaId: "GA1" }, 4)).statusCode).toBe(403); // secretary: numbers only
+    expect((await call({ action: "shareCreate", year: 2026, gaId: "GA1" }, 1)).statusCode).toBe(403); // admin has no GA list
+
+    const calls = fakeDb({ links: [LINK] });
+    const created = await call({ action: "shareCreate", year: 2026, gaId: "GA1" }, 2);
+    expect(created.body.link.token).toMatch(/^[A-Za-z0-9_-]{24}$/);
+    expect(created.body.link.token).not.toBe(TOKEN);
+    const upsert = calls.find((c) => c.path.startsWith("trumpet_share_links") && c.method === "POST");
+    expect(upsert.path).toContain("on_conflict=year,ga_id");
+    expect(upsert.body).toMatchObject({ year: 2026, ga_id: "GA1", created_by: "Líder" });
+
+    const off = await call({ action: "shareRevoke", year: 2026, gaId: "GA1" }, 2);
+    expect(off.body).toEqual({ ok: true });
+    expect(calls.some((c) => c.method === "DELETE" && c.path.startsWith("trumpet_share_links?year=eq.2026&ga_id=eq.GA1"))).toBe(true);
+    expect(auditOf(calls).map((a) => a.action)).toEqual(["trumpet_share_link_created", "trumpet_share_link_revoked"]);
+    expect(JSON.stringify(auditOf(calls))).not.toContain(created.body.link.token);
   });
 });

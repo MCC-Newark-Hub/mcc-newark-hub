@@ -40,6 +40,7 @@ Run these files **in order** using the Supabase SQL editor or `psql`. Each migra
 | `054_trumpet_guests.sql` | `trumpet_guests`, `trumpet_goals`, `trumpet_editions` (Trombetas e Festas guests, goals, motivos), server-only: RLS on, no browser grants; reached through `api/trumpet-guests.js`. Apply **after 055**. Not applied yet. |
 | `055_app_users_server_writes.sql` | Takes INSERT / UPDATE on `app_users` and EXECUTE on `set_user_churches` / `set_user_show_financials` away from the browser roles; profiles are saved by `api/app-users.js` (admins only). Apply with the deploy that ships that endpoint. Not applied yet. |
 | `056_payment_markers.sql` | `app_settings.payment_marker_ids` (integer[], default empty): the `app_users` ids who may mark a registration paid or un-mark it; empty = no limit. Admins pick them in Usuários & PINs. |
+| `057_trumpet_share_links.sql` | `trumpet_share_links`: one shareable link per GA and year for Trombetas e Festas (guest names, inviter, came or not — no phones or e-mails). Server-only like 054: RLS on, no browser grants; reached through `api/trumpet-guests.js` (`share*` and `shared` actions). Apply **after 054**. Applied 2026-11-22. |
 
 ## How to run
 

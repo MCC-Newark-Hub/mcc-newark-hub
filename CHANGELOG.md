@@ -10,6 +10,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Trombetas e Festas: "Link para o grupo" on the GA leader's list. It makes one link per GA and year (`/trombetas/<token>`) that the group opens without a PIN: the guest names grouped by who invited them (or A–Z), a search, the totals and who has come, refreshed every minute. Phones, e-mails and notes are never sent to that page. The leader can copy the link, send it on WhatsApp, replace it (the old one stops working) or turn it off; each change is audited. Needs migration 057.
 - Secretaria › Inscrições: "🪪 Crachás CSV" button, next to the Igrejas filter. It exports the active registrations of the churches picked there (their own church by default) in the same Canva columns as the admin's export; the file name adds the church when it is the secretary's own. The CSV builder moved to `src/lib/badgeCsv.js`, shared with the admin's Inscrições.
 - Configurações › Usuários & PINs: select users (one by one, all, or "Selecionar inativas") and, in bulk, generate new PINs (shown once in a list, with a copy-message button per person) or delete the accounts. Deleting is audited per user and never removes your own account; `api/app-users` gets a `delete` action and `api/user-pin` accepts `userIds`.
 
@@ -105,6 +106,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - **Project convention: English first, everything localized** — code, comments, docs and file names are written in English; Portuguese is a translation made on request; every user-facing string goes through `src/i18n/strings.js` (PT and EN).
 
 ### Database
+- **Migration 057** — `trumpet_share_links` (year, GA, random token) for the Trombetas "Link para o grupo". Server-only like 054: RLS on, no browser grants; reached only through `api/trumpet-guests.js`.
 - **Migration 055** — `REVOKE INSERT, UPDATE ON app_users` and EXECUTE on `set_user_churches` / `set_user_show_financials` from the browser roles (they keep SELECT on the profile columns). Apply with the deploy that ships `api/app-users.js`, and **before 054**. **Not applied yet.**
 - **Migration 054** — `trumpet_guests`, `trumpet_goals` and `trumpet_editions` (Trombetas e Festas guests, goals and motivos), server-only (RLS on, no browser grants), reached only through `api/trumpet-guests.js`. **Not applied yet.**
 - **Migration 053** — trigger `trg_registrations_unique_submission` on `registrations`: a submission number (NNN in `PREFIX-MMDD-NNN-P`) is unique per event whatever the day (person 1 needs an unused submission; person 2+ needs a free person number in it). Refused inserts get error 23505 naming `reg_number`, like the unique index, so the browser retries. Existing rows are not checked or changed. **Applied to production on 2026-11-07** (checked: an insert of `PA202612-1107-050-1` is refused with 23505). Until this branch is deployed, the code on `main` retries such a refusal only 3 times, so a page with stale counters may show "já possui inscrição" instead of saving under a duplicate number.

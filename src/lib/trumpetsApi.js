@@ -33,3 +33,11 @@ export const fetchStats = async (year) => (await call({ action: "stats", year })
 export const fetchSummary = async (year) => (await call({ action: "summary", year })).summary;
 export const getEdition = async (year) => (await call({ action: "edition", year })).edition || { reasons: "", reasonsEn: "" };
 export const saveEdition = async (year, { reasons, reasonsEn }) => { await call({ action: "setEdition", year, reasons: reasons || "", reasonsEn: reasonsEn || "" }); };
+
+// Shareable link to a GA's list (migration 057).
+export const getShareLink = async (year, gaId) => (await call({ action: "shareGet", year, gaId })).link || null;
+export const createShareLink = async (year, gaId) => (await call({ action: "shareCreate", year, gaId })).link;
+export const revokeShareLink = async (year, gaId) => { await call({ action: "shareRevoke", year, gaId }); };
+// Public page: no sign-in. → { year, ga, church, guests: [{ name, invitedBy, attended }] }
+export const fetchSharedList = async (token) => (await call({ action: "shared", token })).list;
+export const shareUrl = (token) => `${window.location.origin}/trombetas/${token}`;

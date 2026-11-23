@@ -289,3 +289,18 @@ Diretório › Importar.
 Leonard, 2026-11-21: the phone is optional. This replaces Revision 2 item 1 / Revision 3 "Phone required":
 only the name is required (modal and import); a phone that is filled in is still validated; an empty one is
 stored as null. Import duplicates without a phone match on the name among guests that also have no phone.
+
+## Revision 6 (2026-11-22) — shareable link for the group
+
+Leonard, 2026-11-22: the image for the WhatsApp group is hard to read with 70+ names; the group needs a page. This
+relaxes Revision 3 ("only the GA leader sees the list") for names only:
+
+- The GA leader makes a **link for the group** (one per GA and year, `/trombetas/<token>`, random 24-character
+  token). Whoever opens it sees, without a PIN, the guest **names**, **who invited** each one and **who came** —
+  never phones, e-mails or notes (the server never sends them).
+- The page groups the names by inviter (most guests first) or lists them A–Z, has a search, shows the totals and
+  refreshes every minute.
+- The leader can copy the link, send it on WhatsApp, **replace** it (the old one stops working) or **turn it off**.
+  Creating and turning off are audited (without the token).
+- Table `trumpet_share_links` (migration 057), server-only like 054; reads and writes go through
+  `api/trumpet-guests.js` (`shareGet`, `shareCreate`, `shareRevoke`; `shared` is the public read).

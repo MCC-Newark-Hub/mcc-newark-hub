@@ -52,6 +52,7 @@ import DoorPublicView from "@/views/DoorPublicView";
 import CensusPublicView from "@/views/CensusPublicView";
 import PublicStatsView from "@/views/PublicStatsView";
 import TrumpetsPanelView from "@/views/TrumpetsPanelView";
+import TrumpetsSharedView from "@/views/TrumpetsSharedView";
 import PrayerPublicView from "@/views/PrayerPublicView";
 
 export default function App() {
@@ -247,6 +248,11 @@ export default function App() {
               {/* Public: service census (Frequência de Culto) — outside PublicLayout so it stays open in maintenance mode */}
               {["/frequencia", "/attendance"].map((p) => (
                 <Route key={p} path={p} element={<CensusPublicView lang={lang} setLang={setLang} />} />
+              ))}
+
+              {/* Public: a GA's Trombetas guest list, opened from the leader's shareable link (names only) — outside PublicLayout so it stays open in maintenance mode */}
+              {["/trombetas", "/trumpets"].map((p) => (
+                <Route key={p} path={`${p}/:token`} element={<TrumpetsSharedView lang={lang} setLang={setLang} />} />
               ))}
 
               {/* Public: registration numbers for the big screen at church — outside PublicLayout so it stays open in maintenance mode */}

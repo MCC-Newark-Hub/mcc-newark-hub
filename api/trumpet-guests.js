@@ -16,9 +16,15 @@
 //   POST { action: "summary", year }                         → { summary }    numbers church → GA → member
 //   POST { action: "edition", year }                         → { edition: { reasons, reasonsEn } }
 //   POST { action: "setEdition", year, reasons, reasonsEn }  → { ok: true }   admin / pastor
+//   POST { action: "shareGet",    year, gaId }               → { link: { token, createdAt } | null }  GA leader of the GA
+//   POST { action: "shareCreate", year, gaId }               → { link }   a new token; the old link stops working
+//   POST { action: "shareRevoke", year, gaId }               → { ok: true }  the link stops working
+//   POST { action: "shared", token }                         → { list: { year, ga, church, guests: [{ name, invitedBy,
+//        attended }] } }  NO sign-in: the public page of the link (migration 057). Names only, no phones / e-mails / notes.
 
+import { randomBytes } from "node:crypto";
 import { restClient, currentUser } from "./_lib/auth.js";
-import { listGaIds, summaryGaIds, canManagePanel, toGuest, cleanGuestInput, buildStats, buildSummary, guestKey, IMPORT_MAX } from "../src/lib/trumpets.js";
+import { listGaIds, summaryGaIds, canManagePanel, toGuest, cleanGuestInput, buildStats, buildSummary, guestKey, IMPORT_MAX, isShareToken, toSharedList } from "../src/lib/trumpets.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const COLS = "id,year,church,ga_id,name,phone,email,invited_by_member_id,attended_at,notes,created_at,updated_at";
@@ -55,9 +61,26 @@ export default async function handler(req, res) {
   const fail = (code, error) => res.status(code).json({ error });
 
   try {
+    const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
+    res.setHeader?.("Cache-Control", "no-store");
+
+    // The public page of a shared link: no sign-in, the token is the key.
+    if (body.action === "shared") {
+      if (!isShareToken(body.token)) return fail(404, "link_not_found");
+      const l = await rest(`trumpet_share_links?token=eq.${body.token}&select=year,ga_id`);
+      if (!l.ok) throw new Error(`share_read_failed:${l.status}`);
+      const link = l.data?.[0];
+      if (!link) return fail(404, "link_not_found");
+      const ga = await rest(`assistance_groups?id=eq.${encodeURIComponent(link.ga_id)}&select=id,name,church`);
+      if (!ga.ok) throw new Error(`gas_read_failed:${ga.status}`);
+      const rows = await fetchAll(rest, `trumpet_guests?year=eq.${link.year}&ga_id=eq.${encodeURIComponent(link.ga_id)}&select=name,invited_by_member_id,attended_at&order=name,id`);
+      const inviterIds = [...new Set(rows.map((r) => r.invited_by_member_id).filter(Boolean))];
+      const members = inviterIds.length ? await fetchAll(rest, `members?id=in.(${inviterIds.join(",")})&select=id,name&order=id`) : [];
+      return res.status(200).json({ list: toSharedList(rows, { members, ga: ga.data?.[0], year: link.year }) });
+    }
+
     const caller = await currentUser(req, rest, SESSION_SECRET);
     if (!caller) return fail(401, "not_signed_in");
-    const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
 
     const me = await rest(`app_users?id=eq.${Number(caller.id)}&select=church,churches,ga_ids`);
     const extra = (me.ok && me.data?.[0]) || {};
@@ -281,6 +304,39 @@ export default async function handler(req, res) {
       if (!gr.ok) throw new Error(`goals_read_failed:${gr.status}`);
       const stats = buildStats(rows, { year, gas, members, goals: gr.data || [], today: todayNY() });
       return res.status(200).json({ stats });
+    }
+
+    if (body.action === "shareGet" || body.action === "shareCreate" || body.action === "shareRevoke") {
+      const year = yearOf(body.year);
+      if (!year) return fail(400, "invalid_year");
+      const gaId = String(body.gaId || "");
+      if (!allowed.has(gaId)) return fail(403, "forbidden");
+      const key = `trumpet_share_links?year=eq.${year}&ga_id=eq.${encodeURIComponent(gaId)}`;
+      const toLink = (r) => (r ? { token: r.token, createdAt: r.created_at } : null);
+      if (body.action === "shareGet") {
+        const r = await rest(`${key}&select=token,created_at`);
+        if (!r.ok) throw new Error(`share_read_failed:${r.status}`);
+        return res.status(200).json({ link: toLink(r.data?.[0]) });
+      }
+      const shareAudit = (action) => rest("audit_log", {
+        method: "POST",
+        body: { actor_name: caller.name, actor_id: caller.id, actor_role: caller.sys_role, action, entity_type: "trumpet_share_link", entity_id: gaId, entity_label: gaById[gaId]?.name || gaId, details: { year } },
+      });
+      if (body.action === "shareRevoke") {
+        const d = await rest(key, { method: "DELETE" });
+        if (!d.ok) throw new Error(`share_delete_failed:${d.status}`);
+        await shareAudit("trumpet_share_link_revoked");
+        return res.status(200).json({ ok: true });
+      }
+      const token = randomBytes(18).toString("base64url");
+      const w = await rest("trumpet_share_links?on_conflict=year,ga_id&select=token,created_at", {
+        method: "POST",
+        body: { year, ga_id: gaId, token, created_at: new Date().toISOString(), created_by: by },
+        prefer: "resolution=merge-duplicates,return=representation",
+      });
+      if (!w.ok || !w.data?.[0]) throw new Error(`share_save_failed:${w.status}`);
+      await shareAudit("trumpet_share_link_created");
+      return res.status(200).json({ link: toLink(w.data[0]) });
     }
 
     return fail(400, "unknown_action");
