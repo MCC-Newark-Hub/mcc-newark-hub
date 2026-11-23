@@ -1,10 +1,12 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Download, FileUp } from "lucide-react";
 import { fill } from "@/i18n/strings";
 import { parseCsv, decodeCsvBuffer, toCsv, downloadCsvFile } from "@/lib/csv";
 import { buildImportPreview, templateRows } from "@/lib/trumpetsImport";
 import { IMPORT_MAX } from "@/lib/trumpets";
 import { importGuests } from "@/lib/trumpetsApi";
+import { searchMembers } from "@/lib/prayerImport";
+import InviterPicker from "./TrumpetsInviterPicker";
 
 const FIELD_LABEL = { name: "name", phone: "phone" };
 
@@ -13,13 +15,23 @@ const FIELD_LABEL = { name: "name", phone: "phone" };
 export default function TrumpetsImportModal({ tt, year, myGas, defaultGaId, members, existing, onImported, onClose }) {
   const [step, setStep] = useState("pick"); // pick | preview | done
   const [fileName, setFileName] = useState("");
-  const [preview, setPreview] = useState(null);
+  const [parsed, setParsed] = useState(null);
+  const [picks, setPicks] = useState(() => new Map()); // inviterPickKey → member id ("" = no inviter)
   const [filter, setFilter] = useState("all");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const fileRef = useRef(null);
   const defaultGa = myGas.find((g) => g.id === defaultGaId) || myGas[0];
+  const buildOpts = { gas: myGas, defaultGaId: defaultGa?.id, members, existing };
+  const preview = useMemo(() => (parsed ? buildImportPreview(parsed, { ...buildOpts, inviterPicks: picks }) : null), [parsed, picks, myGas, defaultGa?.id, members, existing]); // eslint-disable-line react-hooks/exhaustive-deps
+  const choose = (key, id) => setPicks((prev) => new Map(prev).set(key, id));
+  // How many rows share each typed inviter (a choice applies to all of them).
+  const inviterCount = useMemo(() => {
+    const n = new Map();
+    for (const r of preview?.rows || []) if (r.inviter) n.set(r.inviter.key, (n.get(r.inviter.key) || 0) + 1);
+    return n;
+  }, [preview]);
   const reasonText = (r) => fill(tt.importReasons[r.code] || tt.errors[r.code] || r.code, { value: r.value ?? "", line: r.line ?? "" });
 
   const downloadTemplate = () => downloadCsvFile(`trombetas_${year}_modelo.csv`, toCsv(templateRows(tt, defaultGa?.name || "")));
@@ -31,14 +43,16 @@ export default function TrumpetsImportModal({ tt, year, myGas, defaultGaId, memb
     const reader = new FileReader();
     reader.onerror = () => setError(tt.importReadFailed);
     reader.onload = (ev) => {
-      const p = buildImportPreview(parseCsv(decodeCsvBuffer(ev.target.result)), { gas: myGas, defaultGaId: defaultGa?.id, members, existing });
+      const data = parseCsv(decodeCsvBuffer(ev.target.result));
+      const p = buildImportPreview(data, buildOpts);
       setFileName(file.name);
-      const failWith = (msg) => { setError(msg); setPreview(null); setStep("pick"); };
+      const failWith = (msg) => { setError(msg); setParsed(null); setStep("pick"); };
       if (p.missing.length) return failWith(fill(tt.importMissing, { cols: p.missing.map((f) => tt[FIELD_LABEL[f]]).join(", ") }));
       if (p.tooMany) return failWith(fill(tt.importTooMany, { max: IMPORT_MAX }));
       if (!p.rows.length) return failWith(tt.importEmpty);
       setError("");
-      setPreview(p);
+      setPicks(new Map());
+      setParsed(data);
       setFilter(p.counts.invalid ? "invalid" : "all");
       setStep("preview");
     };
@@ -88,6 +102,14 @@ export default function TrumpetsImportModal({ tt, year, myGas, defaultGaId, memb
           .tfi-reasons.duplicate{color:var(--warn)}
           .tfi-table td{overflow-wrap:break-word}
           .tfi-table .tfi-name{min-width:140px}
+          .tfi-table .tfi-inviter{min-width:220px}
+          .tfi-pick select,.tfi-pick input{width:100%;font-size:13px;padding:6px 8px}
+          .tfi-pick-note{font-size:12px;margin-top:4px;color:var(--text-secondary)}
+          .tfi-pick-note.warn{color:var(--danger-fg);font-weight:600}
+          .tfi-pick-results{border:1px solid var(--border);border-radius:var(--r);margin-top:4px;max-height:180px;overflow-y:auto;background:var(--surface,#fff)}
+          .tfi-pick-results button{display:block;width:100%;text-align:left;padding:8px 10px;font-size:13px;background:none;border:0;border-top:1px solid var(--border);cursor:pointer;min-height:36px}
+          .tfi-pick-results button:first-child{border-top:0}
+          .tfi-pick-results button:hover,.tfi-pick-results button:focus-visible{background:var(--hover,#eff6ff)}
           .tfi-filters{display:flex;gap:8px;flex-wrap:wrap}
           @media (max-width:768px){.tfi-filters .btn{min-height:44px}}
         `}</style>
@@ -154,7 +176,18 @@ export default function TrumpetsImportModal({ tt, year, myGas, defaultGaId, memb
                       <td className="tfi-name" style={{ fontWeight: 600 }}>{r.view.name || "—"}</td>
                       <td style={{ whiteSpace: "nowrap" }}>{r.view.phone || "—"}</td>
                       <td>{r.view.ga || "—"}</td>
-                      <td>{r.view.invitedBy || "—"}</td>
+                      <td className="tfi-inviter">
+                        {r.inviter && r.inviter.state !== "exact" ? (
+                          <InviterPicker
+                            tt={tt}
+                            inviter={r.inviter}
+                            rows={inviterCount.get(r.inviter.key) || 1}
+                            memberName={(id) => members.find((m) => m.id === id)?.name || ""}
+                            search={(q) => searchMembers(members, q, { allowed: r.inviter.church ? [r.inviter.church] : null })}
+                            onChoose={(id) => choose(r.inviter.key, id)}
+                          />
+                        ) : (r.view.invitedBy || "—")}
+                      </td>
                       <td>{r.view.email || "—"}</td>
                     </tr>
                   ))}

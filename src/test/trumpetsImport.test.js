@@ -96,6 +96,36 @@ describe("buildImportPreview", () => {
     expect(p.rows.map((r) => r.input.invitedByMemberId)).toEqual(["M4", "M3"]);
   });
 
+  it("an inviter that is not an exact match: a clear suggestion is used, several close ones ask for a choice", () => {
+    const dir = [
+      { id: "A1", name: "Afonso Costa", church: NWK, gaId: "GA1" },
+      { id: "A2", name: "Maria dos Santos Lima", church: NWK, gaId: "GA1" },
+      { id: "A3", name: "João Silva", church: NWK, gaId: "GA1" },
+      { id: "A4", name: "João Pedro Silva", church: NWK, gaId: "GA2" },
+      { id: "A5", name: "Carla Mendes", church: NWK, gaId: "GA1" },
+      { id: "A6", name: "Carla Menezes", church: NWK, gaId: "GA1" },
+    ];
+    const p = preview("Nome,Convidado por\nRita,Afonso da Costa\nBia,maria lima\nCaio,João Silva\nDuda,Carla Mendez\nEli,Xavier", { members: dir });
+    expect(p.rows.map((r) => r.inviter.state)).toEqual(["suggested", "suggested", "exact", "pick", "missing"]);
+    expect(p.rows.map((r) => r.input?.invitedByMemberId ?? null)).toEqual(["A1", "A2", "A3", null, null]);
+    expect(p.rows[0].view.invitedBy).toBe("Afonso Costa");
+    expect(p.rows[3].inviter.candidates.map((m) => m.id)).toEqual(["A5", "A6"]);
+    expect(p.rows[3].reasons.map((r) => r.code)).toEqual(["ambiguous_inviter"]);
+    expect(p.rows[4].reasons.map((r) => r.code)).toEqual(["unknown_inviter"]);
+  });
+
+  it("the leader's choice applies to every row with the same typed inviter; \"\" leaves it blank", () => {
+    const dir = [{ id: "A5", name: "Carla Mendes", church: NWK, gaId: "GA1" }, { id: "A6", name: "Carla Menezes", church: NWK, gaId: "GA1" }];
+    const text = "Nome,Convidado por\nRita,Carla Mendez\nBia,carla  mendez\nEli,Xavier";
+    const first = preview(text, { members: dir });
+    const picks = new Map([[first.rows[0].inviter.key, "A6"], [first.rows[2].inviter.key, ""]]);
+    const p = preview(text, { members: dir, inviterPicks: picks });
+    expect(p.counts).toEqual({ valid: 3, invalid: 0, duplicate: 0 });
+    expect(p.rows.map((r) => r.input.invitedByMemberId)).toEqual(["A6", "A6", ""]);
+    expect(p.rows.map((r) => r.inviter.state)).toEqual(["picked", "picked", "picked"]);
+    expect(p.rows[2].view.invitedBy).toBe("");
+  });
+
   it("the phone is optional: no phone column, or an empty cell, is a valid row", () => {
     const noColumn = preview("Nome,E-mail\nRita,r@x.com");
     expect(noColumn.rows[0]).toMatchObject({ status: "valid", input: { name: "Rita", phone: "", email: "r@x.com" } });
