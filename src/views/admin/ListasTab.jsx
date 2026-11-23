@@ -133,9 +133,9 @@ export default function ListasTab({
     : null;
 
   return (
-    <div style={{ display: "flex", gap: 0, minHeight: 400 }}>
+    <div className="listas-layout" style={{ display: "flex", gap: 0, minHeight: 400 }}>
       {/* Type selector */}
-      <div style={{ width: 190, borderRight: "1px solid var(--border)", paddingRight: 12, flexShrink: 0 }}>
+      <div className="listas-types" style={{ width: 190, borderRight: "1px solid var(--border)", paddingRight: 12, flexShrink: 0 }}>
         {[...TYPES, ...extraTypes].map((t) => (
           <button key={t.key}
             onClick={() => { setActiveType(t.key); setEditing(null); setDeleting(null); }}
@@ -156,8 +156,8 @@ export default function ListasTab({
       </div>
 
       {/* List panel */}
-      {extra ? <div key={extra.key} style={{ flex: 1, minWidth: 0, paddingLeft: 20 }}>{extra.render()}</div> : (
-      <div style={{ flex: 1, paddingLeft: 20 }}>
+      {extra ? <div key={extra.key} className="listas-content" style={{ flex: 1, minWidth: 0, paddingLeft: 20 }}>{extra.render()}</div> : (
+      <div className="listas-content" style={{ flex: 1, minWidth: 0, paddingLeft: 20 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
           <span style={{ fontWeight: 700, fontSize: 15 }}>{cfg.label}</span>
           <button className="btn btn-primary btn-sm" onClick={openNew} style={{ display: "flex", alignItems: "center", gap: 4 }}>

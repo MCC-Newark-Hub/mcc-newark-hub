@@ -373,7 +373,7 @@ function GALeaderView(props) {
                 ) : (
                 <div className="card" style={{ padding: 0, overflow: "hidden" }}>
                   <div className="table-wrap">
-                    <table className="table">
+                    <table className="table table-stack ts-auto-title">
                       <thead>
                         <tr>
                           <th>{t.memberName}</th>

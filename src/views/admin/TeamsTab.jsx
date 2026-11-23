@@ -445,7 +445,7 @@ export default function TeamsTab({ event, events, regs, members, rosters, setRos
                     </div>
                   )}
                 </div>
-                <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                   {mids.length > 0 && (
                     <span className="badge badge-blue">{mids.length} total</span>
                   )}
@@ -664,15 +664,11 @@ export default function TeamsTab({ event, events, regs, members, rosters, setRos
                         }
                       </span>
                       <button
+                        className="icon-btn"
+                        aria-label="Remover da equipe"
+                        title="Remover da equipe"
                         onClick={() => removeFromRoster(team, mid)}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                          color: "#9ca3af",
-                          fontSize: 18,
-                          lineHeight: 1,
-                        }}
+                        style={{ color: "var(--muted)", fontSize: 18, lineHeight: 1 }}
                       >
                         ×
                       </button>

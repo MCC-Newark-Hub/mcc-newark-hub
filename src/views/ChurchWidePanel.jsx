@@ -69,7 +69,7 @@ export default function ChurchWidePanel({ church, members, getStatus, getReg, up
           </div>
         ) : (
           <div className="table-wrap">
-            <table className="table">
+            <table className="table table-stack ts-auto-title">
               <thead>
                 <tr>
                   <th>{t.memberName}</th>

@@ -193,40 +193,42 @@ export default function GroupsPanel({ members, setMembers, gas, setGas, churches
           onDeleteSelected={() => setDeleting({ ids: selected, label: "" })} />
       )}
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-        <table className="table">
-          <thead>
-            <tr>
-              <th style={{ width: 36 }}>
-                <input type="checkbox" checked={allIds.length > 0 && allIds.every((id) => selected.includes(id))}
-                  onChange={(e) => e.target.checked ? selAll(allIds) : clearSel()} />
-              </th>
-              <GaTh k="name">Nome</GaTh><th>Igreja</th><th>Líder</th><th style={{ width: 90 }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.map((g) => {
-              const leader = (members || []).find((m) => m.id === g.leaderId);
-              return (
-                <tr key={g.id} style={{ background: selected.includes(g.id) ? "var(--sidebar-active-bg)" : "" }}>
-                  <td><input type="checkbox" checked={selected.includes(g.id)} onChange={() => toggleSel(g.id)} /></td>
-                  <td style={{ fontWeight: 500 }}>{g.name}</td>
-                  <td style={{ fontSize: 12 }}>{g.church}</td>
-                  <td style={{ fontSize: 13 }}>{leader ? leader.name : (g.leaderId || <span style={{ color: "var(--muted)" }}>—</span>)}</td>
-                  <td>
-                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                      <button className="btn btn-ghost btn-xs" style={{ fontSize: 11 }} onClick={() => setManagingGA(g)}>
-                        👥 {(members || []).filter((m) => m.gaId === g.id).length}
-                      </button>
-                      <button className="btn btn-ghost btn-xs" onClick={() => openEdit(g, { name: g.name, church: g.church || "", leaderId: g.leaderId || "", description: g.description || "" })}><Pencil size={12} /></button>
-                      <button className="btn btn-danger btn-xs" onClick={() => setDeleting({ ids: [g.id], label: g.name })}><Trash2 size={12} /></button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-            {list.length === 0 && <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--muted)", padding: 20 }}>Nenhum resultado.</td></tr>}
-          </tbody>
-        </table>
+        <div className="table-wrap">
+          <table className="table table-stack ts-auto">
+            <thead>
+              <tr>
+                <th style={{ width: 36 }}>
+                  <input type="checkbox" checked={allIds.length > 0 && allIds.every((id) => selected.includes(id))}
+                    onChange={(e) => e.target.checked ? selAll(allIds) : clearSel()} />
+                </th>
+                <GaTh k="name">Nome</GaTh><th>Igreja</th><th>Líder</th><th style={{ width: 90 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((g) => {
+                const leader = (members || []).find((m) => m.id === g.leaderId);
+                return (
+                  <tr key={g.id} style={{ background: selected.includes(g.id) ? "var(--sidebar-active-bg)" : "" }}>
+                    <td><input type="checkbox" checked={selected.includes(g.id)} onChange={() => toggleSel(g.id)} /></td>
+                    <td style={{ fontWeight: 500 }}>{g.name}</td>
+                    <td style={{ fontSize: 12 }}>{g.church}</td>
+                    <td style={{ fontSize: 13 }}>{leader ? leader.name : (g.leaderId || <span style={{ color: "var(--muted)" }}>—</span>)}</td>
+                    <td>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <button className="btn btn-ghost btn-xs" style={{ fontSize: 11 }} onClick={() => setManagingGA(g)}>
+                          👥 {(members || []).filter((m) => m.gaId === g.id).length}
+                        </button>
+                        <button className="btn btn-ghost btn-xs" onClick={() => openEdit(g, { name: g.name, church: g.church || "", leaderId: g.leaderId || "", description: g.description || "" })}><Pencil size={12} /></button>
+                        <button className="btn btn-danger btn-xs" onClick={() => setDeleting({ ids: [g.id], label: g.name })}><Trash2 size={12} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {list.length === 0 && <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--muted)", padding: 20 }}>Nenhum resultado.</td></tr>}
+            </tbody>
+          </table>
+        </div>
       </div>
       <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
         <button className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={() => openNew({ name: "", church: lockChurch ? (defaultChurch || "") : "", leaderId: "", description: "" })}><Plus size={14} /> Novo Grupo</button>

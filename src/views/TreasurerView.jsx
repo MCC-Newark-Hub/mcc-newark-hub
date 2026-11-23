@@ -129,7 +129,7 @@ function RegsTab({ eventRegs, updateReg, notify, readOnly }) {
         ))}
       </div>
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-        <table className="table">
+        <table className="table table-stack ts-auto-title">
           <thead>
             <tr>
               <th>Nome</th>
@@ -239,7 +239,7 @@ function ExpensesTab({ event, expenses, setExpenses, notify, logAudit, readOnly,
       </div>
 
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-        <table className="table">
+        <table className="table table-stack ts-auto">
           <thead>
             <tr>
               <th style={{ width: 100 }}>Data</th>
@@ -408,7 +408,7 @@ function ExtraIncomeTab({ event, extras, setExtras, notify, logAudit, readOnly, 
       </div>
 
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-        <table className="table">
+        <table className="table table-stack ts-auto">
           <thead>
             <tr>
               <th style={{ width: 100 }}>Data</th>
