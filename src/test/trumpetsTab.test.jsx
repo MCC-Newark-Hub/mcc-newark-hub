@@ -15,7 +15,11 @@ const api = vi.hoisted(() => ({
   deleteGuest: vi.fn(),
   listGoals: vi.fn(async () => []),
   saveGoal: vi.fn(async () => {}),
-}));
+  getShareLink: vi.fn(async () => null),
+  createShareLink: vi.fn(async () => ({ token: "AbCdEfGhIjKlMnOpQrStUvWx", createdAt: "t" })),
+  revokeShareLink: vi.fn(async () => {}),
+  shareUrl: (token) => `https://hub.test/trombetas/${token}`,
+}))
 vi.mock("@/lib/trumpetsApi", () => api);
 vi.mock("@/lib/exportElement", () => ({ exportImage: vi.fn(async () => {}) }));
 
@@ -204,6 +208,24 @@ describe("Trombetas e Festas tab", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Importar 3 convidados" }));
     await screen.findByText("3 convidados adicionados.");
     expect(api.importGuests.mock.calls.at(-1)[1].map((g) => g.invitedByMemberId)).toEqual(["M1", "M1", ""]);
+  });
+
+  it("the GA leader creates a link for the group, then turns it off after confirming", async () => {
+    renderAs({ name: "GA", sysRoles: ["ga_leader"], gaIds: ["GA1"] });
+    await screen.findByText("Rita");
+    fireEvent.click(screen.getByRole("button", { name: /Link para o grupo/ }));
+    expect(await screen.findByText(/Telefones, e-mails e notas não aparecem/)).toBeTruthy();
+    fireEvent.click(await screen.findByRole("button", { name: "Criar link" }));
+    const field = await screen.findByLabelText("Link da lista");
+    expect(field.value).toBe("https://hub.test/trombetas/AbCdEfGhIjKlMnOpQrStUvWx");
+    expect(api.createShareLink).toHaveBeenCalledWith(expect.any(Number), "GA1");
+    expect(screen.getByRole("link", { name: /Enviar no WhatsApp/ }).getAttribute("href")).toContain(encodeURIComponent("https://hub.test/trombetas/AbCdEfGhIjKlMnOpQrStUvWx"));
+    fireEvent.click(screen.getByRole("button", { name: /Desativar link/ }));
+    expect(screen.getByText(/vai parar de funcionar para todos/)).toBeTruthy();
+    expect(api.revokeShareLink).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Desativar link" }));
+    expect(await screen.findByRole("button", { name: "Criar link" })).toBeTruthy();
+    expect(api.revokeShareLink).toHaveBeenCalledWith(expect.any(Number), "GA1");
   });
 
   it("an import file without the name column says which column is missing", async () => {

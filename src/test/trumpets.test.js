@@ -3,6 +3,7 @@ import {
   cityOf, profileOf, listGaIds, summaryGaIds, buildSummary, canManagePanel, toGuest, cleanGuestInput,
   totalsByGa, sumTotals, guestsCsv, dayOf, buildStats,
 } from "@/lib/trumpets";
+import { isShareToken, toSharedList, groupByInviter, matchesShared } from "@/lib/trumpets";
 
 const GAS = [
   { id: "GA1", name: "GA Central", church: "Newark, NJ - EUA" },
@@ -155,5 +156,34 @@ describe("buildSummary", () => {
     const e = buildSummary([], { gas: [GAS[0]], members: [], goals: [] });
     expect(e).toMatchObject({ invited: 0, attended: 0, pct: 0, goal: null });
     expect(e.churches[0].gas[0]).toMatchObject({ gaId: "GA1", invited: 0, members: [] });
+  });
+});
+
+describe("shared list (public link)", () => {
+  it("accepts only random-looking tokens", () => {
+    expect(isShareToken("AbCdEfGhIjKlMnOpQrStUvWx")).toBe(true);
+    expect(isShareToken("a-b_c".repeat(5))).toBe(true);
+    for (const bad of ["short", "has space in the token here", "x".repeat(65), "drop;table--xxxxxxxxxxxx", null, 42]) expect(isShareToken(bad)).toBe(false);
+  });
+
+  it("keeps names, inviter and attendance only, sorted by name", () => {
+    const rows = [
+      { name: "Zé", phone: "1", email: "z@x", notes: "n", invited_by_member_id: "M1", attended_at: "t" },
+      { name: "ana", phone: "2", invited_by_member_id: "M9", attended_at: null },
+    ];
+    expect(toSharedList(rows, { members: [{ id: "M1", name: "Tatiana" }], ga: { name: "Newark 1", church: "Newark, NJ" }, year: 2026 })).toEqual({
+      year: 2026, ga: "Newark 1", church: "Newark, NJ",
+      guests: [{ name: "ana", invitedBy: "", attended: false }, { name: "Zé", invitedBy: "Tatiana", attended: true }],
+    });
+  });
+
+  it("groups by inviter, most guests first, no inviter last; search matches guest or inviter", () => {
+    const guests = [
+      { name: "A", invitedBy: "Cleia" }, { name: "B", invitedBy: "" }, { name: "C", invitedBy: "Tatiana" },
+      { name: "D", invitedBy: "Tatiana" }, { name: "E", invitedBy: "Afonso" },
+    ];
+    expect(groupByInviter(guests).map((g) => [g.inviter, g.guests.length])).toEqual([["Tatiana", 2], ["Afonso", 1], ["Cleia", 1], ["", 1]]);
+    expect(guests.filter((g) => matchesShared(g, "tatiána")).map((g) => g.name)).toEqual(["C", "D"]);
+    expect(guests.filter((g) => matchesShared(g, "  ")).length).toBe(5);
   });
 });

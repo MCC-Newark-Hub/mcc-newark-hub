@@ -1,11 +1,12 @@
 // `npm run dev` has no serverless functions: an in-memory stand-in for api/trumpet-guests.js,
 // seeded from the dev directory. No scope checks (the tab already filters by scope). Dev only.
 import { INIT_GAS, INIT_MEMBERS } from "@/dev/seeds";
-import { toGuest, cleanGuestInput, buildStats, buildSummary, guestKey } from "@/lib/trumpets";
+import { toGuest, cleanGuestInput, buildStats, buildSummary, guestKey, toSharedList } from "@/lib/trumpets";
 
 const rows = [];
 const goals = [];
 const editions = {};
+const links = []; // { year, ga_id, token, created_at }
 let seq = 0;
 const now = () => new Date().toISOString();
 const err = (error) => { throw new Error(error); };
@@ -77,6 +78,27 @@ export function devTrumpets(body) {
           today: new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" }),
         }),
       };
+    case "shareGet": {
+      const l = links.find((x) => x.year === year && x.ga_id === body.gaId);
+      return { link: l ? { token: l.token, createdAt: l.created_at } : null };
+    }
+    case "shareCreate": {
+      const i = links.findIndex((x) => x.year === year && x.ga_id === body.gaId);
+      if (i >= 0) links.splice(i, 1);
+      const l = { year, ga_id: body.gaId, token: `dev${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`.padEnd(24, "x"), created_at: now() };
+      links.push(l);
+      return { link: { token: l.token, createdAt: l.created_at } };
+    }
+    case "shareRevoke": {
+      const i = links.findIndex((x) => x.year === year && x.ga_id === body.gaId);
+      if (i >= 0) links.splice(i, 1);
+      return { ok: true };
+    }
+    case "shared": {
+      const l = links.find((x) => x.token === body.token) || err("link_not_found");
+      const ga = INIT_GAS.find((g) => g.id === l.ga_id);
+      return { list: toSharedList(rows.filter((r) => r.year === l.year && r.ga_id === l.ga_id), { members: INIT_MEMBERS, ga, year: l.year }) };
+    }
     default:
       return err("unknown_action");
   }

@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
-import { Plus, Download, FileUp } from "lucide-react";
+import { Plus, Download, FileUp, Link2 } from "lucide-react";
 import { fill } from "@/i18n/strings";
 import { guestsCsv } from "@/lib/trumpets";
 import { listGuests, createGuest, updateGuest, setAttended, deleteGuest } from "@/lib/trumpetsApi";
 import TrumpetGuestModal from "./TrumpetGuestModal";
 import TrumpetsSheetButton from "./TrumpetsSheetButton";
 import TrumpetsImportModal from "./TrumpetsImportModal";
+import TrumpetsShareModal from "./TrumpetsShareModal";
 import { downloadCsvFile } from "@/lib/csv";
 
 const byName = (a, b) => a.name.localeCompare(b.name, "pt");
 
 // The GA leader's own list: the only place guest names and phones appear (spec rev. 3). Add / edit / attendance /
-// delete, a full CSV for the leader, and the image for the WhatsApp group (motivos + names + who invited).
+// delete, a full CSV for the leader, the image for the WhatsApp group (motivos + names + who invited) and a shareable
+// link to a read-only page of names (TrumpetsShareModal, /trombetas/:token).
 // `myGas` are the leader's GAs; rows of any other GA (e.g. while an admin uses "Ver como") are filtered out.
 export default function TrumpetsLeaderList({ tt, year, myGas, gas, members, notify, reasonsText, onChanged }) {
   const [gaId, setGaId] = useState(myGas[0]?.id || "");
@@ -19,6 +21,7 @@ export default function TrumpetsLeaderList({ tt, year, myGas, gas, members, noti
   const [guests, setGuests] = useState(null);
   const [modal, setModal] = useState(null); // null | { guest?: Guest }
   const [importing, setImporting] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const fail = (e) => notify(tt.errors[e?.message] || tt.errors.generic);
 
   useEffect(() => {
@@ -93,6 +96,9 @@ export default function TrumpetsLeaderList({ tt, year, myGas, gas, members, noti
         <button className="btn btn-ghost" disabled={guests === null} onClick={() => setImporting(true)} style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <FileUp size={16} /> {tt.importCsv}
         </button>
+        <button className="btn btn-ghost" disabled={!ga} onClick={() => setSharing(true)} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <Link2 size={16} /> {tt.shareButton}
+        </button>
         <TrumpetsSheetButton tt={tt} label={tt.groupImage} className="btn btn-ghost" filename={`trombetas-${year}-${ga?.id}`}
           title={`${tt.title} ${year}`} subtitle={ga?.name} reasonsText={reasonsText}
           rows={inGa.map((g) => ({ name: g.name, by: memberName[g.invitedByMemberId] || "" }))} />
@@ -137,6 +143,8 @@ export default function TrumpetsLeaderList({ tt, year, myGas, gas, members, noti
           onClose={() => setImporting(false)}
         />
       )}
+
+      {sharing && ga && <TrumpetsShareModal tt={tt} year={year} ga={ga} onClose={() => setSharing(false)} />}
 
       {modal && (
         <TrumpetGuestModal

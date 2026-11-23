@@ -43,6 +43,7 @@ Uses React Router v6. `<BrowserRouter>` in `src/main.jsx`; full route tree in `s
 | `/portaria/:month?` (alias `/door-schedule`) | DoorPublicView — published door-duty month calendar (`YYYY-MM`); outside `PublicLayout` |
 | `/events/painel/:eventId?` (old links `/painel`, `/dashboard` redirect here) | PublicStatsView — numbers-only registration dashboard for the big screen (RPC `event_public_stats`, migration 041); outside `PublicLayout` |
 | `/frequencia` (alias `/attendance`) | CensusPublicView — service census: pick church + own name (RPC `census_member_search`), record today's service (RPC `census_save`, migration 045); outside `PublicLayout` |
+| `/trombetas/:token` (alias `/trumpets/:token`) | TrumpetsSharedView — a GA's Trombetas guest list from the leader's "Link para o grupo": names, who invited, who came (no phones or e-mails); `api/trumpet-guests.js` action `shared`, migration 057; outside `PublicLayout` |
 
 **PIN-gated routes** (wrapped in `AuthGate` → `HubShell`):
 
@@ -121,7 +122,7 @@ Pastors and Ungidos are automatically marked `exempt: true, fee: 0` at registrat
 
 ### Supabase Tables
 
-`churches`, `members`, `families`, `assistance_groups`, `events`, `registrations`, `rosters`, `teams`, `approvals`, `app_users`, `app_settings`, `audit_log`, `prayer_periods`, `schedule_oracao`, `door_workers`, `door_months`, `door_assignments`, `church_groups`, `church_group_members`, `service_census`, `service_groups`, `service_group_workers`, `service_group_schedule`, `member_contacts`, `contact_change_requests`, `trumpet_guests`, `trumpet_goals` (the last four are server-only on purpose: RLS on, no browser grants; see migrations 039, 051 and 054)
+`churches`, `members`, `families`, `assistance_groups`, `events`, `registrations`, `rosters`, `teams`, `approvals`, `app_users`, `app_settings`, `audit_log`, `prayer_periods`, `schedule_oracao`, `door_workers`, `door_months`, `door_assignments`, `church_groups`, `church_group_members`, `service_census`, `service_groups`, `service_group_workers`, `service_group_schedule`, `member_contacts`, `contact_change_requests`, `trumpet_guests`, `trumpet_goals`, `trumpet_editions`, `trumpet_share_links` (the last six are server-only on purpose: RLS on, no browser grants; see migrations 039, 051, 054 and 057)
 
 **Critical — new tables**: RLS must be **explicitly disabled** on every new table or all writes will silently fail with no error. Always add:
 

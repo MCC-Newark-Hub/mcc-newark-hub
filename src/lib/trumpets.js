@@ -182,3 +182,36 @@ export function buildSummary(rows = [], { gas = [], members = [], goals = [] }) 
   }).sort(byInvited);
   return { ...counts(rows), goal: goalOf(""), churches };
 }
+
+// ---- Shareable link to a GA's list (migration 057) -------------------------------------------------------------------
+// The token is random (api/trumpet-guests.js, 18 bytes in base64url = 24 characters).
+export const isShareToken = (t) => typeof t === "string" && /^[A-Za-z0-9_-]{20,64}$/.test(t);
+
+// What the public page gets: names, who invited each one and whether they came. Never phones, e-mails or notes.
+// rows: trumpet_guests rows (snake_case); members: [{ id, name }].
+export function toSharedList(rows, { members = [], ga, year }) {
+  const nameOf = new Map(members.map((m) => [m.id, m.name]));
+  const guests = (rows || [])
+    .map((r) => ({ name: r.name, invitedBy: (r.invited_by_member_id && nameOf.get(r.invited_by_member_id)) || "", attended: !!r.attended_at }))
+    .sort((a, b) => a.name.localeCompare(b.name, "pt", { sensitivity: "base" }));
+  return { year, ga: ga?.name || "", church: ga?.church || "", guests };
+}
+
+// The public list grouped by who invited: most guests first, then by name; guests without an inviter last.
+export function groupByInviter(guests) {
+  const map = new Map();
+  for (const g of guests || []) {
+    const k = g.invitedBy || "";
+    if (!map.has(k)) map.set(k, []);
+    map.get(k).push(g);
+  }
+  return [...map.entries()]
+    .map(([inviter, list]) => ({ inviter, guests: list }))
+    .sort((a, b) => (!a.inviter) - (!b.inviter) || b.guests.length - a.guests.length || a.inviter.localeCompare(b.inviter, "pt"));
+}
+
+// Search on the public list: by the guest's or the inviter's name, accents and case ignored.
+export const matchesShared = (g, query) => {
+  const q = foldText(query).trim();
+  return !q || foldText(g.name).includes(q) || foldText(g.invitedBy).includes(q);
+};
