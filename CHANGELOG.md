@@ -10,6 +10,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Secretaria › Inscrições: "🪪 Crachás CSV" button, next to the Igrejas filter. It exports the active registrations of the churches picked there (their own church by default) in the same Canva columns as the admin's export; the file name adds the church when it is the secretary's own. The CSV builder moved to `src/lib/badgeCsv.js`, shared with the admin's Inscrições.
 - Configurações › Usuários & PINs: select users (one by one, all, or "Selecionar inativas") and, in bulk, generate new PINs (shown once in a list, with a copy-message button per person) or delete the accounts. Deleting is audited per user and never removes your own account; `api/app-users` gets a `delete` action and `api/user-pin` accepts `userIds`.
 
 ### Added
