@@ -25,7 +25,7 @@ export const importGuests = async (year, guests) => {
   return { guests: r.guests || [], skipped: r.skipped || 0 };
 };
 export const updateGuest = async (id, input) => (await call({ action: "update", id, ...input })).guest;
-export const setAttended = async (id, attended) => (await call({ action: "attend", id, attended: !!attended })).guest;
+export const setStatus = async (id, status) => (await call({ action: "status", id, status })).guest;
 export const deleteGuest = async (id) => { await call({ action: "delete", id }); };
 export const listGoals = async (year) => (await call({ action: "goals", year })).goals || [];
 export const saveGoal = async (year, church, goal) => { await call({ action: "setGoal", year, church, goal }); };

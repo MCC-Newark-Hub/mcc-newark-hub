@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { listGuests, createGuest, setAttended, saveGoal, fetchSummary, getEdition, saveEdition } from "@/lib/trumpetsApi";
+import { listGuests, createGuest, setStatus, saveGoal, fetchSummary, getEdition, saveEdition } from "@/lib/trumpetsApi";
 
 // This Node + jsdom setup has no usable localStorage (see censusPublicView.test): no session here.
 beforeEach(() => vi.stubGlobal("localStorage", { getItem: () => null, setItem() {}, removeItem() {} }));
@@ -22,13 +22,13 @@ describe("trumpetsApi", () => {
     await expect(createGuest(2026, { gaId: "GA1", name: "X" })).rejects.toThrow("forbidden");
   });
 
-  it("sends attend and setGoal bodies", async () => {
-    const f = reply(200, { guest: { id: "g1", attendedAt: "t" }, ok: true });
+  it("sends status and setGoal bodies", async () => {
+    const f = reply(200, { guest: { id: "g1", status: "in_person" }, ok: true });
     vi.stubGlobal("fetch", f);
-    await setAttended("g1", true);
+    await setStatus("g1", "in_person");
     await saveGoal(2026, "", 80);
     expect(f.mock.calls.map(([, o]) => JSON.parse(o.body))).toEqual([
-      { action: "attend", id: "g1", attended: true },
+      { action: "status", id: "g1", status: "in_person" },
       { action: "setGoal", year: 2026, church: "", goal: 80 },
     ]);
   });

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Plus, Download, FileUp, Link2 } from "lucide-react";
 import { fill } from "@/i18n/strings";
-import { guestsCsv } from "@/lib/trumpets";
-import { listGuests, createGuest, updateGuest, setAttended, deleteGuest } from "@/lib/trumpetsApi";
+import { guestsCsv, GUEST_STATUSES, isAttendedStatus, statusCounts } from "@/lib/trumpets";
+import { listGuests, createGuest, updateGuest, setStatus, deleteGuest } from "@/lib/trumpetsApi";
 import TrumpetGuestModal from "./TrumpetGuestModal";
 import TrumpetsSheetButton from "./TrumpetsSheetButton";
 import TrumpetsImportModal from "./TrumpetsImportModal";
@@ -42,11 +42,12 @@ export default function TrumpetsLeaderList({ tt, year, myGas, gas, members, noti
   const replace = (g) => setGuests((prev) => (prev || []).map((x) => (x.id === g.id ? g : x)));
   const changed = () => onChanged?.();
 
-  const toggle = (g) => {
-    const next = !g.attendedAt;
-    replace({ ...g, attendedAt: next ? new Date().toISOString() : null });
-    setAttended(g.id, next).then((saved) => { replace(saved); changed(); }).catch(fail);
+  const pickStatus = (g, status) => {
+    if (status === g.status) return;
+    replace({ ...g, status, attendedAt: isAttendedStatus(status) ? g.attendedAt || new Date().toISOString() : null });
+    setStatus(g.id, status).then((saved) => { replace(saved); changed(); }).catch(fail);
   };
+  const split = statusCounts(inGa);
 
   const save = async (input) => {
     if (modal?.guest) {
@@ -69,7 +70,7 @@ export default function TrumpetsLeaderList({ tt, year, myGas, gas, members, noti
     deleteGuest(g.id).then(changed).catch(fail);
   };
 
-  const csvLabels = { name: tt.name, phone: tt.phone, email: tt.email, invitedBy: tt.invitedBy, ga: tt.ga, attended: tt.attended, yes: tt.yes, no: tt.no };
+  const csvLabels = { name: tt.name, phone: tt.phone, email: tt.email, invitedBy: tt.invitedBy, ga: tt.ga, status: tt.status, statuses: tt.statuses, attended: tt.attended, yes: tt.yes, no: tt.no };
 
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -77,7 +78,15 @@ export default function TrumpetsLeaderList({ tt, year, myGas, gas, members, noti
         .tf-row{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.3fr) minmax(0,1.5fr) auto;gap:12px;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px}
         .tf-row .tf-name{background:none;border:none;text-align:left;padding:0;cursor:pointer;color:var(--text);font:inherit;font-weight:700}
         .tf-row .tf-muted{color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .tf-toggle{width:28px;height:28px;accent-color:var(--ok)}
+        .tf-status{min-height:36px;padding:4px 8px;border-radius:99px;font-size:13px;font-weight:700;border:1px solid var(--border);background:var(--bg);color:var(--text);max-width:150px}
+        .tf-status.tf-st-confirmed{background:#dbeafe;color:#1e40af;border-color:transparent}
+        [data-theme="dark"] .tf-status.tf-st-confirmed{background:#0a2e4a;color:#7db8e8}
+        .tf-status.tf-st-in_person{background:var(--ok-bg);color:var(--ok-fg);border-color:transparent}
+        .tf-status.tf-st-zoom,.tf-status.tf-st-youtube{background:#fef3c7;color:#92400e;border-color:transparent}
+        [data-theme="dark"] .tf-status.tf-st-zoom,[data-theme="dark"] .tf-status.tf-st-youtube{background:#2e1e04;color:#fbbf24}
+        .tf-split{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:13px;color:var(--text-secondary)}
+        .tf-split b{color:var(--text)}
+        @media (max-width:640px){.tf-status{min-height:44px}}
         @media (max-width:640px){.tf-row{grid-template-columns:minmax(0,1fr) auto}.tf-row .tf-hide{display:none}}
       `}</style>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -107,6 +116,13 @@ export default function TrumpetsLeaderList({ tt, year, myGas, gas, members, noti
         </button>
       </div>
 
+      {!!inGa.length && (
+        <div className="tf-split" aria-live="polite">
+          <span><b>{inGa.length}</b> {tt.sharedGuests}</span>
+          {GUEST_STATUSES.map((st) => <span key={st}><b>{split[st]}</b> {tt.statusesPlural[st]}</span>)}
+        </div>
+      )}
+
       {guests === null ? (
         <div style={{ color: "var(--muted)" }}>{tt.loading}</div>
       ) : !rows.length ? (
@@ -121,7 +137,9 @@ export default function TrumpetsLeaderList({ tt, year, myGas, gas, members, noti
               </div>
               <div className="tf-muted tf-hide">{memberName[g.invitedByMemberId] || "—"}</div>
               <div className="tf-muted tf-hide" title={g.notes}>{g.notes}</div>
-              <input type="checkbox" className="tf-toggle" aria-label={`${tt.attended}: ${g.name}`} checked={!!g.attendedAt} onChange={() => toggle(g)} />
+              <select className={`tf-status tf-st-${g.status}`} aria-label={fill(tt.statusOf, { name: g.name })} value={g.status} onChange={(e) => pickStatus(g, e.target.value)}>
+                {GUEST_STATUSES.map((st) => <option key={st} value={st}>{tt.statuses[st]}</option>)}
+              </select>
             </div>
           ))}
         </div>

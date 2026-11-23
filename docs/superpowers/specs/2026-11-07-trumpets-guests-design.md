@@ -304,3 +304,19 @@ relaxes Revision 3 ("only the GA leader sees the list") for names only:
   Creating and turning off are audited (without the token).
 - Table `trumpet_share_links` (migration 057), server-only like 054; reads and writes go through
   `api/trumpet-guests.js` (`shareGet`, `shareCreate`, `shareRevoke`; `shared` is the public read).
+
+## Revision 7 (2026-11-22) — guest status; the group page opens A–Z
+
+Leonard, 2026-11-22:
+
+- The shared page opens **by name (A–Z)**; "Por quem convidou" is the second view.
+- Each guest has a **status** instead of present yes/no: **Convidado** (the start, pending), **Confirmado**,
+  **Presencial** (came to the church), **Zoom**, **YouTube**. The leader picks it on each row of their list.
+- **Presencial, Zoom and YouTube count as attended** in every number (tab, drill-down, panel, goal %). The panel adds
+  "N presencial · N online" under the attended number.
+- The shared page shows a status badge on each name (none while Convidado) and totals: guests, confirmed, in person,
+  online.
+- `trumpet_guests.status` (migration 058). `attended_at` stays the moment of the first join (kept when switching
+  between Presencial / Zoom / YouTube, cleared otherwise), so the existing counts keep reading it. API action
+  `status` (`attend` still accepted: in_person / invited).
+

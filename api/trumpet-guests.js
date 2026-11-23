@@ -8,7 +8,9 @@
 //   POST { action: "import",  year, guests: [{ gaId, name, phone, ... }] } → { guests, skipped }  all or nothing;
 //        rows already on file (same name + phone, guestKey) or repeated in the batch are skipped, not errors
 //   POST { action: "update",  id, gaId, name, ... }          → { guest }
-//   POST { action: "attend",  id, attended }                 → { guest }
+//   POST { action: "status",  id, status }                   → { guest }   invited | confirmed | in_person | zoom | youtube
+//        (migration 058); in_person / zoom / youtube set attended_at (kept when moving between them), others clear it
+//   POST { action: "attend",  id, attended }                 → { guest }   older form: in_person or invited
 //   POST { action: "delete",  id }                           → { ok: true }
 //   POST { action: "goals",   year }                         → { goals: [{ church, goal }] }
 //   POST { action: "setGoal", year, church, goal }           → { ok: true }   admin / pastor; goal 0 removes it
@@ -24,10 +26,10 @@
 
 import { randomBytes } from "node:crypto";
 import { restClient, currentUser } from "./_lib/auth.js";
-import { listGaIds, summaryGaIds, canManagePanel, toGuest, cleanGuestInput, buildStats, buildSummary, guestKey, IMPORT_MAX, isShareToken, toSharedList } from "../src/lib/trumpets.js";
+import { listGaIds, summaryGaIds, canManagePanel, toGuest, cleanGuestInput, buildStats, buildSummary, guestKey, IMPORT_MAX, isShareToken, toSharedList, isGuestStatus, isAttendedStatus, statusOf } from "../src/lib/trumpets.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const COLS = "id,year,church,ga_id,name,phone,email,invited_by_member_id,attended_at,notes,created_at,updated_at";
+const COLS = "id,year,church,ga_id,name,phone,email,invited_by_member_id,attended_at,status,notes,created_at,updated_at";
 const PAGE = 1000;
 const yearOf = (v) => {
   const y = Number(v);
@@ -73,7 +75,7 @@ export default async function handler(req, res) {
       if (!link) return fail(404, "link_not_found");
       const ga = await rest(`assistance_groups?id=eq.${encodeURIComponent(link.ga_id)}&select=id,name,church`);
       if (!ga.ok) throw new Error(`gas_read_failed:${ga.status}`);
-      const rows = await fetchAll(rest, `trumpet_guests?year=eq.${link.year}&ga_id=eq.${encodeURIComponent(link.ga_id)}&select=name,invited_by_member_id,attended_at&order=name,id`);
+      const rows = await fetchAll(rest, `trumpet_guests?year=eq.${link.year}&ga_id=eq.${encodeURIComponent(link.ga_id)}&select=name,invited_by_member_id,attended_at,status&order=name,id`);
       const inviterIds = [...new Set(rows.map((r) => r.invited_by_member_id).filter(Boolean))];
       const members = inviterIds.length ? await fetchAll(rest, `members?id=in.(${inviterIds.join(",")})&select=id,name&order=id`) : [];
       return res.status(200).json({ list: toSharedList(rows, { members, ga: ga.data?.[0], year: link.year }) });
@@ -191,17 +193,21 @@ export default async function handler(req, res) {
       return res.status(200).json({ guest: toGuest(r.data[0]) });
     }
 
-    if (body.action === "attend") {
+    if (body.action === "status" || body.action === "attend") {
+      const status = body.action === "attend" ? (body.attended ? "in_person" : "invited") : body.status;
+      if (!isGuestStatus(status)) return fail(400, "invalid_status");
       const own = await loadOwned(body.id);
       if (own.error) return fail(...own.error);
       const now = new Date().toISOString();
+      const wasAttended = isAttendedStatus(statusOf(own.row)) && own.row.attended_at;
+      const attendedAt = isAttendedStatus(status) ? (wasAttended ? own.row.attended_at : now) : null;
       const r = await rest(`trumpet_guests?id=eq.${own.row.id}&select=${COLS}`, {
         method: "PATCH",
-        body: { attended_at: body.attended ? now : null, updated_at: now, updated_by: by },
+        body: { status, attended_at: attendedAt, updated_at: now, updated_by: by },
         prefer: "return=representation",
       });
       if (!r.ok || !r.data?.[0]) return fail(404, "not_found");
-      await audit(body.attended ? "trumpet_guest_attended" : "trumpet_guest_unattended", own.row.id, own.row.ga_id);
+      await audit("trumpet_guest_status", own.row.id, own.row.ga_id, { from: statusOf(own.row), to: status });
       return res.status(200).json({ guest: toGuest(r.data[0]) });
     }
 
@@ -297,7 +303,7 @@ export default async function handler(req, res) {
       if (!canManagePanel(roles)) return fail(403, "forbidden");
       const year = yearOf(body.year);
       if (!year) return fail(400, "invalid_year");
-      const rows = await fetchAll(rest, `trumpet_guests?year=in.(${year},${year - 1})&select=year,church,ga_id,invited_by_member_id,attended_at,created_at&order=created_at,id`);
+      const rows = await fetchAll(rest, `trumpet_guests?year=in.(${year},${year - 1})&select=year,church,ga_id,invited_by_member_id,attended_at,status,created_at&order=created_at,id`);
       const inviterIds = [...new Set(rows.filter((r) => r.year === year).map((r) => r.invited_by_member_id).filter(Boolean))];
       const members = inviterIds.length ? await fetchAll(rest, `members?id=in.(${inviterIds.join(",")})&select=id,name&order=id`) : [];
       const gr = await rest(`trumpet_goals?year=eq.${year}&select=church,goal`);

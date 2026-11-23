@@ -11,7 +11,7 @@ const api = vi.hoisted(() => ({
   createGuest: vi.fn(),
   importGuests: vi.fn(),
   updateGuest: vi.fn(),
-  setAttended: vi.fn(),
+  setStatus: vi.fn(),
   deleteGuest: vi.fn(),
   listGoals: vi.fn(async () => []),
   saveGoal: vi.fn(async () => {}),
@@ -109,13 +109,17 @@ describe("Trombetas e Festas tab", () => {
     expect(api.listGuests).not.toHaveBeenCalled();
   });
 
-  it("GA leader toggles attendance optimistically", async () => {
-    api.setAttended.mockResolvedValue({ ...rita, attendedAt: "t" });
+  it("GA leader picks a guest's status optimistically; the counts above the list follow", async () => {
+    api.setStatus.mockResolvedValue({ ...rita, status: "zoom", attendedAt: "t" });
     renderAs({ name: "GA", sysRoles: ["ga_leader"], gaIds: ["GA1"] });
     await screen.findByText("Rita");
-    fireEvent.click(screen.getByLabelText("Presente: Rita"));
-    expect(screen.getByLabelText("Presente: Rita").checked).toBe(true);
-    await waitFor(() => expect(api.setAttended).toHaveBeenCalledWith("g1", true));
+    const pick = screen.getByLabelText("Situação de Rita");
+    expect(pick.value).toBe("invited");
+    expect([...pick.options].map((o) => o.textContent)).toEqual(["Convidado", "Confirmado", "Presencial", "Zoom", "YouTube"]);
+    fireEvent.change(pick, { target: { value: "zoom" } });
+    expect(screen.getByLabelText("Situação de Rita").value).toBe("zoom");
+    await waitFor(() => expect(api.setStatus).toHaveBeenCalledWith("g1", "zoom"));
+    expect(screen.getByText("Zoom", { selector: ".tf-split span" }).textContent).toBe("1 Zoom");
   });
 
   it("GA leader adds a guest: phone is optional but checked when typed, the modal keeps the values on error", async () => {
