@@ -41,6 +41,24 @@ export function summaryGaIds(profile, gas = []) {
   return gas.map((g) => g.id).filter((id) => ids.has(id));
 }
 
+// ---- Guest status (migration 058) ------------------------------------------------------------------------------------
+// invited (the start) → confirmed → in_person / zoom / youtube. The last three count as attended (attended_at is set).
+export const GUEST_STATUSES = ["invited", "confirmed", "in_person", "zoom", "youtube"];
+const ATTENDED = new Set(["in_person", "zoom", "youtube"]);
+const ONLINE = new Set(["zoom", "youtube"]);
+export const isAttendedStatus = (s) => ATTENDED.has(s);
+export const isOnlineStatus = (s) => ONLINE.has(s);
+export const isGuestStatus = (s) => GUEST_STATUSES.includes(s);
+// A row (snake_case) or a guest (camelCase); rows saved before 058 have no status: present → in_person.
+export const statusOf = (r) => (isGuestStatus(r?.status) ? r.status : r?.attended_at || r?.attendedAt ? "in_person" : "invited");
+
+// How many guests in each status, plus the attended split (in person vs online).
+export function statusCounts(rows = []) {
+  const by = Object.fromEntries(GUEST_STATUSES.map((s) => [s, 0]));
+  for (const r of rows) by[statusOf(r)] += 1;
+  return { ...by, online: by.zoom + by.youtube, attended: by.in_person + by.zoom + by.youtube };
+}
+
 export function toGuest(r) {
   return {
     id: r.id,
@@ -52,6 +70,7 @@ export function toGuest(r) {
     email: r.email || "",
     invitedByMemberId: r.invited_by_member_id || null,
     attendedAt: r.attended_at || null,
+    status: statusOf(r),
     notes: r.notes || "",
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -98,8 +117,8 @@ const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 export function guestsCsv(guests = [], { gas = [], members = [], labels }) {
   const gaName = Object.fromEntries(gas.map((g) => [g.id, g.name]));
   const memberName = Object.fromEntries(members.map((m) => [m.id, m.name]));
-  const head = [labels.name, labels.phone, labels.email, labels.invitedBy, labels.ga, labels.attended];
-  const lines = guests.map((g) => [g.name, g.phone, g.email, memberName[g.invitedByMemberId] || "", gaName[g.gaId] || g.gaId, g.attendedAt ? labels.yes : labels.no]);
+  const head = [labels.name, labels.phone, labels.email, labels.invitedBy, labels.ga, labels.status, labels.attended];
+  const lines = guests.map((g) => [g.name, g.phone, g.email, memberName[g.invitedByMemberId] || "", gaName[g.gaId] || g.gaId, labels.statuses?.[statusOf(g)] || statusOf(g), isAttendedStatus(statusOf(g)) ? labels.yes : labels.no]);
   return [head, ...lines].map((cols) => cols.map(q).join(",")).join("\n");
 }
 
@@ -137,10 +156,14 @@ export function buildStats(rows = [], { year, gas = [], members = [], goals = []
     const d = dayOf(r.created_at);
     counts[d] = (counts[d] || 0) + 1;
   }
+  const split = statusCounts(cur);
   return {
     year,
     invited: cur.length,
     attended,
+    confirmed: split.confirmed,
+    inPerson: split.in_person,
+    online: split.online,
     pct: pctOf(attended, cur.length),
     goal: goalOf(""),
     prev: { invited: prev.length, attended: prev.filter((r) => r.attended_at).length },
@@ -187,12 +210,12 @@ export function buildSummary(rows = [], { gas = [], members = [], goals = [] }) 
 // The token is random (api/trumpet-guests.js, 18 bytes in base64url = 24 characters).
 export const isShareToken = (t) => typeof t === "string" && /^[A-Za-z0-9_-]{20,64}$/.test(t);
 
-// What the public page gets: names, who invited each one and whether they came. Never phones, e-mails or notes.
+// What the public page gets: names, who invited each one and their status. Never phones, e-mails or notes.
 // rows: trumpet_guests rows (snake_case); members: [{ id, name }].
 export function toSharedList(rows, { members = [], ga, year }) {
   const nameOf = new Map(members.map((m) => [m.id, m.name]));
   const guests = (rows || [])
-    .map((r) => ({ name: r.name, invitedBy: (r.invited_by_member_id && nameOf.get(r.invited_by_member_id)) || "", attended: !!r.attended_at }))
+    .map((r) => ({ name: r.name, invitedBy: (r.invited_by_member_id && nameOf.get(r.invited_by_member_id)) || "", status: statusOf(r), attended: isAttendedStatus(statusOf(r)) }))
     .sort((a, b) => a.name.localeCompare(b.name, "pt", { sensitivity: "base" }));
   return { year, ga: ga?.name || "", church: ga?.church || "", guests };
 }

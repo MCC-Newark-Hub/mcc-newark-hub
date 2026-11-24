@@ -7,7 +7,12 @@ describe("dev store", () => {
     const ga = INIT_GAS[0].id;
     const { guest } = devTrumpets({ action: "create", year: 2026, gaId: ga, name: "Teste", phone: "9735550101" });
     expect(devTrumpets({ action: "list", year: 2026 }).guests.map((g) => g.name)).toContain("Teste");
-    expect(devTrumpets({ action: "attend", id: guest.id, attended: true }).guest.attendedAt).toBeTruthy();
+    expect(guest.status).toBe("invited");
+    const zoom = devTrumpets({ action: "status", id: guest.id, status: "zoom" }).guest;
+    expect(zoom).toMatchObject({ status: "zoom" });
+    expect(zoom.attendedAt).toBeTruthy();
+    expect(devTrumpets({ action: "status", id: guest.id, status: "confirmed" }).guest.attendedAt).toBeNull();
+    devTrumpets({ action: "status", id: guest.id, status: "in_person" });
     expect(devTrumpets({ action: "stats", year: 2026 }).stats.attended).toBeGreaterThan(0);
   });
 

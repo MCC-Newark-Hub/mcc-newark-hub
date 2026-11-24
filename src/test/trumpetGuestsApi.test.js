@@ -362,7 +362,7 @@ describe("/api/trumpet-guests shareable link (migration 057)", () => {
     const res = { statusCode: 0, body: null, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; } };
     await handler({ method: "POST", body: { action: "shared", token: TOKEN }, headers: {} }, res);
     expect(res.statusCode).toBe(200);
-    expect(res.body.list).toEqual({ year: 2026, ga: "GA Central", church: "Newark, NJ - EUA", guests: [{ name: "Rita", invitedBy: "Ana", attended: true }] });
+    expect(res.body.list).toEqual({ year: 2026, ga: "GA Central", church: "Newark, NJ - EUA", guests: [{ name: "Rita", invitedBy: "Ana", status: "in_person", attended: true }] });
     expect(JSON.stringify(res.body)).not.toMatch(/9735550101|r@x\.com|secret/);
     expect(calls.some((c) => c.path.startsWith("app_users"))).toBe(false);
   });
@@ -397,5 +397,35 @@ describe("/api/trumpet-guests shareable link (migration 057)", () => {
     expect(calls.some((c) => c.method === "DELETE" && c.path.startsWith("trumpet_share_links?year=eq.2026&ga_id=eq.GA1"))).toBe(true);
     expect(auditOf(calls).map((a) => a.action)).toEqual(["trumpet_share_link_created", "trumpet_share_link_revoked"]);
     expect(JSON.stringify(auditOf(calls))).not.toContain(created.body.link.token);
+  });
+});
+
+describe("/api/trumpet-guests guest status (migration 058)", () => {
+  const patchOf = (calls) => calls.find((c) => c.method === "PATCH" && c.path.startsWith("trumpet_guests?")).body;
+
+  it("sets the status; joining (in person / Zoom / YouTube) stamps attended_at, other statuses clear it", async () => {
+    let calls = fakeDb();
+    const zoom = await call({ action: "status", id: G1.id, status: "zoom" }, 2);
+    expect(zoom.statusCode).toBe(200);
+    expect(patchOf(calls)).toMatchObject({ status: "zoom", updated_by: "Líder" });
+    expect(patchOf(calls).attended_at).toEqual(expect.any(String));
+    expect(auditOf(calls)[0]).toMatchObject({ action: "trumpet_guest_status", details: { from: "invited", to: "zoom" } });
+
+    calls = fakeDb({ guests: [{ ...G1, status: "in_person", attended_at: "2026-11-20T00:00:00Z" }] });
+    await call({ action: "status", id: G1.id, status: "youtube" }, 2);
+    expect(patchOf(calls)).toMatchObject({ status: "youtube", attended_at: "2026-11-20T00:00:00Z" }); // first join kept
+
+    calls = fakeDb({ guests: [{ ...G1, status: "in_person", attended_at: "t" }] });
+    await call({ action: "status", id: G1.id, status: "confirmed" }, 2);
+    expect(patchOf(calls)).toMatchObject({ status: "confirmed", attended_at: null });
+  });
+
+  it("rejects an unknown status and another GA's guest; the older attend form still works", async () => {
+    fakeDb();
+    expect((await call({ action: "status", id: G1.id, status: "maybe" }, 2)).body.error).toBe("invalid_status");
+    expect((await call({ action: "status", id: G2.id, status: "zoom" }, 2)).statusCode).toBe(403);
+    const calls = fakeDb();
+    await call({ action: "attend", id: G1.id, attended: true }, 2);
+    expect(patchOf(calls)).toMatchObject({ status: "in_person" });
   });
 });

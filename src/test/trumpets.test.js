@@ -3,7 +3,7 @@ import {
   cityOf, profileOf, listGaIds, summaryGaIds, buildSummary, canManagePanel, toGuest, cleanGuestInput,
   totalsByGa, sumTotals, guestsCsv, dayOf, buildStats,
 } from "@/lib/trumpets";
-import { isShareToken, toSharedList, groupByInviter, matchesShared } from "@/lib/trumpets";
+import { isShareToken, toSharedList, groupByInviter, matchesShared, statusOf, statusCounts } from "@/lib/trumpets";
 
 const GAS = [
   { id: "GA1", name: "GA Central", church: "Newark, NJ - EUA" },
@@ -85,12 +85,16 @@ describe("totals", () => {
 describe("guestsCsv", () => {
   it("escapes commas, quotes and keeps accents", () => {
     const csv = guestsCsv(
-      [{ name: 'João "Jota", Jr', phone: "1", email: "", invitedByMemberId: "M1", gaId: "GA1", attendedAt: "x" }],
-      { gas: GAS, members: [{ id: "M1", name: "Ana" }], labels: { name: "Nome", phone: "Telefone", email: "E-mail", invitedBy: "Convidado por", ga: "GA", attended: "Presente", yes: "Sim", no: "Não" } },
+      [
+        { name: 'João "Jota", Jr', phone: "1", email: "", invitedByMemberId: "M1", gaId: "GA1", attendedAt: "x", status: "youtube" },
+        { name: "Bia", phone: "", email: "", invitedByMemberId: null, gaId: "GA1", attendedAt: null, status: "confirmed" },
+      ],
+      { gas: GAS, members: [{ id: "M1", name: "Ana" }], labels: { name: "Nome", phone: "Telefone", email: "E-mail", invitedBy: "Convidado por", ga: "GA", status: "Situação", statuses: { youtube: "YouTube", confirmed: "Confirmado" }, attended: "Presente", yes: "Sim", no: "Não" } },
     );
     expect(csv.split("\n")).toEqual([
-      '"Nome","Telefone","E-mail","Convidado por","GA","Presente"',
-      '"João ""Jota"", Jr","1","","Ana","GA Central","Sim"',
+      '"Nome","Telefone","E-mail","Convidado por","GA","Situação","Presente"',
+      '"João ""Jota"", Jr","1","","Ana","GA Central","YouTube","Sim"',
+      '"Bia","","","","GA Central","Confirmado","Não"',
     ]);
   });
 });
@@ -98,7 +102,7 @@ describe("guestsCsv", () => {
 describe("toGuest", () => {
   it("maps snake_case to camelCase", () => {
     expect(toGuest({ id: "u1", year: 2026, church: "N", ga_id: "GA1", name: "R", phone: null, email: null, invited_by_member_id: null, attended_at: null, notes: null, created_at: "c", updated_at: "u" }))
-      .toEqual({ id: "u1", year: 2026, church: "N", gaId: "GA1", name: "R", phone: "", email: "", invitedByMemberId: null, attendedAt: null, notes: "", createdAt: "c", updatedAt: "u" });
+      .toEqual({ id: "u1", year: 2026, church: "N", gaId: "GA1", name: "R", phone: "", email: "", invitedByMemberId: null, attendedAt: null, status: "invited", notes: "", createdAt: "c", updatedAt: "u" });
   });
 });
 
@@ -173,7 +177,7 @@ describe("shared list (public link)", () => {
     ];
     expect(toSharedList(rows, { members: [{ id: "M1", name: "Tatiana" }], ga: { name: "Newark 1", church: "Newark, NJ" }, year: 2026 })).toEqual({
       year: 2026, ga: "Newark 1", church: "Newark, NJ",
-      guests: [{ name: "ana", invitedBy: "", attended: false }, { name: "Zé", invitedBy: "Tatiana", attended: true }],
+      guests: [{ name: "ana", invitedBy: "", status: "invited", attended: false }, { name: "Zé", invitedBy: "Tatiana", status: "in_person", attended: true }],
     });
   });
 
@@ -185,5 +189,28 @@ describe("shared list (public link)", () => {
     expect(groupByInviter(guests).map((g) => [g.inviter, g.guests.length])).toEqual([["Tatiana", 2], ["Afonso", 1], ["Cleia", 1], ["", 1]]);
     expect(guests.filter((g) => matchesShared(g, "tatiána")).map((g) => g.name)).toEqual(["C", "D"]);
     expect(guests.filter((g) => matchesShared(g, "  ")).length).toBe(5);
+  });
+});
+
+describe("guest status", () => {
+  it("reads the status, and rows saved before it existed (present → in person)", () => {
+    expect(statusOf({ status: "zoom" })).toBe("zoom");
+    expect(statusOf({ attended_at: "t" })).toBe("in_person");
+    expect(statusOf({ attendedAt: null })).toBe("invited");
+    expect(statusOf({ status: "nope", attended_at: null })).toBe("invited");
+  });
+
+  it("counts each status and the attended split", () => {
+    const rows = ["invited", "confirmed", "confirmed", "in_person", "zoom", "youtube", "youtube"].map((status) => ({ status }));
+    expect(statusCounts(rows)).toEqual({ invited: 1, confirmed: 2, in_person: 1, zoom: 1, youtube: 2, online: 3, attended: 4 });
+  });
+
+  it("the panel stats split attended into in person and online", () => {
+    const rows = [
+      { year: 2026, church: "N", ga_id: "GA1", status: "in_person", attended_at: "t", created_at: "2026-11-05T15:00:00Z" },
+      { year: 2026, church: "N", ga_id: "GA1", status: "youtube", attended_at: "t", created_at: "2026-11-05T15:00:00Z" },
+      { year: 2026, church: "N", ga_id: "GA1", status: "confirmed", attended_at: null, created_at: "2026-11-05T15:00:00Z" },
+    ];
+    expect(buildStats(rows, { year: 2026, today: "2026-11-22" })).toMatchObject({ invited: 3, attended: 2, confirmed: 1, inPerson: 1, online: 1 });
   });
 });

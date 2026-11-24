@@ -1,7 +1,7 @@
 // `npm run dev` has no serverless functions: an in-memory stand-in for api/trumpet-guests.js,
 // seeded from the dev directory. No scope checks (the tab already filters by scope). Dev only.
 import { INIT_GAS, INIT_MEMBERS } from "@/dev/seeds";
-import { toGuest, cleanGuestInput, buildStats, buildSummary, guestKey, toSharedList } from "@/lib/trumpets";
+import { toGuest, cleanGuestInput, buildStats, buildSummary, guestKey, toSharedList, isGuestStatus, isAttendedStatus } from "@/lib/trumpets";
 
 const rows = [];
 const goals = [];
@@ -21,7 +21,7 @@ export function devTrumpets(body) {
     case "create": {
       const { error, fields } = cleanGuestInput(body);
       if (error) err(error);
-      const row = { ...fields, id: `dev-${++seq}`, year, church: churchOf(fields.ga_id), attended_at: null, created_at: now(), updated_at: now() };
+      const row = { ...fields, id: `dev-${++seq}`, year, church: churchOf(fields.ga_id), attended_at: null, status: "invited", created_at: now(), updated_at: now() };
       rows.push(row);
       return { guest: toGuest(row) };
     }
@@ -33,7 +33,7 @@ export function devTrumpets(body) {
       });
       const keys = new Set(rows.filter((r) => r.year === year).map((r) => guestKey(r.name, r.phone)));
       const fresh = cleaned.filter((f) => !keys.has(guestKey(f.name, f.phone)) && keys.add(guestKey(f.name, f.phone)));
-      const added = fresh.map((f) => ({ ...f, id: `dev-${++seq}`, year, church: churchOf(f.ga_id), attended_at: null, created_at: now(), updated_at: now() }));
+      const added = fresh.map((f) => ({ ...f, id: `dev-${++seq}`, year, church: churchOf(f.ga_id), attended_at: null, status: "invited", created_at: now(), updated_at: now() }));
       rows.push(...added);
       return { guests: added.map(toGuest), skipped: cleaned.length - fresh.length };
     }
@@ -44,9 +44,11 @@ export function devTrumpets(body) {
       Object.assign(row, fields, { church: churchOf(fields.ga_id), updated_at: now() });
       return { guest: toGuest(row) };
     }
-    case "attend": {
+    case "status": {
       const row = find(body.id);
-      row.attended_at = body.attended ? now() : null;
+      if (!isGuestStatus(body.status)) err("invalid_status");
+      row.attended_at = isAttendedStatus(body.status) ? row.attended_at || now() : null;
+      row.status = body.status;
       return { guest: toGuest(row) };
     }
     case "delete":

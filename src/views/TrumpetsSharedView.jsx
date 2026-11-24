@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Search, Check } from "lucide-react";
+import { Search } from "lucide-react";
 import ICMLogo from "@/components/ICMLogo";
 import { STRINGS, fill } from "@/i18n/strings";
 import { fetchSharedList } from "@/lib/trumpetsApi";
-import { groupByInviter, matchesShared } from "@/lib/trumpets";
+import { groupByInviter, matchesShared, statusCounts } from "@/lib/trumpets";
 
 const REFRESH_MS = 60000;
 const VIEW_KEY = "mcc_tf_shared_view";
-const readView = () => { try { return localStorage.getItem(VIEW_KEY) === "guest" ? "guest" : "inviter"; } catch { return "inviter"; } };
+const readView = () => { try { return localStorage.getItem(VIEW_KEY) === "inviter" ? "inviter" : "guest"; } catch { return "guest"; } };
 const writeView = (v) => { try { localStorage.setItem(VIEW_KEY, v); } catch { /* private mode */ } };
 
 const CSS = `
@@ -35,13 +35,18 @@ const CSS = `
 .tsv-list li:last-child{border-bottom:0}
 .tsv-name{font-weight:600;min-width:0;overflow-wrap:anywhere}
 .tsv-by{font-size:13px;color:var(--text-secondary);font-weight:400;display:block;margin-top:2px}
-.tsv-came{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;font-size:12px;font-weight:700;padding:3px 8px;border-radius:99px;background:var(--ok-bg,#e8f5ec);color:var(--ok-fg,#1f6b3a)}
+.tsv-st{display:inline-flex;align-items:center;flex-shrink:0;font-size:12px;font-weight:700;padding:3px 9px;border-radius:99px}
+.tsv-st.confirmed{background:#dbeafe;color:#1e40af}
+.tsv-st.in_person{background:var(--ok-bg);color:var(--ok-fg)}
+.tsv-st.zoom,.tsv-st.youtube{background:#fef3c7;color:#92400e}
+[data-theme="dark"] .tsv-st.confirmed{background:#0a2e4a;color:#7db8e8}
+[data-theme="dark"] .tsv-st.zoom,[data-theme="dark"] .tsv-st.youtube{background:#2e1e04;color:#fbbf24}
 .tsv-note{text-align:center;color:var(--muted);font-size:14px;padding:28px 0}
 .tsv-foot{text-align:center;font-size:12px;color:var(--muted);margin-top:16px}
 `;
 
 // Public page of a GA's shareable link (/trombetas/:token, migration 057): the guest names, who invited each one and
-// who came — never phones or e-mails. Grouped by inviter (default) or A–Z, with a search. Refreshes every minute and
+// their status — never phones or e-mails. A–Z (default) or grouped by inviter, with a search. Refreshes every minute and
 // when the phone wakes up. Outside PublicLayout, so it stays open in maintenance mode.
 export default function TrumpetsSharedView({ lang, setLang }) {
   const { token } = useParams();
@@ -71,11 +76,11 @@ export default function TrumpetsSharedView({ lang, setLang }) {
   const pickView = (v) => { setView(v); writeView(v); };
   const list = state.list;
   const shown = list ? list.guests.filter((g) => matchesShared(g, query)) : [];
-  const came = list ? list.guests.filter((g) => g.attended).length : 0;
+  const split = statusCounts(list?.guests || []);
   const nameRow = (g, withBy) => (
     <li key={`${g.name}|${g.invitedBy}`}>
       <span className="tsv-name">{g.name}{withBy && <span className="tsv-by">{g.invitedBy ? fill(tt.sharedInvitedBy, { name: g.invitedBy }) : tt.sharedNoInviter}</span>}</span>
-      {g.attended && <span className="tsv-came"><Check size={12} aria-hidden="true" /> {tt.sharedCame}</span>}
+      {g.status && g.status !== "invited" && <span className={`tsv-st ${g.status}`}>{tt.statuses[g.status]}</span>}
     </li>
   );
 
@@ -103,7 +108,9 @@ export default function TrumpetsSharedView({ lang, setLang }) {
           <>
             <div className="tsv-stats">
               <div className="tsv-stat"><b>{list.guests.length}</b>{tt.sharedGuests}</div>
-              <div className="tsv-stat"><b>{came}</b>{tt.sharedCameCount}</div>
+              <div className="tsv-stat"><b>{split.confirmed}</b>{tt.statusesPlural.confirmed}</div>
+              <div className="tsv-stat"><b>{split.in_person}</b>{tt.statusesPlural.in_person}</div>
+              <div className="tsv-stat"><b>{split.online}</b>{tt.sharedOnline}</div>
             </div>
 
             <div className="tsv-tools">
@@ -112,8 +119,8 @@ export default function TrumpetsSharedView({ lang, setLang }) {
                 <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tt.sharedSearchShort} aria-label={tt.sharedSearch} />
               </div>
               <div className="tsv-seg" role="group" aria-label={tt.sharedViewLabel}>
-                <button type="button" aria-pressed={view === "inviter"} onClick={() => pickView("inviter")}>{tt.sharedByInviter}</button>
                 <button type="button" aria-pressed={view === "guest"} onClick={() => pickView("guest")}>{tt.sharedByName}</button>
+                <button type="button" aria-pressed={view === "inviter"} onClick={() => pickView("inviter")}>{tt.sharedByInviter}</button>
               </div>
             </div>
 

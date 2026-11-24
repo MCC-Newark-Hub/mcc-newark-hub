@@ -134,6 +134,7 @@ export default function TrumpetsPanelView({ lang = "pt" }) {
                 <div className="tp-tiles">
                   <div className="tp-tile">
                     <b>{d.attended}</b><span>{tt.present}</span>
+                    {d.attended > 0 && <small data-testid="tf-split">{fill(tp.split, { inPerson: d.inPerson ?? d.attended, online: d.online ?? 0 })}</small>}
                   </div>
                   <div className="tp-tile">
                     <b>{d.pct}%</b><span>{tt.rate}</span>
